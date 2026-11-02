@@ -21,6 +21,16 @@
 - Deuda que piden los documentos y queda diferida: `/metrics`, Loki, alertas, `POST /api/v1/errores`, SonarCloud, SBOM CycloneDX, Trivy/Dockle/Cosign, RESTler/ZAP, Pact, caos con Toxiproxy/k6, quality gate GO/STOP, cola de tareas, servicio de ML, WebSocket, Terraform/AWS.
 - A evitar: guardar en memoria del proceso cualquier estado de seguridad; usar los nombres de llaves anteriores.
 
+## Ejecución nv-00 (2026-11-02)
+- Estado: T1 ejecutada. Creados `go.mod` (módulo `github.com/WhereverApp2026/wherever-backend`, `go 1.22`), `Makefile`, `.golangci.yml` (v2), `.gitignore`, `configs/.env.example`, `internal/platform/config/config_example_test.go` (3/3 verdes) y `scripts/critic-guardrails.sh` (PASS). Spec en Borrador con evidencia, sin firma.
+- Decisión: ruta del módulo = `github.com/WhereverApp2026/wherever-backend`. Porqué: GitHub informó que el repositorio se movió de `Wherever-M-vil-2026` a `wherever-backend`; se cambiaron módulo y remoto antes de que nv-01 agregue imports internos.
+- Decisión: `go 1.22` en `go.mod` aunque la máquina local tenga Go 1.27. Porqué: el stack pide 1.22+ y no hay que obligar al equipo ni a CI a la última versión.
+- Decisión: `critic-guardrails.sh` nace en `nv-00` con B1/B2 activos y B3/B4 en `SKIP` mientras no haya `cmd/api/main.go` ni rutas; si aparecen sin que `nv-01` implemente la verificación, falla. Porqué: el criterio de `nv-00` exige critic PASS y no se vale un verde falso.
+- Decisión: B2 busca el valor del token como argumento (quita los literales y busca el identificador) o como atributo de `slog`; un mensaje que solo dice "token inválido" pasa. Porqué: lo prohibido es filtrar el token, no nombrarlo.
+- A evitar: golangci-lint < v2.15 con Go 1.27 falla con "export data version 4"; el `Makefile` lo fija con `go run ...@v2.15.0`.
+- A evitar: gosec G304 con rutas armadas con `filepath.Join` en tests; usar constante.
+- Pendiente: `scripts/check_coverage.sh` (nv-03), `govulncheck` y Semgrep en `ci-pr.yml` (nv-01). `make` no está instalado en esta máquina Windows; los comandos del `Makefile` se corrieron a mano.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

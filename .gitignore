@@ -1,0 +1,19 @@
+# Secretos locales
+.env
+.env.*
+!configs/.env.example
+
+# Binarios y artefactos
+bin/
+*.exe
+*.test
+*.out
+coverage*.txt
+coverage*.html
+
+# Editores y sistema
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
