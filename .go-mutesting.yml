@@ -1,0 +1,9 @@
+# Mutación enfocada (nv-03, advisory). La corre scripts/mutation.sh solo sobre los
+# archivos cambiados; nunca sobre todo el repo en un PR.
+skip_without_test: true
+skip_with_build_tags: true
+json_output: false
+html_output: false
+silent_mode: false
+exclude_dirs:
+  - internal/testutil

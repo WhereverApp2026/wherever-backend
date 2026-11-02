@@ -10,6 +10,9 @@ bin/
 *.out
 coverage*.txt
 coverage*.html
+# Salidas de go-mutesting (scripts/mutation.sh)
+report.json
+go-mutesting-report.html
 
 # Editores y sistema
 .idea/

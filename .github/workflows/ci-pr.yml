@@ -1,6 +1,8 @@
-# CI de PR (constitución §8). Orden acotado a nv-01:
-#   deps → build → unit → integration → security → critic → endpoints → sdd → semgrep
-# database, contract, coverage, delta-check y mutation se suman con nv-03 y el primer módulo.
+# CI de PR (constitución §8). Orden vigente:
+#   deps → build → unit → integration → security → critic → endpoints → sdd
+#   → coverage → delta-check → mutation → semgrep
+# database y contract se suman con el primer módulo que tenga índices y contrato.
+# delta-check y mutation son advisory (nv-03): informan y nunca bloquean.
 # Sin deploy.
 name: ci-pr
 
@@ -24,6 +26,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # delta-check y mutation necesitan la historia para `git merge-base`.
+          fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -45,14 +50,21 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
+      # Cada suite deja su perfil; coverage los une (constitución §7).
       - name: unit
-        run: go test ./internal/... ./cmd/... -count=1
+        run: mkdir -p bin && go test ./internal/... ./cmd/... -count=1 $COVER -coverprofile=bin/coverage-unit.out
+        env:
+          COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: integration
-        run: go test ./tests/integration/... -count=1 -p 1
+        run: go test ./tests/integration/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-integration.out
+        env:
+          COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: security
-        run: go test ./tests/security/... -count=1
+        run: go test ./tests/security/... -count=1 $COVER -coverprofile=bin/coverage-security.out
+        env:
+          COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: critic
         run: bash scripts/critic-guardrails.sh
@@ -62,6 +74,29 @@ jobs:
 
       - name: sdd
         run: bash scripts/check_sdd.sh
+
+      - name: coverage
+        run: bash scripts/check_coverage.sh --min 45 bin/coverage-unit.out bin/coverage-integration.out bin/coverage-security.out
+
+      - name: delta-check
+        continue-on-error: true
+        run: |
+          python3 -m unittest discover -s scripts -p "*_test.py"
+          python3 scripts/check_delta_coverage.py --min 80 --advisory --base "origin/${BASE_REF}"
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+
+      - name: mutation
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: bash scripts/mutation.sh --base "origin/${BASE_REF}"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+
+      # Tras la mutación siempre se compila (AGENTS.md §4); este paso sí bloquea.
+      - name: build tras mutation
+        run: go build ./...
 
       - name: semgrep
         run: |
