@@ -1,0 +1,26 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - gosec
+    - staticcheck
+    - gocyclo
+    - govet
+    - ineffassign
+    - unused
+  settings:
+    gocyclo:
+      # Constitución §5: complejidad ≤ 10 por función.
+      min-complexity: 10
+    errcheck:
+      check-type-assertions: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
