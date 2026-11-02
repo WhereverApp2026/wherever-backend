@@ -1,0 +1,51 @@
+# Bases de desarrollo (constitución §3). Solo para desarrollo local; sin credenciales y
+# publicadas únicamente en 127.0.0.1. Los tests usan Testcontainers en otros puertos fijos.
+# Si un puerto ya está ocupado (p. ej. un MongoDB local), se cambia con MONGO_HOST_PORT,
+# REDIS_HOST_PORT, NEO4J_BOLT_HOST_PORT o NEO4J_HTTP_HOST_PORT y se ajusta la URI en .env.
+name: wherever-dev
+
+services:
+  mongodb:
+    image: mongo:7.0.14
+    ports:
+      - "127.0.0.1:${MONGO_HOST_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4.1-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5.26.0-community
+    environment:
+      NEO4J_AUTH: "none"
+    ports:
+      - "127.0.0.1:${NEO4J_BOLT_HOST_PORT:-7687}:7687"
+      - "127.0.0.1:${NEO4J_HTTP_HOST_PORT:-7474}:7474"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  mongo-data:
+  redis-data:
+  neo4j-data:

@@ -25,15 +25,18 @@ Casa vacía pero con luz. Base ejecutable una sola vez, ya en forma de producci�
 - Claves de configuración canónicas: `APP_ENV, MONGO_URI, REDIS_ADDR, NEO4J_URI, JWT_KEY, JWT_ISSUER, JWT_AUDIENCE, CORS_ALLOWED_ORIGIN, BODY_LIMIT, REQUEST_TIMEOUT`.
 
 ## Tests
-- `Unit/Config 3`: carga válida, falta clave obligatoria → error, `JWT_KEY` corta → error.
-- `Unit/Middleware 8`: headers + CSP, 2 rutas exentas en dev, set antes de `next`, `request_id` único por petición.
-- `Unit/Errors 14`: tabla de 11 mapeos + nulos + `detalle` en prod + `detalle` en dev.
-- `Unit/RateLimit 2`: `429` uniforme con `Retry-After`; con Redis caído el limitador sigue en memoria y registra el aviso.
-- `Integration/Routing 3`: v1 resuelve + `snake_case`, sin versión 404, docs dev 200 / prod 404.
-- `Integration/Health 4`: `/health 200` con `estado` y `version`, `/ready 200` con las tres bases y su detalle, `503` sin MongoDB, `200 degraded` sin Redis.
-- `Integration/Errors 6` con la app en proceso y `APP_ENV=staging` (no hay servidor de staging): 404/403/409/422 reales + 408/500 por sonda + `detalle` ausente en prod.
-- `Security/Headers 3`: `/health` anónimo con headers, `/probe/forbidden` 403 con headers, HSTS 365d en factory prod.
-- `Security/Jwt 3`: token `alg:none` → 401, token sin firma → 401, token vencido → 401.
+> Conciliado con lo implementado (2026-11-02). Conteo de funciones `Test*`; las tablas cuentan como una.
+- `Unit/Config` (`internal/platform/config/config_test.go`, 4): carga válida con valores por defecto, falta clave obligatoria → error, `JWT_KEY` corta o marcador → error, valores inválidos (APP_ENV, CORS con comodín o dos orígenes, cuerpo >10MB, timeout >60s, rate relajado en prod). Más `config_example_test.go` (3) de nv-00, ahora contra `config.Keys()`.
+- `Unit/Middleware` (`security_headers_test.go`, 8): headers base, CSP estricta, `/docs` y `/openapi.json` exentas solo en dev, headers puestos antes de `next` (también en errores), `request_id` único, entrante válido conservado, entrante inválido reemplazado.
+- `Unit/Errors` (`errors_test.go`, 8, con la tabla de 11 mapeos de §5): otro → 500 sin filtrar la causa, `campos` nunca `null` y `detalle` omitido si vacío, `detalle` oculto en prod, visible fuera de prod, campos de validación + `Retry-After`, pánico → 500, ruta inexistente → 404 uniforme.
+- `Unit/RateLimit` (`ratelimit_test.go`, 3): `429` uniforme con `Retry-After`; con Redis caído el limitador sigue en memoria y avisa una sola vez; escrituras concurrentes sobre el límite → `429`.
+- `Unit/Roles+JWT` (`roles_test.go`, 3): anónimo → 401, rol desconocido falla al construir, revocación fail-closed (`503`) con Redis caído.
+- `Unit/Pipeline` (`internal/http/app_test.go`, 1): orden constitucional.
+- `Integration/Routing` (`tests/integration/routing_test.go`, 3): v1 resuelve + `snake_case`, sin versión o mal escrita 404, docs dev 200 / staging y prod 404.
+- `Integration/Health` (`health_test.go`, 5): `/health 200` con `estado` y `version` aunque las bases estén caídas, `/ready 200` con las tres, `503` sin MongoDB (sin cadenas de conexión en la respuesta), `200 degraded` sin Redis, `503` sin Neo4j.
+- `Integration/Errors` (`errors_test.go`, 3) con `APP_ENV=staging`: 404/403/409/422/408/500 reales con `traza_id`, `detalle` visible en staging, en prod sondas 404 y sin `detalle`.
+- `Integration/Auth+Rate` (`auth_ratelimit_test.go`, 3): token válido pasa y revocado en Redis → 401, rol equivocado → 403, límite global compartido entre dos instancias sobre el mismo Redis y con TTL.
+- `Security` (`tests/security/security_test.go`, 8): `/health` anónimo con headers, `/probe/forbidden` 403 con headers, HSTS 365d en prod, `alg:none` → 401, sin firma → 401, vencido → 401, basura/sin Bearer/firma alterada → 401, CORS solo para el origen configurado.
 
 ## Criterios
 - `go build ./... → sin errores` y `go vet ./... → limpio`.
@@ -49,7 +52,7 @@ Casa vacía pero con luz. Base ejecutable una sola vez, ya en forma de producci�
 Sin colecciones de negocio, sin roles usados, sin Stripe/FCM/OTel/`/metrics` completo. JWT configurado pero sin emisión: la emisión llega con el módulo auth (`nv-04+`). Sin hosting: `go build` y `docker build` listos, no desplegados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador sin ejecutar
+- **Estado:** 🚧 Borrador con evidencia (ejecutada, sin firma)
 - **Revisores:** (pendiente de nombre)
-- **Fecha:** —
-- **Detalle:** especificada; tareas aún sin ejecutar. La evidencia irá en `specs/nv-01/checklists/gates.md` + `Memoria.md`.
+- **Fecha:** 2026-11-02 (ejecución)
+- **Detalle:** T1 ejecutada. Evidencia en `specs/nv-01/checklists/gates.md` + `Memoria.md`. Unit 30 + Integration 14 + Security 8 verdes. Desvíos documentados: etapa `request_timeout` entre `request_id` y `proxy_headers`; limitador de escrituras por IP hasta que exista auth; puertos del compose configurables.

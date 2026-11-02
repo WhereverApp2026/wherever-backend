@@ -14,12 +14,6 @@ import (
 // envExamplePath apunta a la plantilla relativa a este paquete.
 const envExamplePath = "../../../configs/.env.example"
 
-// requiredKeys son las únicas claves que el código usa hoy (spec nv-00 T1).
-var requiredKeys = []string{
-	"APP_ENV", "MONGO_URI", "REDIS_ADDR", "NEO4J_URI",
-	"JWT_KEY", "JWT_ISSUER", "JWT_AUDIENCE", "CORS_ALLOWED_ORIGIN",
-}
-
 // futurePrefixes son claves de integraciones fuera de esta etapa.
 var futurePrefixes = []string{"STRIPE_", "FCM_", "AWS_", "PERF_"}
 
@@ -73,7 +67,7 @@ func TestEnvExample_IsValid(t *testing.T) {
 	for k := range values {
 		keys = append(keys, k)
 	}
-	assert.ElementsMatch(t, requiredKeys, keys, "solo claves usadas, ni más ni menos")
+	assert.ElementsMatch(t, Keys(), keys, "solo las claves que lee config.Load, ni más ni menos")
 	assert.Contains(t, []string{"dev", "staging", "prod"}, values["APP_ENV"], "APP_ENV admite solo dev, staging o prod")
 	assert.Equal(t, "dev", values["APP_ENV"], "la plantilla arranca en dev")
 }

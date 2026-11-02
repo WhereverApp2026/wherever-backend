@@ -1,0 +1,83 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Wherever API",
+    "version": "v1",
+    "description": "Arquitectura base (nv-01). Las rutas de negocio llegan con sus specs nv-04+."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness: no consulta bases",
+        "responses": {
+          "200": {"description": "Viva", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Readiness: MongoDB, Redis y Neo4j (1 s cada una)",
+        "responses": {
+          "200": {"description": "Lista u operando sin Redis (degraded)", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ready"}}}},
+          "503": {"description": "MongoDB o Neo4j no responden", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ready"}}}}
+        }
+      }
+    },
+    "/api/v1/ping": {
+      "get": {
+        "summary": "Comprueba que v1 resuelve",
+        "responses": {
+          "200": {"description": "pong", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ping"}}}}
+        }
+      }
+    },
+    "/api/v1/probe/timeout": {"get": {"summary": "Sonda 408 (no-prod)", "responses": {"408": {"$ref": "#/components/responses/Error"}}}},
+    "/api/v1/probe/error": {"get": {"summary": "Sonda 500 (no-prod)", "responses": {"500": {"$ref": "#/components/responses/Error"}}}},
+    "/api/v1/probe/forbidden": {"get": {"summary": "Sonda 403 (no-prod)", "responses": {"403": {"$ref": "#/components/responses/Error"}}}},
+    "/api/v1/probe/conflict": {"get": {"summary": "Sonda 409 (no-prod)", "responses": {"409": {"$ref": "#/components/responses/Error"}}}},
+    "/api/v1/probe/invalid": {"get": {"summary": "Sonda 422 (no-prod)", "responses": {"422": {"$ref": "#/components/responses/Error"}}}}
+  },
+  "components": {
+    "responses": {
+      "Error": {"description": "Error uniforme", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": ["estado", "version"],
+        "properties": {"estado": {"type": "string", "enum": ["ok"]}, "version": {"type": "string"}}
+      },
+      "Ready": {
+        "type": "object",
+        "required": ["estado", "dependencias"],
+        "properties": {
+          "estado": {"type": "string", "enum": ["ok", "degraded", "error"]},
+          "dependencias": {
+            "type": "object",
+            "properties": {
+              "mongodb": {"type": "string", "enum": ["ok", "error"]},
+              "redis": {"type": "string", "enum": ["ok", "error"]},
+              "neo4j": {"type": "string", "enum": ["ok", "error"]}
+            }
+          }
+        }
+      },
+      "Ping": {
+        "type": "object",
+        "required": ["estado"],
+        "properties": {"estado": {"type": "string", "enum": ["pong"]}}
+      },
+      "Error": {
+        "type": "object",
+        "required": ["codigo", "mensaje", "campos", "traza_id"],
+        "properties": {
+          "codigo": {"type": "string"},
+          "mensaje": {"type": "string"},
+          "campos": {"type": "array", "items": {"type": "object", "properties": {"campo": {"type": "string"}, "mensaje": {"type": "string"}}}},
+          "detalle": {"type": "string", "description": "Solo fuera de prod"},
+          "traza_id": {"type": "string"}
+        }
+      }
+    }
+  }
+}

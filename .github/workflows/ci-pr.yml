@@ -1,0 +1,74 @@
+# CI de PR (constitución §8). Orden acotado a nv-01:
+#   deps → build → unit → integration → security → critic → endpoints → sdd → semgrep
+# database, contract, coverage, delta-check y mutation se suman con nv-03 y el primer módulo.
+# Sin deploy.
+name: ci-pr
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    # Testcontainers exige Linux (AGENTS.md §1).
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go.mod fija el mínimo (1.26, por Testcontainers); CI usa el último parche de 1.27
+          # para que govulncheck no marque la librería estándar.
+          go-version: "1.27.x"
+
+      - name: deps
+        run: go mod download
+
+      - name: build
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: lint
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+      - name: unit
+        run: go test ./internal/... ./cmd/... -count=1
+
+      - name: integration
+        run: go test ./tests/integration/... -count=1 -p 1
+
+      - name: security
+        run: go test ./tests/security/... -count=1
+
+      - name: critic
+        run: bash scripts/critic-guardrails.sh
+
+      - name: endpoints
+        run: bash scripts/check_endpoints.sh
+
+      - name: sdd
+        run: bash scripts/check_sdd.sh
+
+      - name: semgrep
+        run: |
+          python3 -m pip install --quiet semgrep==1.95.0
+          semgrep scan --config=auto --config=.semgrep/semgrep.yaml --error
+
+      - name: compose y docker build
+        run: |
+          docker compose -f deployments/docker-compose.yml config --quiet
+          docker build --build-arg VERSION=${{ github.sha }} -t wherever-api:ci .
