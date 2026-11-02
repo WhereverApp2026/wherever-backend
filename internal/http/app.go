@@ -11,6 +11,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
 const (
@@ -30,6 +31,8 @@ type Deps struct {
 	Redis   *goredis.Client
 	Mongo   Pinger
 	Neo4j   Pinger
+	// Validator lo comparten los handlers de los módulos; sus reglas se registran en validation.New.
+	Validator *validation.Validator
 }
 
 // Stage es una etapa con nombre del pipeline.

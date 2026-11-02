@@ -50,6 +50,16 @@
 - A evitar: govulncheck v1.1.4 (x/tools v0.29) entra en pánico con `unexpected expr: *ast.KeyValueExpr` al analizar como Linux con Go 1.27; en Windows pasaba porque se compilan otros archivos. Usar ≥ v1.9.0 y, para reproducir CI en local, instalar la herramienta nativa y correrla con `GOOS=linux`.
 - Deuda: Go local 1.27.0 con 9 vulnerabilidades de la librería estándar (actualizar a ≥1.27.3); `make` no está instalado en esta máquina; `TRUSTED_PROXIES` vacío hasta tener balanceador.
 
+## Ejecución nv-02 (2026-11-02)
+- Estado: T1 ejecutada en la rama `nv-02-molde` (sale de `nv-01-foundation`, aún sin merge). Paginación por cursor, registro único de validators (`go-playground/validator` v10.30.6), contrato `service.Lister[T]` y test de arquitectura; cero rutas nuevas. Unit 46 verdes, cobertura 48,3 %; lint, critic, endpoints, sdd y semgrep en 0. Spec en Borrador con evidencia, sin firma.
+- Decisión: cursor = Base64 URL sin relleno de `{"_id","orden"}`; `_id` debe ser un ObjectId hexadecimal y se rechazan campos extra o basura. No va firmado. Porqué: es opaco pero no secreto; el service siempre filtra por dueño, así que un cursor forjado solo cambia el punto de inicio.
+- Decisión: `NewPaginationQuery()` trae `limite=20` y el parser de query solo pisa lo que llega. Porqué: distinguir `limite` ausente (20) de `limite=0` explícito (422).
+- Decisión: el validator vive en `Deps.Validator` y lo construye `cmd/api/main.go` con `validation.New()`, que falla al arrancar si una regla no se registra. Porqué: sin estado global y con el mismo validador para todos los handlers.
+- Decisión: los nombres de campo en los errores salen de la etiqueta `query` o `json`. Porqué: el cliente ve `limite`/`cursor`, no los nombres de Go.
+- Molde para `nv-04+`: el handler parsea a un DTO, llama `deps.Validator.Struct(dto)` y devuelve el error tal cual (422 con `campos`); el service se construye con sus dependencias y devuelve `apperr`; solo `repository.go` importa los drivers. `internal/arch/arch_test.go` lo vigila: handlers = archivos de `internal/http` (no middlewares) y `handler.go`/`*_handler.go` de cada módulo.
+- A evitar: la cobertura de un test de otro paquete (p. ej. `internal/arch`) no cuenta para el paquete probado sin `-coverpkg`; por eso `validCursor` y `NewPageResult` salen en 0 % aunque se ejercitan.
+- A evitar: semgrep no está instalado en esta máquina; correrlo con `docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.95.0 ...` y `MSYS_NO_PATHCONV=1` en Git Bash.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

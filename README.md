@@ -19,7 +19,7 @@ API REST en Go (Fiber) para Wherever, desarrollada con **Spec Driven Development
 | `nv-02` | Molde DTO → validator → service sin endpoints |
 | `nv-03` | Puerta de calidad incremental (advisory) |
 
-Estado: `nv-00` y `nv-01` ejecutadas (Borrador con evidencia, sin firma); `nv-02` y `nv-03` sin ejecutar. La funcionalidad específica tendrá sus propias specs (`nv-04+`).
+Estado: `nv-00`, `nv-01` y `nv-02` ejecutadas (Borrador con evidencia, sin firma); `nv-03` sin ejecutar. La funcionalidad específica tendrá sus propias specs (`nv-04+`).
 
 ## Arranque local
 1. `cp configs/.env.example .env` y poner un `JWT_KEY` propio de 32 bytes o más.
