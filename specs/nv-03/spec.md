@@ -34,7 +34,8 @@ Sin `build` de imagen, sin tag, sin endpoint. Entrega: 4 documentos en Borrador 
 
 ## Aprobación
 - [ ] Revisor humano — (pendiente de nombre)
-- [ ] Fecha:
+- [x] Fecha: 2026-11-02 (ejecución de T2)
 - [ ] CHECKLIST_PR.md OK
-- [ ] Sin conflicto con constitución
-- **Estado:** 🚧 Borrador sin ejecutar
+- [x] Sin conflicto con constitución
+- **Estado:** 🚧 Borrador con evidencia (T1 y T2 ejecutadas, sin firma)
+- **Detalle:** evidencia en `specs/nv-03/checklists/gates.md` + `Memoria.md`. Archivos reales: `scripts/check_coverage.sh` (une los perfiles de Unit, Integration y Security; deja `bin/coverage.out`), `scripts/check_delta_coverage.py` + `scripts/check_delta_coverage_test.py` (9 pruebas), `scripts/mutation.sh` + `.go-mutesting.yml` (`github.com/avito-tech/go-mutesting`, versión fijada), pasos `coverage`, `delta-check` y `mutation` en `.github/workflows/ci-pr.yml` y metas `cover`, `delta`, `mutate` en el `Makefile`. Desvíos: `delta-check` y `mutation` son pasos del job `pipeline` y no jobs aparte (así respetan el orden §8 antes de `semgrep` y reutilizan los perfiles sin artifacts); `Database` y `Contract` siguen sin suite hasta el primer módulo con índices y contrato; la mutación solo corre en `pull_request`.

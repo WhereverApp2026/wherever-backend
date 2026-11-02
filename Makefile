@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security lint vuln critic endpoints sdd run infra-up infra-down image check
+.PHONY: deps build vet test test-unit test-integration test-security lint vuln critic endpoints sdd cover delta mutate run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -43,6 +43,16 @@ endpoints:
 
 sdd:
 	bash scripts/check_sdd.sh
+
+# Puerta incremental (nv-03). cover mide solo Unit; CI une Unit, Integration y Security.
+cover:
+	bash scripts/check_coverage.sh --min 45
+
+delta: cover
+	python3 scripts/check_delta_coverage.py --min 80 --advisory
+
+mutate:
+	bash scripts/mutation.sh
 
 run:
 	go run -ldflags "-X main.version=$(VERSION)" ./cmd/api

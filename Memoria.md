@@ -60,6 +60,16 @@
 - A evitar: la cobertura de un test de otro paquete (p. ej. `internal/arch`) no cuenta para el paquete probado sin `-coverpkg`; por eso `validCursor` y `NewPageResult` salen en 0 % aunque se ejercitan.
 - A evitar: semgrep no está instalado en esta máquina; correrlo con `docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.95.0 ...` y `MSYS_NO_PATHCONV=1` en Git Bash.
 
+## Ejecución nv-03 (2026-11-02)
+- Estado: T2 ejecutada en la rama `nv-03-puerta` (sale de `nv-02-molde`; `main` ya tiene nv-01 y nv-02 por el merge del PR #3). Cobertura global bloqueante, delta y mutación advisory, en CI y en el `Makefile`. Spec en Borrador con evidencia, sin firma.
+- Piloto (código de nv-02): cobertura global 79,6 % (Unit + Integration + Security con `-coverpkg`; solo Unit 56,1 %), delta 93,8 % (60/64 líneas), mutación 0,56 (23/41) en 107 s. Porqué se registra: el umbral de mutación no se fija hasta tener más slices medidos (§2.5); el 80 % de delta sigue informativo.
+- Decisión: cada suite escribe su perfil con `-coverpkg=./internal/...,./cmd/...` y `check_coverage.sh` los une. Porqué: no repetir las suites para medir y contar lo que cubre un test de otro paquete (p. ej. `internal/arch`). `go tool cover` suma los bloques repetidos.
+- Decisión: `delta-check` y `mutation` son pasos del job `pipeline`, no jobs aparte. Porqué: respetan el orden §8 (antes de `semgrep`) y reutilizan `bin/coverage.out` sin artifacts.
+- Decisión: go-mutesting = fork `avito-tech` con pseudo-versión fijada (no publica tags) y solo en `pull_request`. Porqué: el original de zimmski está abandonado; en `push` a main el delta es vacío.
+- A evitar: go-mutesting deja `report.json` en la raíz aunque `json_output` sea false; `mutation.sh` lo borra y `.gitignore` lo ignora.
+- A evitar: en go-mutesting "PASS" = mutante muerto (bueno) y "FAIL" = mutante vivo. El score solo usa los tests del paquete del archivo, así que lo que prueba `internal/arch` no cuenta.
+- A evitar: Python en la consola de Windows imprime mal los acentos; el script reconfigura stdout a UTF-8.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
