@@ -1,4 +1,4 @@
-module github.com/WhereverApp2026/Wherever-M-vil-2026
+module github.com/WhereverApp2026/wherever-backend
 
 go 1.22
 

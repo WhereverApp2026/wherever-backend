@@ -22,8 +22,8 @@
 - A evitar: guardar en memoria del proceso cualquier estado de seguridad; usar los nombres de llaves anteriores.
 
 ## Ejecución nv-00 (2026-11-02)
-- Estado: T1 ejecutada. Creados `go.mod` (módulo `github.com/WhereverApp2026/Wherever-M-vil-2026`, `go 1.22`), `Makefile`, `.golangci.yml` (v2), `.gitignore`, `configs/.env.example`, `internal/platform/config/config_example_test.go` (3/3 verdes) y `scripts/critic-guardrails.sh` (PASS). Spec en Borrador con evidencia, sin firma.
-- Decisión: ruta del módulo = remoto `origin`. Porqué: no había otra fuente; si el backend se muda a su propio repo hay que cambiarla.
+- Estado: T1 ejecutada. Creados `go.mod` (módulo `github.com/WhereverApp2026/wherever-backend`, `go 1.22`), `Makefile`, `.golangci.yml` (v2), `.gitignore`, `configs/.env.example`, `internal/platform/config/config_example_test.go` (3/3 verdes) y `scripts/critic-guardrails.sh` (PASS). Spec en Borrador con evidencia, sin firma.
+- Decisión: ruta del módulo = `github.com/WhereverApp2026/wherever-backend`. Porqué: GitHub informó que el repositorio se movió de `Wherever-M-vil-2026` a `wherever-backend`; se cambiaron módulo y remoto antes de que nv-01 agregue imports internos.
 - Decisión: `go 1.22` en `go.mod` aunque la máquina local tenga Go 1.27. Porqué: el stack pide 1.22+ y no hay que obligar al equipo ni a CI a la última versión.
 - Decisión: `critic-guardrails.sh` nace en `nv-00` con B1/B2 activos y B3/B4 en `SKIP` mientras no haya `cmd/api/main.go` ni rutas; si aparecen sin que `nv-01` implemente la verificación, falla. Porqué: el criterio de `nv-00` exige critic PASS y no se vale un verde falso.
 - Decisión: B2 busca el valor del token como argumento (quita los literales y busca el identificador) o como atributo de `slog`; un mensaje que solo dice "token inválido" pasa. Porqué: lo prohibido es filtrar el token, no nombrarlo.
@@ -34,7 +34,6 @@
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
-- Ruta definitiva del módulo Go (hoy apunta al remoto `Wherever-M-vil-2026`).
 - Nombre del revisor para firmar las specs (responsables en el Excel: Jorge Alberto Rodríguez Enriquez, hojas J; Alexander Dominguez Zarate, hojas A).
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.
 
