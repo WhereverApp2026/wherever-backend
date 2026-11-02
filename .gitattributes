@@ -1,0 +1,5 @@
+# Finales de línea: LF en el repositorio; los scripts de shell y Make siempre LF también en disco.
+* text=auto eol=lf
+*.sh text eol=lf
+Makefile text eol=lf
+*.xlsx binary
