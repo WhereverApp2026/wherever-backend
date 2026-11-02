@@ -1,0 +1,63 @@
+package config_test
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+)
+
+func TestLoad_ValidConfigWithDefaults(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+
+	require.NoError(t, err)
+	assert.Equal(t, config.EnvDev, cfg.Env)
+	assert.Equal(t, 8080, cfg.Port)
+	assert.Equal(t, 10*1024*1024, cfg.BodyLimit)
+	assert.Equal(t, 60*time.Second, cfg.RequestTimeout)
+	assert.Equal(t, 1000, cfg.RateLimitGlobal)
+	assert.Equal(t, 10, cfg.RateLimitWrites)
+	assert.Empty(t, cfg.CORSAllowedOrigin)
+}
+
+func TestLoad_MissingRequiredKeyFails(t *testing.T) {
+	_, err := config.Load(testutil.Env(map[string]string{config.KeyMongoURI: ""}))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.KeyMongoURI)
+}
+
+func TestLoad_ShortJWTKeyFails(t *testing.T) {
+	for name, key := range map[string]string{
+		"corta":    "corta",
+		"marcador": "PLACEHOLDER_MIN_32_BYTES_PERO_MAS_LARGO",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := config.Load(testutil.Env(map[string]string{config.KeyJWTKey: key}))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.KeyJWTKey)
+		})
+	}
+}
+
+func TestLoad_RejectsInvalidValues(t *testing.T) {
+	cases := map[string]map[string]string{
+		"APP_ENV desconocido":   {config.KeyAppEnv: "local"},
+		"CORS con comodín":      {config.KeyCORSOrigin: "*"},
+		"CORS con dos orígenes": {config.KeyCORSOrigin: "https://a.com,https://b.com"},
+		"cuerpo mayor a 10MB":   {config.KeyBodyLimit: "20971520"},
+		"timeout mayor a 60s":   {config.KeyRequestTimeout: "90s"},
+		"rate relajado en prod": {config.KeyAppEnv: config.EnvProd, config.KeyRateLimitGlobal: "5000"},
+		"entero inválido":       {config.KeyPort: "ochenta"},
+	}
+	for name, overrides := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := config.Load(testutil.Env(overrides))
+			assert.Error(t, err)
+		})
+	}
+}

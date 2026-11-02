@@ -28,7 +28,8 @@ Sin `build` de imagen, sin tag, sin `curl` nuevo. Solo `build + tests + gates` e
 
 ## Aprobación
 - [ ] Revisor 1 — (pendiente de nombre)
-- [ ] Fecha:
+- [x] Fecha: 2026-11-02 (ejecución)
 - [ ] CHECKLIST_PR.md OK
-- [ ] Sin conflicto con constitución
-- **Estado:** 🚧 Borrador sin ejecutar
+- [x] Sin conflicto con constitución
+- **Estado:** 🚧 Borrador con evidencia (ejecutada, sin firma)
+- **Detalle:** T1 ejecutada en la rama `nv-02-molde`. Evidencia en `specs/nv-02/checklists/gates.md` + `Memoria.md`. Archivos reales: `internal/shared/pagination/{cursor.go,page_result.go}`, `internal/shared/validation/{registry.go,pagination_query.go}`, `internal/shared/service/service.go` (contrato `Lister[T]`), `internal/arch/arch_test.go` (6), `internal/shared/pagination/cursor_test.go` (4), más `validation/registry_test.go` (4) y `apperr/apperr_test.go` (2). Desvíos: `apperr` ya venía de nv-01 (aquí solo se prueba); la "línea" de `internal/http/app.go` es el campo `Deps.Validator`, que `cmd/api/main.go` construye con `validation.New()`; la cobertura se midió con `go test -cover` porque `scripts/check_coverage.sh` llega en nv-03.

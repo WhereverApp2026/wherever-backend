@@ -1,0 +1,16 @@
+# Solo entra lo que el Dockerfile copia; nunca secretos.
+.env
+.env.*
+.git
+.github
+.claude
+.specify
+bin
+docs
+specs
+tests
+scripts
+deployments
+configs
+*.md
+coverage*

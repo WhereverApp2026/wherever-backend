@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # critic-guardrails — gate pre-push con 4 bloqueantes (constitución §6, skill critic-guardrails).
 #   B1 secretos en Git · B2 token en logs/errores · B3 pipeline alterado · B4 ruta sin fila en docs/endpoints.md
-# nv-00 activa B1 y B2; B3 y B4 se activan en nv-01, cuando existen pipeline y rutas.
+# B1/B2 desde nv-00; B3/B4 desde nv-01.
 # Sale con 0 si pasa y con 1 si algún bloqueante falla.
 set -euo pipefail
 
@@ -50,22 +50,28 @@ check_b2() {
 	return 0
 }
 
+# Orden constitucional §4 tal como lo declara internal/http/app.go (Pipeline).
+PIPELINE_FILE="internal/http/app.go"
+PIPELINE_EXPECTED="security_headers errors request_id request_timeout proxy_headers cors rate_limit_global rate_limit_writes jwt"
+
 check_b3() {
-	if [[ ! -f cmd/api/main.go ]]; then
-		echo "SKIP B3: sin pipeline todavía (llega en nv-01)"
+	if [[ ! -f "$PIPELINE_FILE" ]]; then
+		fail B3 "no existe $PIPELINE_FILE"
 		return 0
 	fi
-	echo "FAIL B3: existe cmd/api/main.go y la verificación del pipeline aún no está implementada (nv-01)"
-	failures=$((failures + 1))
+	local actual
+	actual=$(grep -o -E 'stage\("[a-z_]+"' "$PIPELINE_FILE" | cut -d'"' -f2 | paste -s -d' ' -)
+	if [[ "$actual" != "$PIPELINE_EXPECTED" ]]; then
+		fail B3 "pipeline alterado. Esperado: [$PIPELINE_EXPECTED] Actual: [$actual]"
+	fi
+	return 0
 }
 
 check_b4() {
-	if [[ ${#GO_FILES[@]} -eq 0 ]] || ! grep -q -E '\.(Get|Post|Put|Patch|Delete)\("' -- "${GO_FILES[@]}" 2>/dev/null; then
-		echo "SKIP B4: sin rutas registradas todavía (llega en nv-01)"
-		return 0
+	if ! bash scripts/check_endpoints.sh >/dev/null 2>&1; then
+		fail B4 "rutas y docs/endpoints.md no coinciden (ver scripts/check_endpoints.sh)"
 	fi
-	echo "FAIL B4: hay rutas y la verificación contra docs/endpoints.md aún no está implementada (nv-01)"
-	failures=$((failures + 1))
+	return 0
 }
 
 check_b1

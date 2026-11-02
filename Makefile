@@ -1,25 +1,59 @@
-# Comandos del proyecto (AGENTS.md §1). infra-up/infra-down llegan en nv-01.
+# Comandos del proyecto (AGENTS.md §1).
 # golangci-lint fijado: v2.15.0 es la primera probada que entiende Go 1.27.
 GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-.PHONY: deps build vet test lint critic check
+GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
+COMPOSE := docker compose -f deployments/docker-compose.yml
+VERSION ?= dev
+
+.PHONY: deps build vet test test-unit test-integration test-security lint vuln critic endpoints sdd run infra-up infra-down image check
 
 deps:
 	go mod download
 
 build:
 	go build ./...
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/api ./cmd/api
 
 vet:
 	go vet ./...
 
-test:
-	go test ./... -count=1
+# Unit no necesita Docker; Integration levanta contenedores con puerto fijo (nunca en paralelo).
+test-unit:
+	go test ./internal/... ./cmd/... -count=1
+
+test-integration:
+	go test ./tests/integration/... -count=1 -p 1
+
+test-security:
+	go test ./tests/security/... -count=1
+
+test: test-unit test-integration test-security
 
 lint:
 	$(GOLANGCI_LINT) run ./...
 
+vuln:
+	$(GOVULNCHECK) ./...
+
 critic:
 	bash scripts/critic-guardrails.sh
 
-# Gates de nv-00 en vacío.
-check: build vet test lint critic
+endpoints:
+	bash scripts/check_endpoints.sh
+
+sdd:
+	bash scripts/check_sdd.sh
+
+run:
+	go run -ldflags "-X main.version=$(VERSION)" ./cmd/api
+
+infra-up:
+	$(COMPOSE) up -d --wait
+
+infra-down:
+	$(COMPOSE) down
+
+image:
+	docker build --build-arg VERSION=$(VERSION) -t wherever-api:$(VERSION) .
+
+check: build vet test lint critic endpoints sdd

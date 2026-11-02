@@ -1,0 +1,56 @@
+# Reglas propias (constitución §5-§6). Se corren junto con --config=auto.
+rules:
+  - id: wherever-no-recover-outside-errors-middleware
+    languages: [go]
+    severity: ERROR
+    message: Sin recover ad-hoc; los pánicos los atrapa middleware.Errors (constitución §5).
+    pattern: recover()
+    paths:
+      exclude:
+        - internal/http/middleware/errors.go
+
+  - id: wherever-no-insecure-tls
+    languages: [go]
+    severity: ERROR
+    message: No desactivar la verificación TLS.
+    pattern: |
+      tls.Config{..., InsecureSkipVerify: true, ...}
+
+  - id: wherever-no-weak-hash
+    languages: [go]
+    severity: ERROR
+    message: MD5/SHA-1 prohibidos; contraseñas con Argon2id 64MB/3iter (AGENTS.md §3).
+    pattern-either:
+      - pattern: md5.New()
+      - pattern: md5.Sum(...)
+      - pattern: sha1.New()
+      - pattern: sha1.Sum(...)
+
+  - id: wherever-jwt-parse-without-options
+    languages: [go]
+    severity: ERROR
+    message: Parsear JWT siempre con jwt.NewParser(WithValidMethods([HS256]), WithIssuer, WithAudience).
+    pattern-either:
+      - pattern: jwt.Parse($T, $F)
+      - pattern: jwt.ParseWithClaims($T, $C, $F)
+
+  - id: wherever-hardcoded-jwt-key
+    languages: [go]
+    severity: ERROR
+    message: La clave JWT llega solo por entorno (JWT_KEY).
+    pattern: $TOKEN.SignedString([]byte("..."))
+    paths:
+      exclude:
+        - "*_test.go"
+
+  - id: wherever-no-fmt-print-in-app
+    languages: [go]
+    severity: WARNING
+    message: Usar slog (con filtro de secretos), no fmt.Print*.
+    pattern-either:
+      - pattern: fmt.Println(...)
+      - pattern: fmt.Printf(...)
+      - pattern: fmt.Print(...)
+    paths:
+      include:
+        - internal/

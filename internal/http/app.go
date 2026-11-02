@@ -1,0 +1,106 @@
+// Package httpapi arma la app Fiber con el pipeline fijo de la constitución §4.
+package httpapi
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	goredis "github.com/redis/go-redis/v9"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+)
+
+const (
+	idleTimeout  = 120 * time.Second
+	globalWindow = time.Minute
+)
+
+// Pinger es lo que /ready necesita de cada base.
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
+
+// Deps son las dependencias ya construidas; se inyectan para que los tests reutilicen NewApp.
+type Deps struct {
+	Logger  *slog.Logger
+	Version string
+	Redis   *goredis.Client
+	Mongo   Pinger
+	Neo4j   Pinger
+	// Validator lo comparten los handlers de los módulos; sus reglas se registran en validation.New.
+	Validator *validation.Validator
+}
+
+// Stage es una etapa con nombre del pipeline.
+type Stage struct {
+	Name    string
+	Handler fiber.Handler
+}
+
+// Pipeline devuelve las etapas en el orden constitucional. El critic (B3) y los tests
+// verifican este orden; no se reordena sin enmendar la constitución.
+func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage {
+	errorHandler := middleware.NewErrorHandler(!cfg.IsProd(), deps.Logger)
+	jwtCfg := middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience}
+	return []Stage{
+		stage("security_headers", middleware.SecurityHeaders(cfg.Env)),
+		stage("errors", middleware.Errors(errorHandler, deps.Logger)),
+		stage("request_id", middleware.RequestID()),
+		stage("request_timeout", middleware.RequestTimeout(cfg.RequestTimeout)),
+		stage("proxy_headers", middleware.ProxyHeaders()),
+		stage("cors", middleware.CORS(cfg.CORSAllowedOrigin)),
+		stage("rate_limit_global", limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow)),
+		stage("rate_limit_writes", limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites)),
+		stage("jwt", middleware.JWT(jwtCfg, deps.Redis)),
+	}
+}
+
+func stage(name string, handler fiber.Handler) Stage {
+	return Stage{Name: name, Handler: handler}
+}
+
+// NewApp construye la app con el pipeline y las rutas base. Roles se aplica por ruta
+// con middleware.RequireRoles cuando un módulo lo necesite.
+func NewApp(cfg config.Config, deps Deps) *fiber.App {
+	app := fiber.New(fiber.Config{
+		AppName:                 "wherever-api",
+		DisableStartupMessage:   true,
+		StrictRouting:           true,
+		CaseSensitive:           true,
+		BodyLimit:               cfg.BodyLimit,
+		ReadTimeout:             cfg.RequestTimeout,
+		WriteTimeout:            cfg.RequestTimeout,
+		IdleTimeout:             idleTimeout,
+		ErrorHandler:            middleware.NewErrorHandler(!cfg.IsProd(), deps.Logger),
+		ProxyHeader:             fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          cfg.TrustedProxies,
+	})
+
+	limiter := middleware.NewLimiter(deps.Redis, deps.Logger)
+	for _, s := range Pipeline(cfg, deps, limiter) {
+		app.Use(s.Handler)
+	}
+
+	registerRoutes(app, cfg, deps)
+	return app
+}
+
+func registerRoutes(app *fiber.App, cfg config.Config, deps Deps) {
+	health := newHealth(deps)
+	app.Get("/health", health.live)
+	app.Get("/ready", health.ready)
+
+	v1 := app.Group("/api/v1")
+	v1.Get("/ping", ping)
+	if !cfg.IsProd() {
+		registerProbes(v1.Group("/probe"))
+	}
+	if cfg.IsDev() {
+		registerDocs(app)
+	}
+}
