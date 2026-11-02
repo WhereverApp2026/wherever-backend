@@ -1,7 +1,7 @@
 # Comandos del proyecto (AGENTS.md §1).
 # golangci-lint fijado: v2.15.0 es la primera probada que entiende Go 1.27.
 GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.1.4
+GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 

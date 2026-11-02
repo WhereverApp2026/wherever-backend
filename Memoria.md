@@ -47,6 +47,7 @@
 - A evitar: Windows (Control de aplicaciones) bloquea al azar algunos `*.test.exe`; reintentar o compilar con `go test -c -o bin/x.test.exe`.
 - A evitar: heredocs largos con comillas en el Bash de la herramienta se rompen; escribir el archivo directo.
 - A evitar: `semgrep --config=auto` no corre con `--metrics=off`.
+- A evitar: govulncheck v1.1.4 (x/tools v0.29) entra en pánico con `unexpected expr: *ast.KeyValueExpr` al analizar como Linux con Go 1.27; en Windows pasaba porque se compilan otros archivos. Usar ≥ v1.9.0 y, para reproducir CI en local, instalar la herramienta nativa y correrla con `GOOS=linux`.
 - Deuda: Go local 1.27.0 con 9 vulnerabilidades de la librería estándar (actualizar a ≥1.27.3); `make` no está instalado en esta máquina; `TRUSTED_PROXIES` vacío hasta tener balanceador.
 
 ## Pendientes de decidir

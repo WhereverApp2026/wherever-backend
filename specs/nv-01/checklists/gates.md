@@ -18,7 +18,7 @@
 
 ## Evidencia (2026-11-02, Go 1.27.0 local, Docker 29.8.1, Windows + Git Bash)
 - `go test ./internal/... ./cmd/... -count=1` → 30 PASS; `./tests/security/...` → 8 PASS; `./tests/integration/... -p 1` → 14 PASS con MongoDB 7.0.14, Redis 7.4.1 y Neo4j 5.26.0 reales en Testcontainers (puertos 27018/6380/7688). Sin contenedores huérfanos al terminar.
-- `golangci-lint@v2.15.0 run ./...` → 0 issues. `govulncheck@v1.1.4` con Go 1.27.3 → 0 vulnerabilidades alcanzables (con el Go 1.27.0 local quedan 9 de la librería estándar, corregidas en 1.27.2/1.27.3).
+- `golangci-lint@v2.15.0 run ./...` → 0 issues. `govulncheck@v1.9.0` con Go 1.27.3 → 0 vulnerabilidades alcanzables, analizando como Windows y como Linux (v1.1.4 entraba en pánico en CI) (con el Go 1.27.0 local quedan 9 de la librería estándar, corregidas en 1.27.2/1.27.3).
 - `semgrep 1.95.0 scan --config=auto --config=.semgrep/semgrep.yaml --error` → 0 (se fijaron las acciones de GitHub a SHA).
 - `yaml.safe_load` OK en `ci-pr.yml`, `semgrep.yaml`, `.golangci.yml` y `docker-compose.yml`. `docker compose config` válido.
 - Binario real (`-ldflags -X main.version=v0.1.0-nv01`, staging): `/health` 200 con HSTS y CSP, `/ready` 200 → 503 al detener MongoDB → 200 `degraded` al detener Redis, `/api/v1/ping` sigue en 200 sin Redis, `/ping` 404, token basura 401; el log no contiene la clave JWT.
