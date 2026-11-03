@@ -45,6 +45,7 @@ type Service struct {
 	repo       *Repository
 	rdb        *goredis.Client
 	mail       mailer.Mailer
+	syncMail   mailer.Mailer
 	issuer     *Issuer
 	hasher     *Hasher
 	accessTTL  time.Duration
@@ -63,6 +64,7 @@ func NewService(users *usuarios.Repository, repo *Repository, rdb *goredis.Clien
 		repo:       repo,
 		rdb:        rdb,
 		mail:       mail,
+		syncMail:   mail,
 		issuer:     NewIssuer(cfg.JWT, cfg.AccessTTL),
 		hasher:     hasher,
 		accessTTL:  cfg.AccessTTL,
@@ -419,13 +421,29 @@ func (s *Service) CloseAllSessions(ctx context.Context, userID bson.ObjectID) er
 	return s.revokeAccess(ctx, now, revoked...)
 }
 
-// SendExportLink manda el enlace de un solo uso (24 h) para descargar "mis datos" (D-2, nv-05).
+// WithSyncMailer fija el mailer síncrono (sin cola) que usa SendExportLink: el trabajo
+// nocturno necesita saber si el aviso salió (nv-06). Por defecto es el mismo de las peticiones.
+func (s *Service) WithSyncMailer(m mailer.Mailer) *Service {
+	s.syncMail = m
+	return s
+}
+
+// SendExportLink manda el enlace de un solo uso (24 h) para descargar "mis datos" (D-2, nv-05)
+// y devuelve el error del envío. Cada intento invalida el enlace anterior y crea uno nuevo:
+// solo guardamos el hash, así que no se puede reenviar el mismo (nv-06).
 func (s *Service) SendExportLink(ctx context.Context, userID bson.ObjectID) error {
 	user, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		return dbError(err)
 	}
-	return s.sendLink(ctx, user, mailer.KindExport, ExportLinkTTL)
+	if err := s.repo.InvalidateTokens(ctx, userID, string(mailer.KindExport), time.Now().UTC()); err != nil {
+		return dbError(err)
+	}
+	raw, err := s.issueLink(ctx, user, mailer.KindExport, ExportLinkTTL)
+	if err != nil {
+		return err
+	}
+	return s.syncMail.Send(ctx, mailer.Message{To: user.Email, Name: user.Name, Kind: mailer.KindExport, Token: raw})
 }
 
 // ConsumeExportLink usa el enlace de descarga una sola vez y devuelve de quién es.
@@ -499,22 +517,31 @@ func (s *Service) cooldown(ctx context.Context, userID bson.ObjectID, kind maile
 	return max(0, ResendCooldown-time.Since(last)), nil
 }
 
-// sendLink guarda el hash del enlace y manda el correo. Si el proveedor falla se registra
-// sin datos del enlace; el cliente recibe la misma respuesta.
+// sendLink guarda el hash del enlace y lo encola. Un fallo del correo no cambia la
+// respuesta (nv-06): con la cola nunca hay error; si el mailer devuelve uno, solo se registra.
 func (s *Service) sendLink(ctx context.Context, user usuarios.User, kind mailer.Kind, ttl time.Duration) error {
-	raw, hash, err := NewOpaque()
+	raw, err := s.issueLink(ctx, user, kind, ttl)
 	if err != nil {
 		return err
+	}
+	if err := s.mail.Send(ctx, mailer.Message{To: user.Email, Name: user.Name, Kind: kind, Token: raw}); err != nil {
+		s.log.WarnContext(ctx, "no se pudo encolar el correo", "tipo", string(kind))
+	}
+	return nil
+}
+
+// issueLink crea el token de un solo uso y guarda solo su hash; devuelve el token en claro.
+func (s *Service) issueLink(ctx context.Context, user usuarios.User, kind mailer.Kind, ttl time.Duration) (string, error) {
+	raw, hash, err := NewOpaque()
+	if err != nil {
+		return "", err
 	}
 	now := time.Now().UTC()
 	link := OneTimeToken{ID: bson.NewObjectID(), UserID: user.ID, Kind: string(kind), TokenHash: hash, ExpiresAt: now.Add(ttl), CreatedAt: now}
 	if err := s.repo.InsertToken(ctx, link); err != nil {
-		return dbError(err)
+		return "", dbError(err)
 	}
-	if err := s.mail.Send(ctx, mailer.Message{To: user.Email, Kind: kind, Token: raw}); err != nil {
-		s.log.ErrorContext(ctx, "no se pudo enviar el correo", "tipo", string(kind), "error", err)
-	}
-	return nil
+	return raw, nil
 }
 
 // revokeAccess pone en `jwt_revocado:{jti}` el access token vigente de cada sesión, con TTL

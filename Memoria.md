@@ -116,6 +116,19 @@
 - A evitar: insertar un usuario sin `codigo_amigo` choca en `ux_codigo_amigo` con el segundo que tampoco lo tenga (el índice no es parcial); insertar siempre con `Repository.Create` o con código.
 - A evitar: el validador de `gtefield` reporta el nombre del campo de Go; el mensaje es fijo ("mayor o igual que el mínimo").
 
+## Ejecución nv-06 (2026-11-03)
+- Estado: T1–T8 ejecutadas en la rama `nv-06-correo` (sale de `main` con nv-05 cerrada, tras fusionar el PR #8). Adaptador SMTP con la librería estándar, cola en segundo plano, tres plantillas en español, Mailpit en el compose y en las pruebas, aviso de exportación con reintento. Spec en Borrador con evidencia; revisor Osmar Reséndiz, pendiente de aprobar.
+- Decisión (ajustes del revisor antes de ejecutar): `MAIL_FROM` nuevo (en nv-04 no existía) y obligatorio con `SMTP_HOST`; `Name` en `mailer.Message` para el saludo; en prod la API no arranca sin `SMTP_HOST`, con `SMTP_TLS=none` o con `APP_LINK_BASE` sin `https://`; `SMTP_USER` con `SMTP_TLS=none` falla en cualquier entorno.
+- Decisión: dos caminos de correo. Las peticiones usan `mailer.Async` (cola acotada, nunca bloquea, descarta y cuenta si se llena) sobre `mailer.Retrying` (2 intentos, 1 s, `MAIL_TIMEOUT` por intento); el trabajo nocturno usa `mailer.Retrying` directo porque necesita saber si el aviso salió (`auth.Service.WithSyncMailer`). Al apagar, la cola se vacía antes de cerrar las bases.
+- Decisión (revisor): cada reintento del aviso de exportación invalida el enlace anterior (`usado_en`) y crea uno nuevo, porque solo guardamos el hash. Tope de 72 h desde `lista_en` (el TTL la borra aunque el aviso no salga); las 24 h de descarga cuentan desde `aviso_enviado_en`, sin pasar de las 72 h.
+- Decisión: la autenticación SMTP se niega sin TLS aunque el servidor sea localhost (`smtp.PlainAuth` sí la mandaría ahí). Los errores del envío no llevan la respuesta cruda del servidor; el log solo dice tipo, destinatario enmascarado, resultado ("tiempo agotado", "sin conexión", "rechazado") y duración.
+- Para la spec móvil: los enlaces de los correos llevan el token en el **fragmento** (`{APP_LINK_BASE}/verificar#token=…`, `/restablecer#token=…`, `/exportacion#token=…`). La página o la app debe leerlo de `location.hash` (o del intent del App Link), no de la consulta, y mandarlo por `POST` a la API (`verificar-correo`, `restablecer`, `exportaciones/descargar`). Así el token no queda en los logs del servidor que sirve la página ni en el `Referer`. No usar `wherever://` en producción: otra app podría registrar el mismo esquema e interceptar el token.
+- Mailpit fijado en `axllent/mailpit:v1.21.8`; en pruebas SMTP 1026 y API 8026 (dev: 1025 y 8025).
+- Deuda: proveedor sin elegir (SES, Resend o Brevo; SMTP lo hace cambio de configuración), dominio propio con SPF/DKIM/DMARC, Android App Links, aviso de privacidad con el proveedor como encargado (LFPDPPP), plantillas de marca, rebotes y quejas. Pendiente de subir al Excel: `exportaciones.aviso_enviado_en`.
+- Decisión: `// nosemgrep` en el import de `text/template` de `render.go`, con su motivo. Porqué: la regla de Semgrep avisa de XSS, pero ese paquete solo arma la parte `text/plain`; el HTML del correo usa `html/template` y su escape tiene prueba.
+- A evitar: Mailpit lista los correos del más nuevo al más viejo; elegir por enlace o asunto, no por posición.
+- A evitar: en el Bash de la herramienta, un heredoc de Python con `"\r\n"` se escribe como salto de línea real; para cadenas con escapes usar el editor o un archivo de script.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

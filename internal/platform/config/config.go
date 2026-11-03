@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/mail"
 	"net/url"
 	"strconv"
 	"strings"
@@ -20,17 +21,24 @@ const (
 
 // Límites fijados por la constitución (§3, §6). Se pueden bajar, nunca subir.
 const (
-	MaxBodyLimit      = 10 * 1024 * 1024
-	MaxRequestTimeout = 60 * time.Second
-	DefaultRateGlobal = 1000
-	DefaultRateWrites = 10
-	MinJWTKeyBytes    = 32
-	MaxAccessTTL      = 15 * time.Minute
-	MaxRefreshTTL     = 30 * 24 * time.Hour
-	MinPhoneKeyBytes  = 32
-	MaxArcoGraceDays  = 30
-	defaultPort       = 8080
-	jwtKeyPlaceholder = "PLACEHOLDER"
+	MaxBodyLimit       = 10 * 1024 * 1024
+	MaxRequestTimeout  = 60 * time.Second
+	DefaultRateGlobal  = 1000
+	DefaultRateWrites  = 10
+	MinJWTKeyBytes     = 32
+	MaxAccessTTL       = 15 * time.Minute
+	MaxRefreshTTL      = 30 * 24 * time.Hour
+	MinPhoneKeyBytes   = 32
+	MaxArcoGraceDays   = 30
+	defaultSMTPPort    = 587
+	defaultMailTimeout = 5 * time.Second
+	maxMailTimeout     = 30 * time.Second
+	defaultMailWorkers = 4
+	maxMailWorkers     = 32
+	defaultMailQueue   = 100
+	maxMailQueue       = 10000
+	defaultPort        = 8080
+	jwtKeyPlaceholder  = "PLACEHOLDER"
 )
 
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
@@ -53,6 +61,23 @@ const (
 	KeyJWTRefreshTTL   = "JWT_REFRESH_TTL"
 	KeyPhoneHMACKey    = "PHONE_HMAC_KEY"
 	KeyArcoGraceDays   = "ARCO_DIAS_GRACIA"
+	KeySMTPHost        = "SMTP_HOST"
+	KeySMTPPort        = "SMTP_PORT"
+	KeySMTPUser        = "SMTP_USER"
+	KeySMTPPassword    = "SMTP_PASSWORD"
+	KeySMTPTLS         = "SMTP_TLS"
+	KeyMailFrom        = "MAIL_FROM"
+	KeyMailTimeout     = "MAIL_TIMEOUT"
+	KeyMailWorkers     = "MAIL_WORKERS"
+	KeyMailQueueSize   = "MAIL_QUEUE_SIZE"
+	KeyAppLinkBase     = "APP_LINK_BASE"
+)
+
+// Modos de SMTP_TLS (spec nv-06).
+const (
+	SMTPTLSStartTLS = "starttls"
+	SMTPTLSImplicit = "tls"
+	SMTPTLSNone     = "none"
 )
 
 var requiredKeys = []string{
@@ -62,6 +87,8 @@ var requiredKeys = []string{
 var optionalKeys = []string{
 	KeyPort, KeyCORSOrigin, KeyTrustedProxies, KeyBodyLimit, KeyRequestTimeout, KeyRateLimitGlobal, KeyRateLimitWrites,
 	KeyJWTAccessTTL, KeyJWTRefreshTTL, KeyArcoGraceDays,
+	KeySMTPHost, KeySMTPPort, KeySMTPUser, KeySMTPPassword, KeySMTPTLS, KeyMailFrom,
+	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -83,6 +110,7 @@ type Config struct {
 	RefreshTTL        time.Duration
 	PhoneHMACKey      []byte
 	ArcoGraceDays     int
+	Mail              Mail
 	CORSAllowedOrigin string
 	TrustedProxies    []string
 	BodyLimit         int
@@ -90,6 +118,24 @@ type Config struct {
 	RateLimitGlobal   int
 	RateLimitWrites   int
 }
+
+// Mail es la configuración del correo saliente (nv-06). Sin SMTPHost no hay servidor: dev y
+// staging usan el LogMailer; producción no arranca.
+type Mail struct {
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPTLS      string
+	From         string
+	Timeout      time.Duration
+	Workers      int
+	QueueSize    int
+	LinkBase     string
+}
+
+// Enabled indica si hay servidor SMTP configurado.
+func (m Mail) Enabled() bool { return m.SMTPHost != "" }
 
 // IsProd indica si corre en producción.
 func (c Config) IsProd() bool { return c.Env == EnvProd }
@@ -110,14 +156,22 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	cfg := Config{
-		Env:               getenv(KeyAppEnv),
-		MongoURI:          getenv(KeyMongoURI),
-		RedisAddr:         getenv(KeyRedisAddr),
-		Neo4jURI:          getenv(KeyNeo4jURI),
-		JWTKey:            []byte(getenv(KeyJWTKey)),
-		JWTIssuer:         getenv(KeyJWTIssuer),
-		JWTAudience:       getenv(KeyJWTAudience),
-		PhoneHMACKey:      []byte(getenv(KeyPhoneHMACKey)),
+		Env:          getenv(KeyAppEnv),
+		MongoURI:     getenv(KeyMongoURI),
+		RedisAddr:    getenv(KeyRedisAddr),
+		Neo4jURI:     getenv(KeyNeo4jURI),
+		JWTKey:       []byte(getenv(KeyJWTKey)),
+		JWTIssuer:    getenv(KeyJWTIssuer),
+		JWTAudience:  getenv(KeyJWTAudience),
+		PhoneHMACKey: []byte(getenv(KeyPhoneHMACKey)),
+		Mail: Mail{
+			SMTPHost:     strings.TrimSpace(getenv(KeySMTPHost)),
+			SMTPUser:     getenv(KeySMTPUser),
+			SMTPPassword: getenv(KeySMTPPassword),
+			SMTPTLS:      orDefault(strings.ToLower(strings.TrimSpace(getenv(KeySMTPTLS))), SMTPTLSStartTLS),
+			From:         strings.TrimSpace(getenv(KeyMailFrom)),
+			LinkBase:     strings.TrimSpace(getenv(KeyAppLinkBase)),
+		},
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
 	}
@@ -141,6 +195,9 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyRateLimitGlobal, &c.RateLimitGlobal, DefaultRateGlobal},
 		{KeyRateLimitWrites, &c.RateLimitWrites, DefaultRateWrites},
 		{KeyArcoGraceDays, &c.ArcoGraceDays, MaxArcoGraceDays},
+		{KeySMTPPort, &c.Mail.SMTPPort, defaultSMTPPort},
+		{KeyMailWorkers, &c.Mail.Workers, defaultMailWorkers},
+		{KeyMailQueueSize, &c.Mail.QueueSize, defaultMailQueue},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -157,6 +214,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyRequestTimeout, &c.RequestTimeout, MaxRequestTimeout},
 		{KeyJWTAccessTTL, &c.AccessTTL, MaxAccessTTL},
 		{KeyJWTRefreshTTL, &c.RefreshTTL, MaxRefreshTTL},
+		{KeyMailTimeout, &c.Mail.Timeout, defaultMailTimeout},
 	}
 	for _, item := range durations {
 		value, err := durationOr(getenv(item.key), item.fallback)
@@ -184,6 +242,7 @@ func (c Config) validate() []error {
 	if err := validateOrigin(c.CORSAllowedOrigin); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", KeyCORSOrigin, err))
 	}
+	errs = append(errs, c.validateMail()...)
 	return append(errs, c.validateLimits()...)
 }
 
@@ -266,4 +325,82 @@ func splitList(raw string) []string {
 		}
 	}
 	return out
+}
+
+// validateMail aplica nv-06: en producción hace falta servidor, con TLS y enlaces https://.
+func (c Config) validateMail() []error {
+	m := c.Mail
+	var errs []error
+	if c.IsProd() && !m.Enabled() {
+		errs = append(errs, fmt.Errorf("en prod %s es obligatorio: sin correo nadie verifica su cuenta ni recupera su contraseña", KeySMTPHost))
+	}
+	switch m.SMTPTLS {
+	case SMTPTLSStartTLS, SMTPTLSImplicit:
+	case SMTPTLSNone:
+		if c.IsProd() {
+			errs = append(errs, fmt.Errorf("en prod %s no puede ser none", KeySMTPTLS))
+		}
+		if m.SMTPUser != "" {
+			errs = append(errs, fmt.Errorf("%s=none con %s mandaría la contraseña sin cifrar", KeySMTPTLS, KeySMTPUser))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("%s admite starttls, tls o none", KeySMTPTLS))
+	}
+	if m.Enabled() {
+		errs = append(errs, m.validateServer(c.IsProd())...)
+	}
+	return append(errs, m.validateQueue()...)
+}
+
+func (m Mail) validateServer(prod bool) []error {
+	var errs []error
+	if m.SMTPPort < 1 || m.SMTPPort > 65535 {
+		errs = append(errs, fmt.Errorf("%s fuera de rango", KeySMTPPort))
+	}
+	if addr, err := mail.ParseAddress(m.From); err != nil || addr.Name != "" || strings.ContainsAny(m.From, "\r\n") {
+		errs = append(errs, fmt.Errorf("%s debe ser un correo simple (remitente@dominio)", KeyMailFrom))
+	}
+	if err := validateLinkBase(m.LinkBase, prod); err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", KeyAppLinkBase, err))
+	}
+	return errs
+}
+
+func (m Mail) validateQueue() []error {
+	var errs []error
+	if m.Timeout <= 0 || m.Timeout > maxMailTimeout {
+		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyMailTimeout, maxMailTimeout))
+	}
+	if m.Workers < 1 || m.Workers > maxMailWorkers {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 1 y %d", KeyMailWorkers, maxMailWorkers))
+	}
+	if m.QueueSize < 1 || m.QueueSize > maxMailQueue {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 1 y %d", KeyMailQueueSize, maxMailQueue))
+	}
+	return errs
+}
+
+// validateLinkBase exige http(s)://host[/ruta] sin consulta ni fragmento; en prod solo https.
+func validateLinkBase(base string, prod bool) error {
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return errors.New("debe tener la forma http(s)://host[/ruta], sin consulta ni fragmento")
+	}
+	switch {
+	case u.Scheme == "https":
+		return nil
+	case u.Scheme == "http" && !prod:
+		return nil
+	case prod:
+		return errors.New("en prod debe ser https://")
+	default:
+		return errors.New("debe ser http:// o https://")
+	}
+}
+
+func orDefault(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }

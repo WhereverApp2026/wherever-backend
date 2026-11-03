@@ -60,18 +60,42 @@ func New(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg co
 	return Build(t, client, rdb, cfg)
 }
 
+// MailFactory arma los dos mailers (peticiones y trabajo nocturno) con el logger del Env,
+// para probar el correo real contra Mailpit (nv-06). Sin factory se usa el buzón en memoria.
+type MailFactory func(log *slog.Logger) (requests, sync mailer.Mailer)
+
+// NewWithMail es New con mailers propios.
+func NewWithMail(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config, mail MailFactory) *Env {
+	t.Helper()
+	ctx := context.Background()
+	require.NoError(t, client.DB().Drop(ctx))
+	require.NoError(t, rdb.FlushDB(ctx).Err())
+	require.NoError(t, platformmongo.EnsureIndexes(ctx, client.DB(), indexes.All()...))
+	return build(t, client, rdb, cfg, mail)
+}
+
 // Build arma el módulo sin limpiar nada (para una segunda instancia o un Redis caído).
 func Build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config) *Env {
 	t.Helper()
+	return build(t, client, rdb, cfg, nil)
+}
+
+func build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config, factory MailFactory) *Env {
+	t.Helper()
 	log, logs := testutil.Logger()
 	mail := mailer.NewMemory()
+	var requests, sync mailer.Mailer = mail, mail
+	if factory != nil {
+		requests, sync = factory(log)
+	}
 	users := usuarios.NewRepository(client.DB())
-	svc, err := auth.NewService(users, auth.NewRepository(client.DB()), rdb, mail, auth.Config{
+	svc, err := auth.NewService(users, auth.NewRepository(client.DB()), rdb, requests, auth.Config{
 		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
 		AccessTTL:  cfg.AccessTTL,
 		RefreshTTL: cfg.RefreshTTL,
 	}, log)
 	require.NoError(t, err)
+	svc.WithSyncMailer(sync)
 	v, err := validation.New()
 	require.NoError(t, err)
 

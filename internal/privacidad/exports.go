@@ -22,12 +22,14 @@ const (
 	ExportDownloaded = "descargada"
 )
 
-// Plazos de una exportación: una por día, la pendiente se limpia sola a los 7 días y la
-// lista vive lo mismo que su enlace (24 h).
+// Plazos de una exportación (nv-06): una por día; la pendiente se limpia sola a los 7 días;
+// la lista vive como máximo 72 h desde que se armó, aunque el aviso no haya salido, y las
+// 24 h de descarga cuentan desde que salió el aviso.
 const (
 	ExportCooldown   = 24 * time.Hour
 	pendingRetention = 7 * 24 * time.Hour
-	readyRetention   = 24 * time.Hour
+	ReadyMaxAge      = 72 * time.Hour
+	DownloadWindow   = 24 * time.Hour
 )
 
 // ErrNoExport indica que no hay exportación lista.
@@ -44,6 +46,7 @@ type Export struct {
 	CreatedAt    time.Time     `bson:"creado_en"`
 	ReadyAt      *time.Time    `bson:"lista_en,omitempty"`
 	DownloadedAt *time.Time    `bson:"descargada_en,omitempty"`
+	NoticeSentAt *time.Time    `bson:"aviso_enviado_en,omitempty"`
 	ExpiresAt    time.Time     `bson:"expira_en"`
 }
 
@@ -102,11 +105,38 @@ func (e *Exports) Pending(ctx context.Context, limit int64) ([]Export, error) {
 	return out, cur.All(ctx, &out)
 }
 
-// MarkReady guarda el archivo; vence junto con su enlace.
+// MarkReady guarda el archivo; vence a las 72 h aunque el aviso no salga (el TTL la borra).
 func (e *Exports) MarkReady(ctx context.Context, id bson.ObjectID, data string, now time.Time) error {
 	_, err := e.col.UpdateByID(ctx, id, bson.D{{Key: "$set", Value: bson.D{
 		{Key: "estado", Value: ExportReady}, {Key: "datos_json", Value: data},
-		{Key: "lista_en", Value: now}, {Key: "expira_en", Value: now.Add(readyRetention)},
+		{Key: "lista_en", Value: now}, {Key: "expira_en", Value: now.Add(ReadyMaxAge)},
+	}}})
+	return err
+}
+
+// AwaitingNotice devuelve las exportaciones listas, sin vencer, cuyo aviso no ha salido.
+func (e *Exports) AwaitingNotice(ctx context.Context, now time.Time, limit int64) ([]Export, error) {
+	cur, err := e.col.Find(ctx, bson.D{
+		{Key: "estado", Value: ExportReady},
+		{Key: "aviso_enviado_en", Value: nil},
+		{Key: "expira_en", Value: bson.D{{Key: "$gt", Value: now}}},
+	}, options.Find().SetSort(bson.D{{Key: "lista_en", Value: 1}}).SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	var out []Export
+	return out, cur.All(ctx, &out)
+}
+
+// MarkNotified anota el aviso: desde ahí corren las 24 h de descarga, sin pasar de las 72 h
+// desde que se armó.
+func (e *Exports) MarkNotified(ctx context.Context, exp Export, now time.Time) error {
+	expires := now.Add(DownloadWindow)
+	if exp.ReadyAt != nil && exp.ReadyAt.Add(ReadyMaxAge).Before(expires) {
+		expires = exp.ReadyAt.Add(ReadyMaxAge)
+	}
+	_, err := e.col.UpdateByID(ctx, exp.ID, bson.D{{Key: "$set", Value: bson.D{
+		{Key: "aviso_enviado_en", Value: now}, {Key: "expira_en", Value: expires},
 	}}})
 	return err
 }

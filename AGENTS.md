@@ -66,7 +66,8 @@
 ## 7. Testing quirks
 - `testing` + `testify`; mocks solo de interfaces externas; Integration y Security usan la app real en proceso.
 - `Security` reutiliza el helper `internal/testutil` (tokens válidos/vencidos/sin firma).
-- Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`).
+- Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`). Desde nv-06 el stack incluye Mailpit (SMTP 1026, API 8026) y `testutil.Mailpit` lee los correos.
+- Correo (nv-06): las peticiones encolan con `mailer.Async` y nunca esperan al servidor; el trabajo nocturno envía directo con `mailer.Retrying`. Enlaces siempre con el token en el fragmento (`#token=`).
 - Paquetes de usuarios (nv-05): `internal/usuarios` es modelo, repositorio y el guardia `RequireActive`; `internal/usuarios/account` es service, handler y DTO. Van separados porque auth usa el repositorio de usuarios y el service de usuarios usa a auth. El test de arquitectura trata `internal/usuarios/account/handler.go` como handler: no puede importar drivers ni usar `recover`.
 - El service de un módulo se prueba en `tests/integration` contra bases reales (no en `internal/<modulo>`, que es Unit sin Docker); el armado del módulo para pruebas va en `internal/testutil/<modulo>test`.
 - Los tests de integración que reinician un contenedor deben fijar el puerto del host; si no, el puerto cambia y la conexión queda obsoleta.

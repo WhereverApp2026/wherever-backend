@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
+.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades mail-dev lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -84,7 +84,11 @@ infra-up:
 	$(COMPOSE) up -d --wait
 
 infra-down:
-	$(COMPOSE) down
+	$(COMPOSE) --profile dev down
+
+# Correo de desarrollo (nv-06): SMTP en 127.0.0.1:1025 y vista web en http://127.0.0.1:8025.
+mail-dev:
+	$(COMPOSE) --profile dev up -d mailpit
 
 image:
 	docker build --build-arg VERSION=$(VERSION) -t wherever-api:$(VERSION) .

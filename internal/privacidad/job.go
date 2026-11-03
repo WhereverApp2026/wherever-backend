@@ -43,6 +43,8 @@ type Result struct {
 	DeleteFailed  int
 	Exported      int
 	ExportsFailed int
+	Notified      int
+	NoticeFailed  int
 }
 
 // Job es el trabajo nocturno: borra las cuentas vencidas y arma las exportaciones pendientes.
@@ -101,9 +103,11 @@ func (j *Job) RunOnce(ctx context.Context) (Result, error) {
 	now := time.Now().UTC()
 	j.deleteDue(ctx, now, &res)
 	j.buildExports(ctx, now, &res)
+	j.sendNotices(ctx, now, &res)
 	j.log.InfoContext(ctx, "trabajo nocturno terminado",
 		"cuentas_borradas", res.Deleted, "borrados_fallidos", res.DeleteFailed,
-		"exportaciones", res.Exported, "exportaciones_fallidas", res.ExportsFailed)
+		"exportaciones", res.Exported, "exportaciones_fallidas", res.ExportsFailed,
+		"avisos", res.Notified, "avisos_fallidos", res.NoticeFailed)
 	return res, nil
 }
 
@@ -149,10 +153,31 @@ func (j *Job) buildExport(ctx context.Context, exp Export, now time.Time) error 
 	if err != nil {
 		return err
 	}
-	if err := j.exports.MarkReady(ctx, exp.ID, string(raw), now); err != nil {
-		return err
+	return j.exports.MarkReady(ctx, exp.ID, string(raw), now)
+}
+
+// sendNotices manda el aviso de las exportaciones listas que aún no lo tienen: las recién
+// armadas y las que fallaron en corridas anteriores, mientras no venzan (72 h). El envío es
+// síncrono (con sus reintentos) y cada intento crea un enlace nuevo que invalida el anterior.
+func (j *Job) sendNotices(ctx context.Context, now time.Time, res *Result) {
+	waiting, err := j.exports.AwaitingNotice(ctx, now, batchSize)
+	if err != nil {
+		j.log.ErrorContext(ctx, "trabajo nocturno: no se pudieron listar los avisos pendientes", "error", err.Error())
+		return
 	}
-	return j.links.SendExportLink(ctx, exp.UserID)
+	for _, exp := range waiting {
+		if err := j.links.SendExportLink(ctx, exp.UserID); err != nil {
+			// Queda sin aviso_enviado_en: la siguiente corrida lo reintenta si no venció.
+			res.NoticeFailed++
+			continue
+		}
+		if err := j.exports.MarkNotified(ctx, exp, time.Now().UTC()); err != nil {
+			res.NoticeFailed++
+			j.log.ErrorContext(ctx, "trabajo nocturno: no se pudo anotar el aviso", "error", err.Error())
+			continue
+		}
+		res.Notified++
+	}
 }
 
 func (j *Job) acquire(ctx context.Context) (string, bool, error) {

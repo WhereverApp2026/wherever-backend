@@ -1,5 +1,6 @@
-// Package mailer define el envío de correos de la API. El proveedor real (SMTP o servicio)
-// es deuda de nv-04: hoy existen el buzón en memoria para pruebas y el Log para desarrollo.
+// Package mailer envía los correos de la API (spec nv-06): adaptador SMTP genérico, cola en
+// segundo plano con reintentos, plantillas en español y enlaces con el token en el fragmento.
+// El buzón en memoria (pruebas) y el Log (dev y staging sin servidor) cumplen la misma interfaz.
 package mailer
 
 import "context"
@@ -14,9 +15,11 @@ const (
 	KindExport        Kind = "descargar_exportacion" // D-2 (nv-05): enlace de descarga de "mis datos"
 )
 
-// Message es un correo con el token del enlace; el proveedor arma el enlace.
+// Message es un correo con el token del enlace. El adaptador arma el enlace y el cuerpo;
+// Name es el nombre de pila para el saludo.
 type Message struct {
 	To    string
+	Name  string
 	Kind  Kind
 	Token string
 }

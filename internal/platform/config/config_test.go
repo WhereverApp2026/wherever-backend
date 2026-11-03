@@ -68,3 +68,63 @@ func TestLoad_RejectsInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func prodMail(overrides map[string]string) map[string]string {
+	values := map[string]string{
+		config.KeyAppEnv:      config.EnvProd,
+		config.KeySMTPHost:    "smtp.proveedor.test",
+		config.KeyMailFrom:    "no-responder@wherever.test",
+		config.KeyAppLinkBase: "https://wherever.test",
+	}
+	for k, v := range overrides {
+		values[k] = v
+	}
+	return values
+}
+
+func TestLoad_MailDefaultsWithoutServer(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+
+	require.NoError(t, err)
+	assert.False(t, cfg.Mail.Enabled(), "dev sin SMTP_HOST usa el LogMailer")
+	assert.Equal(t, config.SMTPTLSStartTLS, cfg.Mail.SMTPTLS)
+	assert.Equal(t, 587, cfg.Mail.SMTPPort)
+	assert.Equal(t, 5*time.Second, cfg.Mail.Timeout)
+	assert.Equal(t, 4, cfg.Mail.Workers)
+	assert.Equal(t, 100, cfg.Mail.QueueSize)
+}
+
+func TestLoad_ProdMailRules(t *testing.T) {
+	_, err := config.Load(testutil.Env(prodMail(nil)))
+	require.NoError(t, err, "prod con servidor, TLS y https arranca")
+
+	for name, overrides := range map[string]map[string]string{
+		"sin SMTP_HOST":        {config.KeySMTPHost: ""},
+		"SMTP_TLS none":        {config.KeySMTPTLS: "none"},
+		"enlace http":          {config.KeyAppLinkBase: "http://wherever.test"},
+		"enlace con consulta":  {config.KeyAppLinkBase: "https://wherever.test/?x=1"},
+		"remitente con nombre": {config.KeyMailFrom: "Wherever <no-responder@wherever.test>"},
+		"modo TLS desconocido": {config.KeySMTPTLS: "ssl"},
+		"cola enorme":          {config.KeyMailQueueSize: "50000"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := config.Load(testutil.Env(prodMail(overrides)))
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestLoad_NoPasswordOverPlainSMTP(t *testing.T) {
+	_, err := config.Load(testutil.Env(map[string]string{
+		config.KeySMTPHost: "127.0.0.1", config.KeySMTPPort: "1025", config.KeySMTPTLS: "none",
+		config.KeyMailFrom: "dev@wherever.test", config.KeyAppLinkBase: "http://localhost:8080",
+	}))
+	require.NoError(t, err, "Mailpit en dev: sin TLS y sin usuario")
+
+	_, err = config.Load(testutil.Env(map[string]string{
+		config.KeySMTPHost: "127.0.0.1", config.KeySMTPTLS: "none", config.KeySMTPUser: "alguien",
+		config.KeyMailFrom: "dev@wherever.test", config.KeyAppLinkBase: "http://localhost:8080",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sin cifrar")
+}

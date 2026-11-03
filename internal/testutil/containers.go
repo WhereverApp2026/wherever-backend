@@ -20,22 +20,27 @@ const (
 	MongoTestPort = "27018"
 	RedisTestPort = "6380"
 	Neo4jTestPort = "7688"
+	// Mailpit (nv-06): SMTP y API web.
+	MailpitSMTPTestPort = "1026"
+	MailpitWebTestPort  = "8026"
 
 	startupTimeout = 3 * time.Minute
 )
 
 // Mismas versiones que deployments/docker-compose.yml.
 const (
-	mongoImage = "mongo:7.0.14"
-	redisImage = "redis:7.4.1-alpine"
-	neo4jImage = "neo4j:5.26.0-community"
+	mongoImage   = "mongo:7.0.14"
+	redisImage   = "redis:7.4.1-alpine"
+	neo4jImage   = "neo4j:5.26.0-community"
+	mailpitImage = "axllent/mailpit:v1.21.8"
 )
 
-// Stack son las tres bases reales levantadas para Integration.
+// Stack son las tres bases reales y Mailpit (servidor de correo de prueba, nv-06).
 type Stack struct {
 	MongoURI  string
 	RedisAddr string
 	Neo4jURI  string
+	Mailpit   *Mailpit
 	stop      []func(context.Context) error
 	redis     testcontainers.Container
 }
@@ -74,7 +79,30 @@ func StartStack(ctx context.Context) (*Stack, error) {
 			stack.redis = c
 		}
 	}
+	if err := stack.startMailpit(ctx); err != nil {
+		return nil, errors.Join(err, stack.Stop(ctx))
+	}
 	return stack, nil
+}
+
+// startMailpit levanta Mailpit con sus dos puertos fijos (SMTP y API web).
+func (s *Stack) startMailpit(ctx context.Context) error {
+	c, err := testcontainers.Run(ctx, mailpitImage,
+		testcontainers.WithExposedPorts("1025/tcp", "8025/tcp"),
+		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+			hc.PortBindings = network.PortMap{
+				network.MustParsePort("1025/tcp"): {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: MailpitSMTPTestPort}},
+				network.MustParsePort("8025/tcp"): {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: MailpitWebTestPort}},
+			}
+		}),
+		testcontainers.WithWaitStrategy(wait.ForLog("accessible via").WithStartupTimeout(startupTimeout)),
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", mailpitImage, err)
+	}
+	s.stop = append(s.stop, func(ctx context.Context) error { return c.Terminate(ctx) })
+	s.Mailpit = &Mailpit{API: "http://127.0.0.1:" + MailpitWebTestPort, SMTPHost: "127.0.0.1", SMTPPort: MailpitSMTPTestPort}
+	return nil
 }
 
 // StopRedis detiene Redis sin borrarlo, para probar la caída real.
