@@ -304,6 +304,34 @@ func TestPrivacidad_LockLetsOnlyOneInstanceRun(t *testing.T) {
 	assert.Zero(t, exists, "al terminar suelta su candado")
 }
 
+// Dos instancias corren el trabajo al mismo tiempo sobre la misma cuenta vencida: entre las
+// dos la borran una sola vez (la otra no toma el candado o ya no la encuentra).
+func TestPrivacidad_TwoInstancesProcessEachAccountOnce(t *testing.T) {
+	env := authEnv(t)
+	second := authtestBuild(t, env)
+	_, due := register(t, env, "vence@wherever.test")
+	_, err := env.Account.RequestDeletion(context.Background(), due, account.DeleteConfirmation)
+	require.NoError(t, err)
+	_, err = env.Users.Update(context.Background(), stored(t, env, due).ID, bson.D{{Key: "eliminar_en", Value: time.Now().UTC().Add(-time.Minute)}})
+	require.NoError(t, err)
+
+	results := make([]privacidad.Result, 2)
+	var wg sync.WaitGroup
+	for i, job := range []*privacidad.Job{env.Job, second.Job} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, runErr := job.RunOnce(context.Background())
+			assert.NoError(t, runErr)
+			results[i] = res
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, 1, results[0].Deleted+results[1].Deleted, "%+v", results)
+	assert.Zero(t, results[0].DeleteFailed+results[1].DeleteFailed)
+}
+
 func TestPrivacidad_ExportIsOncePerDayAndDownloadsOnce(t *testing.T) {
 	env := authEnv(t)
 	_, claims := register(t, env, lu)

@@ -205,7 +205,11 @@ func (h *Handler) patchPrivacy(c *fiber.Ctx) error {
 
 func (h *Handler) setPhone(c *fiber.Ctx) error {
 	var req PhoneRequest
-	if err := h.bind(c, &req); err != nil {
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	req.Phone = NormalizePhone(req.Phone)
+	if err := h.validator.Struct(req); err != nil {
 		return err
 	}
 	if err := h.svc.SetPhone(c.UserContext(), claims(c), req.Phone); err != nil {
