@@ -30,15 +30,19 @@ const (
 // Config arma una configuración válida para el entorno dado.
 func Config(env string) config.Config {
 	return config.Config{
-		Env:             env,
-		Port:            8080,
-		JWTKey:          []byte(SigningKey),
-		JWTIssuer:       Issuer,
-		JWTAudience:     Audience,
-		AccessTTL:       config.MaxAccessTTL,
-		RefreshTTL:      config.MaxRefreshTTL,
-		PhoneHMACKey:    []byte(PhoneKey),
-		ArcoGraceDays:   config.MaxArcoGraceDays,
+		Env:           env,
+		Port:          8080,
+		JWTKey:        []byte(SigningKey),
+		JWTIssuer:     Issuer,
+		JWTAudience:   Audience,
+		AccessTTL:     config.MaxAccessTTL,
+		RefreshTTL:    config.MaxRefreshTTL,
+		PhoneHMACKey:  []byte(PhoneKey),
+		ArcoGraceDays: config.MaxArcoGraceDays,
+		Mail: config.Mail{
+			SMTPTLS: config.SMTPTLSStartTLS, SMTPPort: 587, Timeout: 5 * time.Second, Workers: 4, QueueSize: 100,
+			LinkBase: "http://localhost:8080",
+		},
 		BodyLimit:       config.MaxBodyLimit,
 		RequestTimeout:  config.MaxRequestTimeout,
 		RateLimitGlobal: config.DefaultRateGlobal,

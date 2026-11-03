@@ -233,6 +233,14 @@ func (r *Repository) LastTokenAt(ctx context.Context, userID bson.ObjectID, kind
 	return t.CreatedAt, true, nil
 }
 
+// InvalidateTokens deja sin efecto los enlaces sin usar de ese tipo (los marca como usados).
+func (r *Repository) InvalidateTokens(ctx context.Context, userID bson.ObjectID, kind string, now time.Time) error {
+	_, err := r.tokens.UpdateMany(ctx,
+		bson.D{{Key: "usuario_id", Value: userID}, {Key: "tipo", Value: kind}, {Key: "usado_en", Value: nil}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "usado_en", Value: now}}}})
+	return err
+}
+
 // ConsumeToken marca el token como usado si es de ese tipo, no se usó y no venció.
 // Es atómico: dos peticiones con el mismo enlace no lo pueden usar las dos.
 func (r *Repository) ConsumeToken(ctx context.Context, hash, kind string, now time.Time) (OneTimeToken, error) {

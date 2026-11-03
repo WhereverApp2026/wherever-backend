@@ -67,7 +67,8 @@ func run() error {
 		return fmt.Errorf("neo4j: %w", err)
 	}
 
-	modules, job, err := buildModules(cfg, log, mongoClient, redisClient)
+	mail := buildMail(cfg.Mail, log)
+	modules, job, err := buildModules(cfg, log, mongoClient, redisClient, mail)
 	if err != nil {
 		return err
 	}
@@ -104,11 +105,12 @@ func run() error {
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return errors.Join(err, mongoClient.Close(closeCtx), redisClient.Close(), neo4jDriver.Close(closeCtx))
+	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
+	return errors.Join(err, mail.shutdown(closeCtx), mongoClient.Close(closeCtx), redisClient.Close(), neo4jDriver.Close(closeCtx))
 }
 
 // buildModules arma los módulos de negocio y el trabajo nocturno con sus dependencias.
-func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client) ([]httpapi.Module, *privacidad.Job, error) {
+func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client, mail mailers) ([]httpapi.Module, *privacidad.Job, error) {
 	validator, err := validation.New()
 	if err != nil {
 		return nil, nil, err
@@ -116,8 +118,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	db := mongoClient.DB()
 	users := usuarios.NewRepository(db)
 	authRepo := auth.NewRepository(db)
-	// Sin proveedor de correo todavía (deuda de nv-04): el Log solo registra tipo y destinatario enmascarado.
-	authSvc, err := auth.NewService(users, authRepo, redisClient, mailer.NewLog(log), auth.Config{
+	authSvc, err := auth.NewService(users, authRepo, redisClient, mail.requests, auth.Config{
 		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
 		AccessTTL:  cfg.AccessTTL,
 		RefreshTTL: cfg.RefreshTTL,
@@ -125,6 +126,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth: %w", err)
 	}
+	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
 	exports := privacidad.NewExports(db)
 
@@ -149,4 +151,28 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		ciudades.NewHandler(citySvc, validator),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
+}
+
+// mailers son los dos caminos del correo (nv-06): las peticiones encolan y nunca esperan al
+// servidor; el trabajo nocturno envía directo porque necesita saber si el aviso salió.
+type mailers struct {
+	requests mailer.Mailer
+	sync     mailer.Mailer
+	shutdown func(context.Context) error
+}
+
+// buildMail arma el correo según la configuración. Sin SMTP_HOST (solo dev y staging; prod no
+// arranca) se usa el Log, que registra tipo y destinatario enmascarado.
+func buildMail(cfg config.Mail, log *slog.Logger) mailers {
+	if !cfg.Enabled() {
+		log.Warn("sin SMTP_HOST: los correos no se envían, solo se registran (tipo y destinatario enmascarado)")
+		logMailer := mailer.NewLog(log)
+		return mailers{requests: logMailer, sync: logMailer, shutdown: func(context.Context) error { return nil }}
+	}
+	smtpMailer := mailer.NewSMTP(mailer.SMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, TLSMode: cfg.SMTPTLS, From: cfg.From,
+	}, mailer.NewLinks(cfg.LinkBase), log)
+	direct := mailer.NewRetrying(smtpMailer, mailer.DefaultAttempts, mailer.DefaultRetryWait, cfg.Timeout)
+	queue := mailer.NewAsync(direct, cfg.Workers, cfg.QueueSize, log)
+	return mailers{requests: queue, sync: direct, shutdown: queue.Shutdown}
 }

@@ -18,11 +18,13 @@ import (
 var (
 	mongoClient *mongo.Client
 	redisClient *goredis.Client
+	mailpit     *testutil.Mailpit
 )
 
 func TestMain(m *testing.M) {
 	os.Exit(testutil.RunWithStack(m, func(s *testutil.Stack) (func(), error) {
 		var err error
+		mailpit = s.Mailpit
 		if mongoClient, err = mongo.New(s.MongoURI); err != nil {
 			return nil, err
 		}
