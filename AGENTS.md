@@ -67,6 +67,7 @@
 - `testing` + `testify`; mocks solo de interfaces externas; Integration y Security usan la app real en proceso.
 - `Security` reutiliza el helper `internal/testutil` (tokens válidos/vencidos/sin firma).
 - Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`).
+- Paquetes de usuarios (nv-05): `internal/usuarios` es modelo, repositorio y el guardia `RequireActive`; `internal/usuarios/account` es service, handler y DTO. Van separados porque auth usa el repositorio de usuarios y el service de usuarios usa a auth. El test de arquitectura trata `internal/usuarios/account/handler.go` como handler: no puede importar drivers ni usar `recover`.
 - El service de un módulo se prueba en `tests/integration` contra bases reales (no en `internal/<modulo>`, que es Unit sin Docker); el armado del módulo para pruebas va en `internal/testutil/<modulo>test`.
 - Los tests de integración que reinician un contenedor deben fijar el puerto del host; si no, el puerto cambia y la conexión queda obsoleta.
 - El proceso local se mata por nombre del binario, no por `go`.
@@ -96,7 +97,8 @@
 | `internal/platform` | Config, logger, Mongo, Redis, Neo4j |
 | `internal/http` | Servidor Fiber, middlewares, errores, rutas base |
 | `internal/shared` | Paginación por cursor, validación |
-| `internal/<modulo>` | Un módulo por funcionalidad (`nv-04+`) |
+| `internal/<modulo>` | Un módulo por funcionalidad (`nv-04+`); si su service usa a otro módulo que a su vez usa su repositorio, el service va en un subpaquete (`internal/usuarios/account`) |
+| `internal/privacidad` | ARCO: registro de `Purger`/`Exporter` y trabajo nocturno (`nv-05`) |
 | `internal/testutil` | Helpers de prueba (tokens, datos, contenedores) |
 | `tests/` | integration, security, database, contract |
 | `scripts/` | critic, endpoints, sdd, coverage, delta, indexes |

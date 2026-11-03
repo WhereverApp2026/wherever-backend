@@ -27,6 +27,8 @@ const (
 	MinJWTKeyBytes    = 32
 	MaxAccessTTL      = 15 * time.Minute
 	MaxRefreshTTL     = 30 * 24 * time.Hour
+	MinPhoneKeyBytes  = 32
+	MaxArcoGraceDays  = 30
 	defaultPort       = 8080
 	jwtKeyPlaceholder = "PLACEHOLDER"
 )
@@ -49,15 +51,17 @@ const (
 	KeyRateLimitWrites = "RATE_LIMIT_WRITES"
 	KeyJWTAccessTTL    = "JWT_ACCESS_TTL"
 	KeyJWTRefreshTTL   = "JWT_REFRESH_TTL"
+	KeyPhoneHMACKey    = "PHONE_HMAC_KEY"
+	KeyArcoGraceDays   = "ARCO_DIAS_GRACIA"
 )
 
 var requiredKeys = []string{
-	KeyAppEnv, KeyMongoURI, KeyRedisAddr, KeyNeo4jURI, KeyJWTKey, KeyJWTIssuer, KeyJWTAudience,
+	KeyAppEnv, KeyMongoURI, KeyRedisAddr, KeyNeo4jURI, KeyJWTKey, KeyJWTIssuer, KeyJWTAudience, KeyPhoneHMACKey,
 }
 
 var optionalKeys = []string{
 	KeyPort, KeyCORSOrigin, KeyTrustedProxies, KeyBodyLimit, KeyRequestTimeout, KeyRateLimitGlobal, KeyRateLimitWrites,
-	KeyJWTAccessTTL, KeyJWTRefreshTTL,
+	KeyJWTAccessTTL, KeyJWTRefreshTTL, KeyArcoGraceDays,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -77,6 +81,8 @@ type Config struct {
 	JWTAudience       string
 	AccessTTL         time.Duration
 	RefreshTTL        time.Duration
+	PhoneHMACKey      []byte
+	ArcoGraceDays     int
 	CORSAllowedOrigin string
 	TrustedProxies    []string
 	BodyLimit         int
@@ -111,6 +117,7 @@ func Load(getenv func(string) string) (Config, error) {
 		JWTKey:            []byte(getenv(KeyJWTKey)),
 		JWTIssuer:         getenv(KeyJWTIssuer),
 		JWTAudience:       getenv(KeyJWTAudience),
+		PhoneHMACKey:      []byte(getenv(KeyPhoneHMACKey)),
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
 	}
@@ -133,6 +140,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyBodyLimit, &c.BodyLimit, MaxBodyLimit},
 		{KeyRateLimitGlobal, &c.RateLimitGlobal, DefaultRateGlobal},
 		{KeyRateLimitWrites, &c.RateLimitWrites, DefaultRateWrites},
+		{KeyArcoGraceDays, &c.ArcoGraceDays, MaxArcoGraceDays},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -170,6 +178,9 @@ func (c Config) validate() []error {
 	if len(c.JWTKey) < MinJWTKeyBytes || strings.HasPrefix(string(c.JWTKey), jwtKeyPlaceholder) {
 		errs = append(errs, fmt.Errorf("%s debe tener al menos %d bytes y no ser el marcador de ejemplo", KeyJWTKey, MinJWTKeyBytes))
 	}
+	if len(c.PhoneHMACKey) < MinPhoneKeyBytes || strings.HasPrefix(string(c.PhoneHMACKey), jwtKeyPlaceholder) {
+		errs = append(errs, fmt.Errorf("%s debe tener al menos %d bytes y no ser el marcador de ejemplo", KeyPhoneHMACKey, MinPhoneKeyBytes))
+	}
 	if err := validateOrigin(c.CORSAllowedOrigin); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", KeyCORSOrigin, err))
 	}
@@ -199,6 +210,10 @@ func (c Config) validateTTLs() []error {
 	}
 	if c.RefreshTTL <= 0 || c.RefreshTTL > MaxRefreshTTL {
 		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyJWTRefreshTTL, MaxRefreshTTL))
+	}
+	// Hoja A1: la cuenta se borra 30 días después de pedirlo; se puede acortar, no alargar.
+	if c.ArcoGraceDays < 1 || c.ArcoGraceDays > MaxArcoGraceDays {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 1 y %d", KeyArcoGraceDays, MaxArcoGraceDays))
 	}
 	return errs
 }

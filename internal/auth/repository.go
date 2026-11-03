@@ -27,9 +27,9 @@ var errNoDocument = errors.New("sin documento")
 
 // Device es el teléfono que abrió la sesión.
 type Device struct {
-	Model      string `bson:"modelo"`
-	System     string `bson:"sistema"`
-	AppVersion string `bson:"app_version"`
+	Model      string `bson:"modelo" json:"modelo"`
+	System     string `bson:"sistema" json:"sistema"`
+	AppVersion string `bson:"app_version" json:"app_version"`
 }
 
 // Session es un documento de `sesiones` (hoja J1 §1). Agrega `refresh_hash_previo` (spec
@@ -250,4 +250,24 @@ func (r *Repository) ConsumeToken(ctx context.Context, hash, kind string, now ti
 		return OneTimeToken{}, errNoDocument
 	}
 	return t, err
+}
+
+// DeleteUserData borra las sesiones y los enlaces del usuario (borrado ARCO a los 30 días).
+func (r *Repository) DeleteUserData(ctx context.Context, userID bson.ObjectID) error {
+	filter := bson.D{{Key: "usuario_id", Value: userID}}
+	if _, err := r.sessions.DeleteMany(ctx, filter); err != nil {
+		return err
+	}
+	_, err := r.tokens.DeleteMany(ctx, filter)
+	return err
+}
+
+// ListByUser devuelve todas las sesiones del usuario, abiertas o no (exportación ARCO).
+func (r *Repository) ListByUser(ctx context.Context, userID bson.ObjectID) ([]Session, error) {
+	cur, err := r.sessions.Find(ctx, bson.D{{Key: "usuario_id", Value: userID}}, options.Find().SetSort(bson.D{{Key: "creado_en", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	var out []Session
+	return out, cur.All(ctx, &out)
 }

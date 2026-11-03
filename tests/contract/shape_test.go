@@ -55,6 +55,11 @@ func shape(t *testing.T, v any) any {
 
 func call(t *testing.T, app *fiber.App, method, path string, body any, token string) (int, any) {
 	t.Helper()
+	return callHeaders(t, app, method, path, body, token, nil)
+}
+
+func callHeaders(t *testing.T, app *fiber.App, method, path string, body any, token string, headers map[string]string) (int, any) {
+	t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
 		require.NoError(t, json.NewEncoder(&buf).Encode(body))
@@ -63,6 +68,9 @@ func call(t *testing.T, app *fiber.App, method, path string, body any, token str
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	if token != "" {
 		req.Header.Set(fiber.HeaderAuthorization, "Bearer "+token)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	resp, err := app.Test(req, -1)
 	require.NoError(t, err)

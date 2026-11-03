@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,4 +91,34 @@ func TestEmailRule_HasSpanishMessage(t *testing.T) {
 	fields := fieldsOf(t, newValidator(t).Struct(passwordDTO{Password: "abcdefg1", Email: "no-es-correo"}))
 
 	assert.Equal(t, map[string]string{"correo": "no es un correo válido"}, fields)
+}
+
+type profileDTO struct {
+	Birth  string `json:"fecha_nacimiento" validate:"omitempty,adult"`
+	Phone  string `json:"telefono" validate:"omitempty,e164"`
+	Quiet  string `json:"desde" validate:"omitempty,hhmm"`
+	CityID string `json:"ciudad_id" validate:"omitempty,objectid"`
+}
+
+func TestAdultRule_EighteenByUTCDate(t *testing.T) {
+	today := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	assert.True(t, IsAdult(time.Date(2008, 11, 2, 0, 0, 0, 0, time.UTC), today), "cumple 18 hoy")
+	assert.False(t, IsAdult(time.Date(2008, 11, 3, 0, 0, 0, 0, time.UTC), today), "cumple 18 mañana")
+
+	v := newValidator(t)
+	assert.NoError(t, v.Struct(profileDTO{Birth: "1990-01-31"}))
+	for _, bad := range []string{time.Now().UTC().AddDate(-17, 0, 0).Format(DateLayout), "31/01/1990", "1990-02-30"} {
+		assert.Contains(t, fieldsOf(t, v.Struct(profileDTO{Birth: bad}))["fecha_nacimiento"], "18 años", bad)
+	}
+}
+
+func TestFormatRules_E164HHMMObjectID(t *testing.T) {
+	v := newValidator(t)
+	assert.NoError(t, v.Struct(profileDTO{Phone: "+5215512345678", Quiet: "22:30", CityID: "65a1f0c2e4b0a1b2c3d4e5f6"}))
+
+	fields := fieldsOf(t, v.Struct(profileDTO{Phone: "5512345678", Quiet: "24:00", CityID: "abc"}))
+
+	assert.Contains(t, fields["telefono"], "formato internacional")
+	assert.Contains(t, fields["desde"], "HH:MM")
+	assert.Contains(t, fields["ciudad_id"], "identificador")
 }

@@ -11,6 +11,7 @@ type Kind string
 const (
 	KindPasswordReset Kind = "recuperar_password" // #nosec G101 -- tipo de correo, no una credencial
 	KindVerifyEmail   Kind = "verificar_correo"
+	KindExport        Kind = "descargar_exportacion" // D-2 (nv-05): enlace de descarga de "mis datos"
 )
 
 // Message es un correo con el token del enlace; el proveedor arma el enlace.

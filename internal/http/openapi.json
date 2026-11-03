@@ -3,7 +3,7 @@
   "info": {
     "title": "Wherever API",
     "version": "v1",
-    "description": "Arquitectura base (nv-01) y autenticación (nv-04, hoja J1). POST /auth/google queda diferido (D-1)."
+    "description": "Arquitectura base (nv-01), autenticación (nv-04, hoja J1) y usuarios, perfil y privacidad (nv-05, hoja A1). POST /auth/google queda diferido (D-1)."
   },
   "paths": {
     "/health": {
@@ -471,6 +471,698 @@
           }
         }
       }
+    },
+    "/api/v1/usuarios": {
+      "post": {
+        "summary": "Registro con correo (5 por hora por IP)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta creada con tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/correo-disponible": {
+      "get": {
+        "summary": "Correo disponible (20/min por IP)",
+        "parameters": [
+          {
+            "name": "correo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disponibilidad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "disponible": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo": {
+      "get": {
+        "summary": "Perfil propio (ETag = version)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edita nombre, foto o ciudad con If-Match",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string"
+                  },
+                  "foto_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "ciudad_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Pide eliminar la cuenta (30 días de gracia); cierra todas las sesiones",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirmacion"
+                ],
+                "properties": {
+                  "confirmacion": {
+                    "type": "string",
+                    "enum": [
+                      "ELIMINAR"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Fecha de borrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eliminar_en": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/correo": {
+      "put": {
+        "summary": "Cambia el correo (pide contraseña); queda sin verificar",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "correo_nuevo": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/gustos": {
+      "put": {
+        "summary": "Gustos del onboarding (consumidor)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Gustos"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Gustos"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/preferencias": {
+      "patch": {
+        "summary": "Preferencias parciales; reservas no se apagan",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferencias"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Preferencias"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/privacidad": {
+      "patch": {
+        "summary": "Interruptores de privacidad parciales",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Privacidad"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Privacidad"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/telefono": {
+      "put": {
+        "summary": "Teléfono E.164, guardado como HMAC-SHA-256",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "telefono_registrado": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "telefono": {
+                    "type": "string",
+                    "example": "+5215512345678"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/modo": {
+      "post": {
+        "summary": "Cambia entre explorar y negocio",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modo_actual": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "modo": {
+                    "type": "string",
+                    "enum": [
+                      "explorar",
+                      "negocio"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/exportar": {
+      "post": {
+        "summary": "Pide descargar mis datos (una por día)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Sin cuerpo"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/historial": {
+      "delete": {
+        "summary": "Borra el historial; conserva la cuenta",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sin cuerpo"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/yo/cancelar-eliminacion": {
+      "post": {
+        "summary": "Cancela la eliminación dentro del plazo",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/exportaciones/descargar": {
+      "post": {
+        "summary": "Descarga mis datos con el enlace de un solo uso (D-2); el archivo se borra al descargarlo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON con un objeto por módulo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/ciudades/autocompletar": {
+      "get": {
+        "summary": "Autocompletado de ciudades por prefijo",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 8,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ciudades",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "nombre": {
+                        "type": "string"
+                      },
+                      "estado": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -794,6 +1486,265 @@
             "minLength": 8,
             "maxLength": 128,
             "description": "Al menos una letra y un número"
+          }
+        }
+      },
+      "Gustos": {
+        "type": "object",
+        "properties": {
+          "categorias": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 3,
+            "maxItems": 10
+          },
+          "presupuesto_min": {
+            "type": "integer"
+          },
+          "presupuesto_max": {
+            "type": "integer"
+          },
+          "restricciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alergias": {
+            "type": "string"
+          }
+        }
+      },
+      "Preferencias": {
+        "type": "object",
+        "properties": {
+          "movilidad_default": {
+            "type": "string",
+            "enum": [
+              "a_pie",
+              "bicicleta",
+              "auto",
+              "transporte_publico"
+            ]
+          },
+          "tema": {
+            "type": "string",
+            "enum": [
+              "claro",
+              "oscuro",
+              "sistema"
+            ]
+          },
+          "unidades": {
+            "type": "string",
+            "enum": [
+              "km",
+              "mi"
+            ]
+          },
+          "horario_silencioso": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "desde": {
+                "type": "string",
+                "example": "22:00"
+              },
+              "hasta": {
+                "type": "string",
+                "example": "07:00"
+              }
+            }
+          },
+          "notificaciones": {
+            "type": "object",
+            "properties": {
+              "reservas": {
+                "type": "boolean"
+              },
+              "cupones": {
+                "type": "boolean"
+              },
+              "grupos": {
+                "type": "boolean"
+              },
+              "resenas": {
+                "type": "boolean"
+              },
+              "promociones": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "Privacidad": {
+        "type": "object",
+        "properties": {
+          "ubicacion": {
+            "type": "boolean"
+          },
+          "aprendizaje_personalizado": {
+            "type": "boolean"
+          },
+          "estado_animo": {
+            "type": "boolean"
+          },
+          "datos_uso": {
+            "type": "boolean"
+          },
+          "buscable_por_telefono": {
+            "type": "boolean"
+          },
+          "promociones_correo": {
+            "type": "boolean"
+          },
+          "version_terminos": {
+            "type": "string"
+          },
+          "fecha_aceptacion": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Perfil": {
+        "type": "object",
+        "description": "Nunca incluye password_hash, telefono_hash ni google_id.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string"
+          },
+          "correo_verificado": {
+            "type": "boolean"
+          },
+          "foto_url": {
+            "type": "string"
+          },
+          "codigo_amigo": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modo_actual": {
+            "type": "string",
+            "enum": [
+              "explorar",
+              "negocio"
+            ]
+          },
+          "ciudad": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre": {
+                "type": "string"
+              }
+            }
+          },
+          "gustos": {
+            "$ref": "#/components/schemas/Gustos"
+          },
+          "preferencias": {
+            "$ref": "#/components/schemas/Preferencias"
+          },
+          "privacidad": {
+            "$ref": "#/components/schemas/Privacidad"
+          },
+          "telefono_registrado": {
+            "type": "boolean"
+          },
+          "puntos": {
+            "type": "integer"
+          },
+          "nivel": {
+            "type": "string"
+          },
+          "racha_semanas": {
+            "type": "integer"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "bloqueado",
+              "eliminacion_pendiente"
+            ]
+          },
+          "eliminar_en": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RegistroRequest": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "fecha_nacimiento",
+          "correo",
+          "password",
+          "acepta_terminos",
+          "version_terminos"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40
+          },
+          "fecha_nacimiento": {
+            "type": "string",
+            "format": "date",
+            "description": "18 años o más (UTC)"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "acepta_terminos": {
+            "type": "boolean"
+          },
+          "version_terminos": {
+            "type": "string"
+          },
+          "promociones_correo": {
+            "type": "boolean"
+          },
+          "dispositivo": {
+            "$ref": "#/components/schemas/Dispositivo"
           }
         }
       }

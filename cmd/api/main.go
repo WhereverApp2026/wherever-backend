@@ -5,13 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // el trabajo nocturno usa America/Mexico_City aunque la imagen no traiga zonas
+
+	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
@@ -21,8 +26,10 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
+	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 )
 
 // version se fija al compilar: -ldflags "-X main.version=v0.1.0".
@@ -60,22 +67,15 @@ func run() error {
 		return fmt.Errorf("neo4j: %w", err)
 	}
 
-	validator, err := validation.New()
+	modules, job, err := buildModules(cfg, log, mongoClient, redisClient)
 	if err != nil {
 		return err
 	}
-
-	// Sin proveedor de correo todavía (deuda de nv-04): el Log solo registra tipo y destinatario enmascarado.
-	authSvc, err := auth.NewService(
-		usuarios.NewRepository(mongoClient.DB()), auth.NewRepository(mongoClient.DB()), redisClient, mailer.NewLog(log),
-		auth.Config{
-			JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
-			AccessTTL:  cfg.AccessTTL,
-			RefreshTTL: cfg.RefreshTTL,
-		}, log)
+	stopJob, err := job.Start()
 	if err != nil {
-		return fmt.Errorf("auth: %w", err)
+		return fmt.Errorf("trabajo nocturno: %w", err)
 	}
+	defer func() { _ = stopJob() }()
 
 	app := httpapi.NewApp(cfg, httpapi.Deps{
 		Logger:  log,
@@ -85,7 +85,7 @@ func run() error {
 		Neo4j:   neo4jDriver,
 		// La API no crea índices (constitución §5); /ready da 503 si falta alguno.
 		MongoIndexes: mongo.NewIndexVerifier(mongoClient.DB(), indexes.All()...),
-		Modules:      []httpapi.Module{auth.NewHandler(authSvc, validator)},
+		Modules:      modules,
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -105,4 +105,48 @@ func run() error {
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return errors.Join(err, mongoClient.Close(closeCtx), redisClient.Close(), neo4jDriver.Close(closeCtx))
+}
+
+// buildModules arma los módulos de negocio y el trabajo nocturno con sus dependencias.
+func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client) ([]httpapi.Module, *privacidad.Job, error) {
+	validator, err := validation.New()
+	if err != nil {
+		return nil, nil, err
+	}
+	db := mongoClient.DB()
+	users := usuarios.NewRepository(db)
+	authRepo := auth.NewRepository(db)
+	// Sin proveedor de correo todavía (deuda de nv-04): el Log solo registra tipo y destinatario enmascarado.
+	authSvc, err := auth.NewService(users, authRepo, redisClient, mailer.NewLog(log), auth.Config{
+		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+		AccessTTL:  cfg.AccessTTL,
+		RefreshTTL: cfg.RefreshTTL,
+	}, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth: %w", err)
+	}
+	citySvc := ciudades.NewService(ciudades.NewRepository(db))
+	exports := privacidad.NewExports(db)
+
+	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
+	registry := privacidad.NewRegistry()
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, account.NewPrivacy(users)} {
+		registry.RegisterPurger(p)
+	}
+	registry.RegisterExporter(account.NewPrivacy(users))
+	registry.RegisterExporter(auth.NewPrivacy(authRepo))
+
+	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
+		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("usuarios: %w", err)
+	}
+	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
+	active := usuarios.RequireActive(users)
+	modules := []httpapi.Module{
+		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
+		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
+		ciudades.NewHandler(citySvc, validator),
+	}
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
