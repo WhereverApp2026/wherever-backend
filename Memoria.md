@@ -70,10 +70,35 @@
 - A evitar: en go-mutesting "PASS" = mutante muerto (bueno) y "FAIL" = mutante vivo. El score solo usa los tests del paquete del archivo, así que lo que prueba `internal/arch` no cuenta.
 - A evitar: Python en la consola de Windows imprime mal los acentos; el script reconfigura stdout a UTF-8.
 
+## Ejecución nv-04 (2026-11-02)
+- Estado: aprobada por Osmar Reséndiz el 2026-11-02 (PR #6), salvo T7. T1–T6 y T8 ejecutadas en la rama `nv-04-auth` (sale de `main` con nv-03). Once endpoints de J1, colecciones `sesiones` y `tokens_un_uso`, `usuarios` mínimo, mailer en memoria y de log, índices por script y suites Database y Contract nuevas. T7 (Google) diferida. Spec en Borrador con evidencia, sin firma.
+- Decisión D-1 (pendiente, no tomada aquí): Google sin `fecha_nacimiento`. Hasta que el responsable de A1 (Alexander Dominguez Zarate) apruebe la propuesta de la spec, no hay `/auth/google` ni la dependencia `google.golang.org/api/idtoken` (excepción de stack, Apache-2.0, mantenida por Google) ni `GOOGLE_CLIENT_ID`.
+- Decisión: llaves `jwt_revocado:{jti}` y `login_fallos:{correo}` aunque la spec nv-04 decía `blacklist:/attempts:/lockout:`. Porqué: la constitución §6 y la alineación del 2026-10-29 fijan esos nombres; nv-01 ya usa `jwt_revocado:`. El bloqueo es la misma llave con 5 o más y su TTL da los minutos del 423.
+- Decisión: índices declarados por módulo (`Indexes()`), reunidos en `internal/indexes` y creados solo por `scripts/indexes` (`make indexes`). Porqué: constitución §5; el plan decía "en el arranque".
+- Decisión: `sesiones` guarda `jti_vigente` (subido a la hoja J1 en la v3 del Excel junto con `refresh_hash_previo`; su vencimiento se calcula con `ultimo_uso` + vida del access, sin campo extra); al cerrar una, todas, por reutilización o al cambiar contraseña se revoca el access vigente de cada sesión, y al rotar el refresh el access anterior. Porqué: sin eso un teléfono "cerrado" seguía entrando hasta 15 min.
+- Decisión: los módulos montan sus rutas con `httpapi.Module` (`Routes(v1, limiter)`) y reciben el validador por constructor; se quitó `Deps.Validator` de nv-02. Porqué: el handler necesita su service y el limitador para sus políticas por ruta; `internal/http` sigue sin importar drivers.
+- Decisión: el service se prueba en `tests/integration` (bases reales) y el armado del módulo para pruebas va en `internal/testutil/authtest` (aparte de `testutil` para no crear un ciclo con los tests internos de `auth`). Security, Database y Contract usan `testutil.RunWithStack`.
+- Decisión: login 5 por 5 min por IP; `refresh`, `recuperar`, `restablecer` y `verificar-correo` 10 por min por IP, cada una con su llave. Valor provisional (spec), medir antes de endurecer.
+- Decisión: `202` sin cuerpo (`c.Status`), porque `SendStatus` escribe "Accepted" como texto.
+- Deuda: proveedor real de correo (hoy `mailer.Log` en todos los entornos: los enlaces no salen); `MAIL_FROM` llega con él. Para nv-05: `auth.Service.CreateSession` y `SendVerification` son los puntos de entrada (su spec dice `CrearSesion`).
+- A evitar: `require.Equal(..., readAll(t, resp))` consume el cuerpo antes de decodificarlo (EOF); leer primero y luego afirmar.
+- A evitar: en Windows, Control de aplicaciones bloquea siempre el `cover.exe` de Go 1.27.3 recién instalado; la cobertura se mide en `golang:1.27.3` con `-v //var/run/docker.sock:/var/run/docker.sock --network host` (Testcontainers funciona desde el contenedor). No se cambió la política.
+- A evitar: gosec G101 marca nombres como `tokens_un_uso` o `recuperar_password`; se anota `#nosec G101` con motivo y en `_test.go` se excluye por configuración.
+- A evitar: heredocs largos con comillas en el Bash de la herramienta siguen fallando; escribir el archivo directo.
+- A evitar: go-mutesting reemplaza el archivo original mientras prueba cada mutante (deja un `.go.tmp`). No hacer `git add`, compilar ni editar `.go` durante `scripts/mutation.sh`: aquí se llegó a stagear un mutante de `password.go`; se corrigió re-stageando tras la corrida.
+- Decisión: `/ready` da 503 (`indices_mongodb: error`) si falta un índice declarado; lo verifica `mongo.IndexVerifier` sin crearlo. Porqué: si alguien arranca la API sin `make indexes`, sin `ux_correo` dos registros en carrera crearían cuentas duplicadas; el balanceador no le manda tráfico hasta que existan.
+- Decisión: `scripts/mutation.sh` copia el árbol (versionados + nuevos no ignorados) a un directorio temporal y muta ahí; en PR solo `MUTATION_SCOPE` (por defecto `internal/auth/{service,tokens}.go` cambiados) y la completa en `.github/workflows/nightly.yml` (`--full`, 120 min). Línea base: 0,62 sobre los 18 archivos de nv-04.
+- Límite conocido de la mutación: con `skip_without_test: true` go-mutesting solo muta archivos con un `_test.go` del mismo nombre, y solo corre las pruebas de su paquete. De 36 candidatos de `internal/` muta 12 (también en `--full`); salta `auth/service.go`, `handler.go`, `repository.go`, `usuarios/repository.go` y todo lo que se prueba en `tests/`. Por eso la línea base 0,62 solo mide 7 de los 18 archivos de nv-04 (`password`, `tokens`, `app`, `roles`, `config`, `mailer`, `registry`) y el 0,79 del alcance de PR solo mide `tokens.go`: ninguno dice nada de la calidad de las pruebas del service. Para medirlo: un `--exec` en el nightly que corra las pruebas de integración del paquete (lento). Un `service_test.go` con repositorios simulados daría el número pero va contra la regla de bases reales.
+- Verificado (2026-11-02): la constitución del repo dice `jwt_revocado:{jti}` y `login_fallos:{correo}` desde el primer commit (980dff8), igual que la hoja J1 v3; el critic B2 no tiene excepción por `blacklist:`. `specs/nv-03` sin diferencias con `main`.
+- Medición nv-04: cobertura unida 83,7 % (solo Unit 36,4 %; el gate de CI une las cinco suites), delta 81,4 %, mutación 0,62 en 31 min (línea base de 7 archivos, ahora nightly) y 0,79 en 3 min 43 s con el alcance de PR (solo `tokens.go`; ver el límite conocido).
+- A evitar: `check_delta_coverage.py` en Windows leía `git diff` como cp1252 y caía con acentos; ahora fija UTF-8. Y medirlo siempre después de unir los cinco perfiles: `check_coverage.sh` sin perfiles sobrescribe `bin/coverage.out` solo con Unit.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
-- Nombre del revisor para firmar las specs (responsables en el Excel: Jorge Alberto Rodríguez Enriquez, hojas J; Alexander Dominguez Zarate, hojas A).
+- D-1: cuenta nueva por Google sin `fecha_nacimiento` (propuesta en `specs/nv-04/spec.md`; dueño A1).
+- Proveedor de correo (SMTP o servicio) y su remitente (`MAIL_FROM`).
+- Firma de `nv-00…nv-03`: siguen en Borrador con evidencia. Desde nv-04 el revisor es Osmar Reséndiz (único integrante de backend; el Excel nombra a Jorge Alberto Rodríguez Enriquez para las hojas J y a Alexander Dominguez Zarate para las A como responsables del diseño).
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.
 
 ## Mapa de fases

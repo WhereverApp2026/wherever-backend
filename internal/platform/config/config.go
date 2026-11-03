@@ -25,6 +25,8 @@ const (
 	DefaultRateGlobal = 1000
 	DefaultRateWrites = 10
 	MinJWTKeyBytes    = 32
+	MaxAccessTTL      = 15 * time.Minute
+	MaxRefreshTTL     = 30 * 24 * time.Hour
 	defaultPort       = 8080
 	jwtKeyPlaceholder = "PLACEHOLDER"
 )
@@ -45,6 +47,8 @@ const (
 	KeyRequestTimeout  = "REQUEST_TIMEOUT"
 	KeyRateLimitGlobal = "RATE_LIMIT_GLOBAL"
 	KeyRateLimitWrites = "RATE_LIMIT_WRITES"
+	KeyJWTAccessTTL    = "JWT_ACCESS_TTL"
+	KeyJWTRefreshTTL   = "JWT_REFRESH_TTL"
 )
 
 var requiredKeys = []string{
@@ -53,6 +57,7 @@ var requiredKeys = []string{
 
 var optionalKeys = []string{
 	KeyPort, KeyCORSOrigin, KeyTrustedProxies, KeyBodyLimit, KeyRequestTimeout, KeyRateLimitGlobal, KeyRateLimitWrites,
+	KeyJWTAccessTTL, KeyJWTRefreshTTL,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -70,6 +75,8 @@ type Config struct {
 	JWTKey            []byte
 	JWTIssuer         string
 	JWTAudience       string
+	AccessTTL         time.Duration
+	RefreshTTL        time.Duration
 	CORSAllowedOrigin string
 	TrustedProxies    []string
 	BodyLimit         int
@@ -134,11 +141,22 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		}
 		*item.target = value
 	}
-	timeout, err := durationOr(getenv(KeyRequestTimeout), MaxRequestTimeout)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("%s: no es una duración (ej. 60s)", KeyRequestTimeout))
+	durations := []struct {
+		key      string
+		target   *time.Duration
+		fallback time.Duration
+	}{
+		{KeyRequestTimeout, &c.RequestTimeout, MaxRequestTimeout},
+		{KeyJWTAccessTTL, &c.AccessTTL, MaxAccessTTL},
+		{KeyJWTRefreshTTL, &c.RefreshTTL, MaxRefreshTTL},
 	}
-	c.RequestTimeout = timeout
+	for _, item := range durations {
+		value, err := durationOr(getenv(item.key), item.fallback)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: no es una duración (ej. 60s)", item.key))
+		}
+		*item.target = value
+	}
 	return errs
 }
 
@@ -169,7 +187,20 @@ func (c Config) validateLimits() []error {
 	if c.RequestTimeout <= 0 || c.RequestTimeout > MaxRequestTimeout {
 		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyRequestTimeout, MaxRequestTimeout))
 	}
+	errs = append(errs, c.validateTTLs()...)
 	return append(errs, c.validateRates()...)
+}
+
+// validateTTLs aplica la constitución §6: access 15 min y refresh 30 días como máximo.
+func (c Config) validateTTLs() []error {
+	var errs []error
+	if c.AccessTTL <= 0 || c.AccessTTL > MaxAccessTTL {
+		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyJWTAccessTTL, MaxAccessTTL))
+	}
+	if c.RefreshTTL <= 0 || c.RefreshTTL > MaxRefreshTTL {
+		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyJWTRefreshTTL, MaxRefreshTTL))
+	}
+	return errs
 }
 
 func (c Config) validateRates() []error {

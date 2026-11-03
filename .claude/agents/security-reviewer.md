@@ -17,7 +17,7 @@ model: inherit
 
 ## Matriz por fase (no todo aplica siempre)
 - En `nv-00`: solo `.env.example` sin secretos + `golangci-lint`/`gosec` configurados + `critic B1/B2` + test de configuración. Auth diferido: un FAIL de auth aquí es falso positivo.
-- En `nv-01`: orden del pipeline + headers + `/ready` + CORS 1 origen + límites de cuerpo y timeout + políticas de rate configuradas (sin usuarios) + `semgrep 0`. Emisión de JWT, lockout y roles usados son `nv-04+`; no fallarlos en vacío.
+- En `nv-01`: orden del pipeline + headers + `/ready` + CORS 1 origen + límites de cuerpo y timeout + políticas de rate configuradas (sin usuarios) + `semgrep 0`. Emisión de JWT, bloqueo de login (`login_fallos:{correo}`) y roles usados son `nv-04+`; no fallarlos en vacío.
 - En `nv-02`: sin superficie nueva; validar que el molde no expone rutas ni accede a la base desde handlers.
 - En `nv-04+` (primer módulo con auth real): roles usados (401 sin token, 403 sin rol) + hash o plano nunca en la respuesta + 429 uniforme con `Retry-After` + algoritmo erróneo o `none` → 401 + claims `sub/jti/roles` preservados.
 

@@ -23,27 +23,50 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// JWTConfig fija clave, emisor y audiencia. La emisión llega con el módulo auth.
+// JWTConfig fija clave, emisor y audiencia. La emisión vive en el módulo auth.
 type JWTConfig struct {
 	Key      []byte
 	Issuer   string
 	Audience string
 }
 
-// JWT valida el Bearer si viene. Sin encabezado la petición sigue como anónima y las
-// rutas protegidas lo exigen con RequireRoles. Un token presente e inválido siempre es 401.
-// La revocación `jwt_revocado:{jti}` se consulta en Redis y es fail-closed (503).
-func JWT(cfg JWTConfig, rdb *goredis.Client) fiber.Handler {
-	parser := jwt.NewParser(
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithIssuer(cfg.Issuer),
-		jwt.WithAudience(cfg.Audience),
-		jwt.WithExpirationRequired(),
-		jwt.WithIssuedAt(),
-		jwt.WithLeeway(0),
-	)
-	keyFunc := func(*jwt.Token) (any, error) { return cfg.Key, nil }
+// AccessParser valida un access token: solo HS256, iss/aud, `exp` e `iat` obligatorios,
+// leeway 0, y `sub`/`jti` presentes. Lo comparten el middleware y el módulo auth.
+type AccessParser struct {
+	parser *jwt.Parser
+	key    []byte
+}
 
+// NewAccessParser arma el validador con la clave, el emisor y la audiencia dados.
+func NewAccessParser(cfg JWTConfig) *AccessParser {
+	return &AccessParser{
+		parser: jwt.NewParser(
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+			jwt.WithIssuer(cfg.Issuer),
+			jwt.WithAudience(cfg.Audience),
+			jwt.WithExpirationRequired(),
+			jwt.WithIssuedAt(),
+			jwt.WithLeeway(0),
+		),
+		key: cfg.Key,
+	}
+}
+
+// Parse devuelve los claims de un token válido; cualquier falla es apperr.Unauthorized.
+func (p *AccessParser) Parse(raw string) (*Claims, error) {
+	claims := &Claims{}
+	keyFunc := func(*jwt.Token) (any, error) { return p.key, nil }
+	if _, err := p.parser.ParseWithClaims(raw, claims, keyFunc); err != nil || claims.Subject == "" || claims.ID == "" {
+		return nil, apperr.Unauthorized("credenciales inválidas")
+	}
+	return claims, nil
+}
+
+// JWT valida el Bearer si viene. Sin encabezado la petición sigue como anónima y las
+// rutas protegidas lo exigen con RequireAuth o RequireRoles. Un token presente e inválido
+// siempre es 401. La revocación `jwt_revocado:{jti}` se consulta en Redis y es fail-closed (503).
+func JWT(cfg JWTConfig, rdb *goredis.Client) fiber.Handler {
+	parser := NewAccessParser(cfg)
 	return func(c *fiber.Ctx) error {
 		header := c.Get(fiber.HeaderAuthorization)
 		if header == "" {
@@ -53,9 +76,9 @@ func JWT(cfg JWTConfig, rdb *goredis.Client) fiber.Handler {
 		if !ok || raw == "" {
 			return apperr.Unauthorized("credenciales inválidas")
 		}
-		claims := &Claims{}
-		if _, err := parser.ParseWithClaims(raw, claims, keyFunc); err != nil || claims.Subject == "" || claims.ID == "" {
-			return apperr.Unauthorized("credenciales inválidas")
+		claims, err := parser.Parse(raw)
+		if err != nil {
+			return err
 		}
 		revoked, err := rdb.Exists(c.UserContext(), revokedKeyBase+claims.ID).Result()
 		if err != nil {

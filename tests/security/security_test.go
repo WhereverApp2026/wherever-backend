@@ -1,5 +1,6 @@
-// Package security prueba la app real en proceso contra ataques base: encabezados y JWT.
-// No necesita contenedores: un token inválido se rechaza antes de consultar Redis.
+// Package security prueba la app real en proceso contra ataques base: encabezados, JWT y
+// auth (nv-04). Las de este archivo usan bases caídas: un token inválido se rechaza antes de
+// consultar Redis. Las de auth_security_test.go usan MongoDB y Redis reales.
 package security
 
 import (

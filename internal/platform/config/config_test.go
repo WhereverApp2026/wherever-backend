@@ -21,6 +21,8 @@ func TestLoad_ValidConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, 60*time.Second, cfg.RequestTimeout)
 	assert.Equal(t, 1000, cfg.RateLimitGlobal)
 	assert.Equal(t, 10, cfg.RateLimitWrites)
+	assert.Equal(t, 15*time.Minute, cfg.AccessTTL)
+	assert.Equal(t, 30*24*time.Hour, cfg.RefreshTTL)
 	assert.Empty(t, cfg.CORSAllowedOrigin)
 }
 
@@ -53,6 +55,9 @@ func TestLoad_RejectsInvalidValues(t *testing.T) {
 		"timeout mayor a 60s":   {config.KeyRequestTimeout: "90s"},
 		"rate relajado en prod": {config.KeyAppEnv: config.EnvProd, config.KeyRateLimitGlobal: "5000"},
 		"entero inválido":       {config.KeyPort: "ochenta"},
+		"access mayor a 15 min": {config.KeyJWTAccessTTL: "30m"},
+		"refresh mayor a 30 d":  {config.KeyJWTRefreshTTL: "1000h"},
+		"access no positivo":    {config.KeyJWTAccessTTL: "0s"},
 	}
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {

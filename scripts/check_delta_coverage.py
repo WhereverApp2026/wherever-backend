@@ -119,7 +119,8 @@ def evaluate(deltas: dict[str, FileDelta], minimum: float, advisory: bool) -> tu
 
 
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
+    # UTF-8 explícito: en Windows el predeterminado es cp1252 y el diff trae acentos.
+    return subprocess.run(["git", *args], check=True, capture_output=True, encoding="utf-8", errors="replace").stdout
 
 
 def default_base() -> str:

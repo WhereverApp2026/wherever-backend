@@ -1,0 +1,128 @@
+// Package authtest arma el módulo auth real contra MongoDB y Redis reales para las suites
+// Integration, Security y Contract. Solo se simula el correo (buzón en memoria).
+// Va aparte de testutil para no crear un ciclo con los tests internos de auth.
+package authtest
+
+import (
+	"context"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	goredis "github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
+	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
+	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
+)
+
+// Password es la contraseña de los usuarios de prueba; no es secreto de ningún entorno.
+const Password = "Prueba_1234"
+
+// Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
+type Env struct {
+	Cfg     config.Config
+	Mongo   *platformmongo.Client
+	Redis   *goredis.Client
+	Users   *usuarios.Repository
+	Service *auth.Service
+	Mail    *mailer.Memory
+	Log     *slog.Logger
+	Logs    *testutil.LogBuffer
+	handler *auth.Handler
+}
+
+// New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
+func New(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config) *Env {
+	t.Helper()
+	ctx := context.Background()
+	require.NoError(t, client.DB().Drop(ctx))
+	require.NoError(t, rdb.FlushDB(ctx).Err())
+	require.NoError(t, platformmongo.EnsureIndexes(ctx, client.DB(), indexes.All()...))
+	return Build(t, client, rdb, cfg)
+}
+
+// Build arma el módulo sin limpiar nada (para una segunda instancia o un Redis caído).
+func Build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config) *Env {
+	t.Helper()
+	log, logs := testutil.Logger()
+	mail := mailer.NewMemory()
+	users := usuarios.NewRepository(client.DB())
+	svc, err := auth.NewService(users, auth.NewRepository(client.DB()), rdb, mail, auth.Config{
+		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+		AccessTTL:  cfg.AccessTTL,
+		RefreshTTL: cfg.RefreshTTL,
+	}, log)
+	require.NoError(t, err)
+	v, err := validation.New()
+	require.NoError(t, err)
+	return &Env{Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Mail: mail, Log: log, Logs: logs, handler: auth.NewHandler(svc, v)}
+}
+
+// App construye la app real con el módulo auth montado.
+func (e *Env) App() *fiber.App {
+	return httpapi.NewApp(e.Cfg, httpapi.Deps{
+		Logger:  e.Log,
+		Version: "v0.0.0-test",
+		Redis:   e.Redis,
+		Mongo:   e.Mongo,
+		Neo4j:   testutil.DownPinger{},
+		Modules: []httpapi.Module{e.handler},
+	})
+}
+
+// CreateUser inserta un usuario activo con rol consumidor y la contraseña de prueba.
+func (e *Env) CreateUser(t *testing.T, email string) usuarios.User {
+	t.Helper()
+	hasher, err := auth.NewHasher()
+	require.NoError(t, err)
+	hash, err := hasher.Hash(Password)
+	require.NoError(t, err)
+	birth := time.Date(1995, 5, 17, 0, 0, 0, 0, time.UTC)
+	u := usuarios.User{
+		Name: "Prueba", NormalizedName: "prueba", Email: email, PasswordHash: hash, BirthDate: &birth,
+		Roles: []string{middleware.RoleConsumer}, Status: usuarios.StatusActive,
+	}
+	require.NoError(t, e.Users.Create(context.Background(), &u))
+	return u
+}
+
+// ClearRateLimits borra los contadores `rate:*` para que las pruebas no choquen con el
+// límite de login (5 por IP cada 5 min); los fallos de login no se tocan.
+func (e *Env) ClearRateLimits(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	keys, err := e.Redis.Keys(ctx, "rate:*").Result()
+	require.NoError(t, err)
+	if len(keys) > 0 {
+		require.NoError(t, e.Redis.Del(ctx, keys...).Err())
+	}
+}
+
+// ExpireLinks vence todos los tokens de enlace del usuario (sin esperar al TTL de MongoDB).
+func (e *Env) ExpireLinks(t *testing.T, userID bson.ObjectID) {
+	t.Helper()
+	_, err := e.Mongo.DB().Collection(auth.TokensCollection).UpdateMany(context.Background(),
+		bson.D{{Key: "usuario_id", Value: userID}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "expira_en", Value: time.Now().UTC().Add(-time.Minute)}}}})
+	require.NoError(t, err)
+}
+
+// AgeLinks mueve la creación de los enlaces del usuario al pasado para saltar el reenvío de 60 s.
+func (e *Env) AgeLinks(t *testing.T, userID bson.ObjectID) {
+	t.Helper()
+	_, err := e.Mongo.DB().Collection(auth.TokensCollection).UpdateMany(context.Background(),
+		bson.D{{Key: "usuario_id", Value: userID}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "creado_en", Value: time.Now().UTC().Add(-2 * time.Minute)}}}})
+	require.NoError(t, err)
+}

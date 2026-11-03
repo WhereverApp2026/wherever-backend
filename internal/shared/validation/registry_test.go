@@ -2,6 +2,7 @@ package validation
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,4 +68,26 @@ func TestPaginationQuery_DefaultsAndPosition(t *testing.T) {
 	_, ok, err := q.Position()
 	require.NoError(t, err)
 	assert.False(t, ok)
+}
+
+type passwordDTO struct {
+	Password string `json:"password" validate:"password"`
+	Email    string `json:"correo" validate:"omitempty,email"`
+}
+
+func TestPasswordRule_EightCharsWithLetterAndNumber(t *testing.T) {
+	v := newValidator(t)
+	for _, ok := range []string{"abcdefg1", "Contraseña9", "1234567a"} {
+		assert.NoError(t, v.Struct(passwordDTO{Password: ok}), ok)
+	}
+	for _, bad := range []string{"", "abc1", "abcdefgh", "12345678", strings.Repeat("a1", 65)} {
+		fields := fieldsOf(t, v.Struct(passwordDTO{Password: bad}))
+		assert.Contains(t, fields["password"], "una letra y un número", bad)
+	}
+}
+
+func TestEmailRule_HasSpanishMessage(t *testing.T) {
+	fields := fieldsOf(t, newValidator(t).Struct(passwordDTO{Password: "abcdefg1", Email: "no-es-correo"}))
+
+	assert.Equal(t, map[string]string{"correo": "no es un correo válido"}, fields)
 }

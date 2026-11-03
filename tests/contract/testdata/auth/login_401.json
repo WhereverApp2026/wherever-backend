@@ -1,0 +1,9 @@
+{
+  "status": 401,
+  "body": {
+    "campos": [],
+    "codigo": "string",
+    "mensaje": "string",
+    "traza_id": "string"
+  }
+}

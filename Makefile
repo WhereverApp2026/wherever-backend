@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security lint vuln critic endpoints sdd cover delta mutate run infra-up infra-down image check
+.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -24,10 +24,21 @@ test-unit:
 test-integration:
 	go test ./tests/integration/... -count=1 -p 1
 
+# Security, Database y Contract también levantan contenedores con puerto fijo (-p 1).
 test-security:
-	go test ./tests/security/... -count=1
+	go test ./tests/security/... -count=1 -p 1
 
-test: test-unit test-integration test-security
+test-database:
+	go test ./tests/database/... -count=1 -p 1
+
+test-contract:
+	go test ./tests/contract/... -count=1 -p 1
+
+# Regenera las capturas de tests/contract/testdata; revisar el diff antes de subirlo.
+contract-capture:
+	CONTRACT_CAPTURE=1 go test ./tests/contract/... -count=1 -p 1
+
+test: test-unit test-integration test-security test-database test-contract
 
 lint:
 	$(GOLANGCI_LINT) run ./...
@@ -51,8 +62,16 @@ cover:
 delta: cover
 	python3 scripts/check_delta_coverage.py --min 80 --advisory
 
+# Corren en una copia temporal del árbol; nunca mutan los archivos de trabajo.
 mutate:
 	bash scripts/mutation.sh
+
+mutate-full:
+	bash scripts/mutation.sh --full
+
+# Índices de MongoDB (constitución §5): idempotente, lee MONGO_URI de .env.
+indexes:
+	go run ./scripts/indexes
 
 run:
 	go run -ldflags "-X main.version=$(VERSION)" ./cmd/api

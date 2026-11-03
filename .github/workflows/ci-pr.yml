@@ -1,7 +1,7 @@
 # CI de PR (constitución §8). Orden vigente:
-#   deps → build → unit → integration → security → critic → endpoints → sdd
-#   → coverage → delta-check → mutation → semgrep
-# database y contract se suman con el primer módulo que tenga índices y contrato.
+#   deps → build → unit → integration → security → database → contract → critic → endpoints
+#   → sdd → coverage → delta-check → mutation → semgrep
+# database y contract llegan con nv-04 (primer módulo con índices y contrato).
 # delta-check y mutation son advisory (nv-03): informan y nunca bloquean.
 # Sin deploy.
 name: ci-pr
@@ -62,7 +62,18 @@ jobs:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: security
-        run: go test ./tests/security/... -count=1 $COVER -coverprofile=bin/coverage-security.out
+        run: go test ./tests/security/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-security.out
+        env:
+          COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
+
+      - name: database
+        run: go test ./tests/database/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-database.out
+        env:
+          COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
+
+      # Sin CONTRACT_CAPTURE solo valida contra tests/contract/testdata.
+      - name: contract
+        run: go test ./tests/contract/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-contract.out
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
@@ -76,7 +87,9 @@ jobs:
         run: bash scripts/check_sdd.sh
 
       - name: coverage
-        run: bash scripts/check_coverage.sh --min 45 bin/coverage-unit.out bin/coverage-integration.out bin/coverage-security.out
+        run: >-
+          bash scripts/check_coverage.sh --min 45 bin/coverage-unit.out bin/coverage-integration.out
+          bin/coverage-security.out bin/coverage-database.out bin/coverage-contract.out
 
       - name: delta-check
         continue-on-error: true
@@ -86,6 +99,7 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
 
+      # PR: solo service y tokens de auth cambiados (MUTATION_SCOPE); la completa va en nightly.yml.
       - name: mutation
         if: github.event_name == 'pull_request'
         continue-on-error: true

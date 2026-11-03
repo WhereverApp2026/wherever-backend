@@ -27,9 +27,10 @@ type healthResponse struct {
 }
 
 type dependencies struct {
-	Mongo string `json:"mongodb"`
-	Redis string `json:"redis"`
-	Neo4j string `json:"neo4j"`
+	Mongo        string `json:"mongodb"`
+	Redis        string `json:"redis"`
+	Neo4j        string `json:"neo4j"`
+	MongoIndexes string `json:"indices_mongodb,omitempty"`
 }
 
 type readyResponse struct {
@@ -43,6 +44,7 @@ type health struct {
 	mongo   Pinger
 	redis   Pinger
 	neo4j   Pinger
+	indexes Pinger
 }
 
 func newHealth(deps Deps) *health {
@@ -52,6 +54,7 @@ func newHealth(deps Deps) *health {
 		mongo:   deps.Mongo,
 		redis:   platformredis.Pinger{Client: deps.Redis},
 		neo4j:   deps.Neo4j,
+		indexes: deps.MongoIndexes,
 	}
 }
 
@@ -62,6 +65,7 @@ func (h *health) live(c *fiber.Ctx) error {
 
 // ready consulta las tres bases en paralelo. MongoDB o Neo4j caídos = 503; Redis caído =
 // 200 `degraded`, porque es compartido y un 503 sacaría a todas las instancias a la vez.
+// Si hay verificador de índices, un índice obligatorio que falte también es 503 (nv-04).
 func (h *health) ready(c *fiber.Ctx) error {
 	var deps dependencies
 	var wg sync.WaitGroup
@@ -73,6 +77,13 @@ func (h *health) ready(c *fiber.Ctx) error {
 		{"mongodb", h.mongo, &deps.Mongo},
 		{"redis", h.redis, &deps.Redis},
 		{"neo4j", h.neo4j, &deps.Neo4j},
+	}
+	if h.indexes != nil {
+		checks = append(checks, struct {
+			name   string
+			pinger Pinger
+			result *string
+		}{"indices_mongodb", h.indexes, &deps.MongoIndexes})
 	}
 	// fiber.Ctx no es seguro entre goroutines: el contexto se toma antes.
 	parent := c.UserContext()
@@ -87,7 +98,7 @@ func (h *health) ready(c *fiber.Ctx) error {
 
 	resp := readyResponse{Status: statusOK, Dependencies: deps}
 	switch {
-	case deps.Mongo != statusOK || deps.Neo4j != statusOK:
+	case deps.Mongo != statusOK || deps.Neo4j != statusOK || (h.indexes != nil && deps.MongoIndexes != statusOK):
 		resp.Status = statusError
 		return c.Status(fiber.StatusServiceUnavailable).JSON(resp)
 	case deps.Redis != statusOK:
