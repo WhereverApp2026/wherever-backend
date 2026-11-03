@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "horario_silencioso": {
+      "desde": "string",
+      "hasta": "string"
+    },
+    "movilidad_default": "string",
+    "notificaciones": {
+      "cupones": "bool",
+      "grupos": "bool",
+      "promociones": "bool",
+      "resenas": "bool",
+      "reservas": "bool"
+    },
+    "tema": "string",
+    "unidades": "string"
+  }
+}

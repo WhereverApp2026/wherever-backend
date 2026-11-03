@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "body": {
+    "alergias": "string",
+    "categorias": [
+      "string"
+    ],
+    "presupuesto_max": "number",
+    "presupuesto_min": "number",
+    "restricciones": [
+      "string"
+    ]
+  }
+}

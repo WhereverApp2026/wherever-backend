@@ -20,6 +20,7 @@ import (
 // Valores fijos de prueba; no son secretos de ningún entorno.
 const (
 	SigningKey = "solo_para_pruebas_no_usar_en_ningun_entorno_0123"
+	PhoneKey   = "solo_para_pruebas_hmac_de_telefonos_no_usar_0456"
 	Issuer     = "wherever-api"
 	Audience   = "wherever-app"
 	// DeadAddr no tiene nada escuchando: simula una base caída sin reiniciar contenedores.
@@ -36,6 +37,8 @@ func Config(env string) config.Config {
 		JWTAudience:     Audience,
 		AccessTTL:       config.MaxAccessTTL,
 		RefreshTTL:      config.MaxRefreshTTL,
+		PhoneHMACKey:    []byte(PhoneKey),
+		ArcoGraceDays:   config.MaxArcoGraceDays,
 		BodyLimit:       config.MaxBodyLimit,
 		RequestTimeout:  config.MaxRequestTimeout,
 		RateLimitGlobal: config.DefaultRateGlobal,
@@ -46,13 +49,14 @@ func Config(env string) config.Config {
 // Env devuelve un getenv con las claves obligatorias válidas más los cambios dados.
 func Env(overrides map[string]string) func(string) string {
 	values := map[string]string{
-		config.KeyAppEnv:      config.EnvDev,
-		config.KeyMongoURI:    "mongodb://localhost:27017/wherever",
-		config.KeyRedisAddr:   "localhost:6379",
-		config.KeyNeo4jURI:    "neo4j://localhost:7687",
-		config.KeyJWTKey:      SigningKey,
-		config.KeyJWTIssuer:   Issuer,
-		config.KeyJWTAudience: Audience,
+		config.KeyAppEnv:       config.EnvDev,
+		config.KeyMongoURI:     "mongodb://localhost:27017/wherever",
+		config.KeyRedisAddr:    "localhost:6379",
+		config.KeyNeo4jURI:     "neo4j://localhost:7687",
+		config.KeyJWTKey:       SigningKey,
+		config.KeyJWTIssuer:    Issuer,
+		config.KeyJWTAudience:  Audience,
+		config.KeyPhoneHMACKey: PhoneKey,
 	}
 	for k, v := range overrides {
 		values[k] = v

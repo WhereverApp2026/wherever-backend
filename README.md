@@ -21,11 +21,11 @@ API REST en Go (Fiber) para Wherever, desarrollada con **Spec Driven Development
 | `nv-04` | Autenticación, sesiones y recuperación de contraseña (J1) |
 | `nv-05` | Usuarios, perfil, gustos y privacidad (A1) |
 
-Estado: `nv-00…nv-04` ejecutadas (Borrador con evidencia, sin firma); en `nv-04` falta `POST /auth/google` (espera la decisión D-1). `nv-05` sin ejecutar.
+Estado: `nv-04` aprobada y `nv-05` ejecutada (Borrador con evidencia); `nv-00…nv-03` en Borrador con evidencia. En `nv-04` falta `POST /auth/google` (espera la decisión D-1).
 
 ## Arranque local
 1. `cp configs/.env.example .env` y poner un `JWT_KEY` propio de 32 bytes o más.
 2. `make infra-up` (o `docker compose -f deployments/docker-compose.yml up -d --wait`). Si un puerto está ocupado, usar `MONGO_HOST_PORT`, `REDIS_HOST_PORT` o `NEO4J_BOLT_HOST_PORT` y ajustar la URI en `.env`.
-3. `make indexes` (o `go run ./scripts/indexes`): crea los índices de MongoDB; se puede correr las veces que sea.
+3. `make indexes` (o `go run ./scripts/indexes`): crea los índices de MongoDB; se puede correr las veces que sea. Las ciudades se cargan con `go run ./scripts/importar_ciudades ciudades.csv` (CSV `nombre,estado,latitud,longitud,con_cobertura` o JSON).
 4. `go run ./cmd/api` y probar `curl localhost:8080/ready`. Sin proveedor de correo, los enlaces de recuperar y verificar no se envían: el log solo dice el tipo y el destinatario enmascarado.
 5. Pruebas: `make test-unit`; con Docker, `make test-integration`, `make test-security`, `make test-database` y `make test-contract` (una a la vez). `make contract-capture` regenera las capturas de Contract.

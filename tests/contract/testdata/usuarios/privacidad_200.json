@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "body": {
+    "aprendizaje_personalizado": "bool",
+    "buscable_por_telefono": "bool",
+    "datos_uso": "bool",
+    "estado_animo": "bool",
+    "fecha_aceptacion": "string",
+    "promociones_correo": "bool",
+    "ubicacion": "bool",
+    "version_terminos": "string"
+  }
+}

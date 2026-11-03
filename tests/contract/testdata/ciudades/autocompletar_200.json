@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "estado": "string",
+      "id": "string",
+      "nombre": "string"
+    }
+  ]
+}

@@ -25,6 +25,7 @@ const (
 	LockoutWindow    = 15 * time.Minute
 	PasswordResetTTL = time.Hour
 	VerifyEmailTTL   = 24 * time.Hour
+	ExportLinkTTL    = 24 * time.Hour
 	ResendCooldown   = 60 * time.Second
 
 	loginFailuresKey = "login_fallos:"
@@ -91,7 +92,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (TokenResponse, erro
 	}
 	found := err == nil
 	ok := s.hasher.Verify(in.Password, user.PasswordHash)
-	if !found || !ok || !user.Active() {
+	if !found || !ok || !user.CanSignIn() {
 		return TokenResponse{}, s.registerFailure(ctx, email)
 	}
 	if err := s.rdb.Del(ctx, loginFailuresKey+email).Err(); err != nil {
@@ -316,7 +317,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 	if err != nil {
 		return dbError(err)
 	}
-	if !user.Active() {
+	if !user.CanSignIn() {
 		return nil
 	}
 	if wait, err := s.cooldown(ctx, user.ID, mailer.KindPasswordReset); err != nil || wait > 0 {
@@ -407,6 +408,38 @@ func (s *Service) SendVerification(ctx context.Context, user usuarios.User) erro
 	return s.sendLink(ctx, user, mailer.KindVerifyEmail, VerifyEmailTTL)
 }
 
+// CloseAllSessions cierra todas las sesiones del usuario y revoca sus access (lo usa nv-05 al
+// pedir eliminar la cuenta).
+func (s *Service) CloseAllSessions(ctx context.Context, userID bson.ObjectID) error {
+	now := time.Now().UTC()
+	revoked, err := s.repo.RevokeUserSessions(ctx, userID, bson.ObjectID{}, now)
+	if err != nil {
+		return dbError(err)
+	}
+	return s.revokeAccess(ctx, now, revoked...)
+}
+
+// SendExportLink manda el enlace de un solo uso (24 h) para descargar "mis datos" (D-2, nv-05).
+func (s *Service) SendExportLink(ctx context.Context, userID bson.ObjectID) error {
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return dbError(err)
+	}
+	return s.sendLink(ctx, user, mailer.KindExport, ExportLinkTTL)
+}
+
+// ConsumeExportLink usa el enlace de descarga una sola vez y devuelve de quién es.
+func (s *Service) ConsumeExportLink(ctx context.Context, raw string) (bson.ObjectID, error) {
+	link, err := s.repo.ConsumeToken(ctx, HashOpaque(raw), string(mailer.KindExport), time.Now().UTC())
+	if errors.Is(err, errNoDocument) {
+		return bson.ObjectID{}, apperr.BadRequest("el enlace venció o ya se usó")
+	}
+	if err != nil {
+		return bson.ObjectID{}, dbError(err)
+	}
+	return link.UserID, nil
+}
+
 // ChangePassword exige la contraseña actual y cierra las otras sesiones; la actual sigue.
 func (s *Service) ChangePassword(ctx context.Context, claims *middleware.Claims, current, next string) error {
 	userID, sessionID, err := identity(claims)
@@ -434,7 +467,7 @@ func (s *Service) ChangePassword(ctx context.Context, claims *middleware.Claims,
 // activeUser carga al usuario de una sesión; si ya no existe o no está activo es 401.
 func (s *Service) activeUser(ctx context.Context, id bson.ObjectID) (usuarios.User, error) {
 	user, err := s.users.FindByID(ctx, id)
-	if errors.Is(err, usuarios.ErrNotFound) || (err == nil && !user.Active()) {
+	if errors.Is(err, usuarios.ErrNotFound) || (err == nil && !user.CanSignIn()) {
 		return usuarios.User{}, apperr.Unauthorized("sesión inválida")
 	}
 	if err != nil {

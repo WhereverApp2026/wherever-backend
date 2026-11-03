@@ -10,16 +10,21 @@ import (
 	mongodrv "go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
+	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
-// expected son los índices de las hojas A1 (los de nv-04) y J1, más ix_refresh_previo.
+// expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
+// `exportaciones` (colección nueva de nv-05).
 var expected = map[string][]string{
-	usuarios.Collection:     {"_id_", "ux_correo", "ux_google_id"},
-	auth.SessionsCollection: {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
-	auth.TokensCollection:   {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
+	usuarios.Collection:          {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash"},
+	ciudades.Collection:          {"_id_", "ux_ciudad", "ix_centro"},
+	privacidad.ExportsCollection: {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
+	auth.SessionsCollection:      {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
+	auth.TokensCollection:        {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -70,7 +75,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
 
 	for collection, names := range map[string][]string{
-		usuarios.Collection:     {"ux_correo", "ux_google_id"},
+		usuarios.Collection:     {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash"},
+		ciudades.Collection:     {"ux_ciudad"},
 		auth.SessionsCollection: {"ux_refresh_hash"},
 		auth.TokensCollection:   {"ux_token_hash"},
 	} {
@@ -80,26 +86,27 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 			assert.True(t, *got[name].Unique, name)
 		}
 	}
-	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token"} {
+	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion"} {
 		ttl := specs(t, db, collection)[name]
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)
 	}
 }
 
-// ux_google_id es parcial: muchas cuentas sin google_id no chocan, dos con el mismo sí.
+// ux_google_id y ux_telefono_hash son parciales: muchas cuentas sin el campo no chocan, dos
+// con el mismo valor sí. ux_codigo_amigo no es parcial: toda cuenta trae su código.
 func TestIndexes_PartialGoogleIDAllowsManyWithout(t *testing.T) {
 	db := freshDB(t)
 	ctx := context.Background()
 	require.NoError(t, mongo.EnsureIndexes(ctx, db, indexes.All()...))
 	col := db.Collection(usuarios.Collection)
 
-	_, err := col.InsertMany(ctx, []any{bson.D{{Key: "correo", Value: "a@x.test"}}, bson.D{{Key: "correo", Value: "b@x.test"}}})
+	_, err := col.InsertMany(ctx, []any{bson.D{{Key: "correo", Value: "a@x.test"}, {Key: "codigo_amigo", Value: "AAAA2222"}}, bson.D{{Key: "correo", Value: "b@x.test"}, {Key: "codigo_amigo", Value: "BBBB2222"}}})
 	require.NoError(t, err)
-	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "c@x.test"}, {Key: "google_id", Value: "g-1"}})
+	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "c@x.test"}, {Key: "codigo_amigo", Value: "CCCC2222"}, {Key: "google_id", Value: "g-1"}})
 	require.NoError(t, err)
-	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "d@x.test"}, {Key: "google_id", Value: "g-1"}})
+	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "d@x.test"}, {Key: "codigo_amigo", Value: "DDDD2222"}, {Key: "google_id", Value: "g-1"}})
 	assert.True(t, mongodrv.IsDuplicateKeyError(err))
-	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "a@x.test"}})
+	_, err = col.InsertOne(ctx, bson.D{{Key: "correo", Value: "a@x.test"}, {Key: "codigo_amigo", Value: "EEEE2222"}})
 	assert.True(t, mongodrv.IsDuplicateKeyError(err), "ux_correo")
 }

@@ -1,0 +1,62 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "ciudad": "null",
+    "codigo_amigo": "string",
+    "correo": "string",
+    "correo_verificado": "bool",
+    "creado_en": "string",
+    "eliminar_en": "null",
+    "estado": "string",
+    "foto_url": "string",
+    "gustos": {
+      "alergias": "string",
+      "categorias": [
+        "string"
+      ],
+      "presupuesto_max": "number",
+      "presupuesto_min": "number",
+      "restricciones": [
+        "string"
+      ]
+    },
+    "id": "string",
+    "modo_actual": "string",
+    "nivel": "string",
+    "nombre": "string",
+    "preferencias": {
+      "horario_silencioso": {
+        "desde": "string",
+        "hasta": "string"
+      },
+      "movilidad_default": "string",
+      "notificaciones": {
+        "cupones": "bool",
+        "grupos": "bool",
+        "promociones": "bool",
+        "resenas": "bool",
+        "reservas": "bool"
+      },
+      "tema": "string",
+      "unidades": "string"
+    },
+    "privacidad": {
+      "aprendizaje_personalizado": "bool",
+      "buscable_por_telefono": "bool",
+      "datos_uso": "bool",
+      "estado_animo": "bool",
+      "fecha_aceptacion": "string",
+      "promociones_correo": "bool",
+      "ubicacion": "bool",
+      "version_terminos": "string"
+    },
+    "puntos": "number",
+    "racha_semanas": "number",
+    "roles": [
+      "string"
+    ],
+    "telefono_registrado": "bool",
+    "version": "number"
+  }
+}

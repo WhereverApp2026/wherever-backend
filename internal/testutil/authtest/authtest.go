@@ -1,6 +1,7 @@
-// Package authtest arma el módulo auth real contra MongoDB y Redis reales para las suites
-// Integration, Security y Contract. Solo se simula el correo (buzón en memoria).
-// Va aparte de testutil para no crear un ciclo con los tests internos de auth.
+// Package authtest arma los módulos de identidad reales (auth, usuarios, ciudades y el trabajo
+// nocturno de privacidad) contra MongoDB y Redis reales para las suites Integration, Security
+// y Contract. Solo se simula el correo (buzón en memoria). Va aparte de testutil para no
+// crear un ciclo con los tests internos de auth.
 package authtest
 
 import (
@@ -15,15 +16,18 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
+	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 )
 
 // Password es la contraseña de los usuarios de prueba; no es secreto de ningún entorno.
@@ -36,10 +40,14 @@ type Env struct {
 	Redis   *goredis.Client
 	Users   *usuarios.Repository
 	Service *auth.Service
+	Account *account.Service
+	Cities  *ciudades.Service
+	Exports *privacidad.Exports
+	Job     *privacidad.Job
 	Mail    *mailer.Memory
 	Log     *slog.Logger
 	Logs    *testutil.LogBuffer
-	handler *auth.Handler
+	modules []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -66,7 +74,29 @@ func Build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	v, err := validation.New()
 	require.NoError(t, err)
-	return &Env{Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Mail: mail, Log: log, Logs: logs, handler: auth.NewHandler(svc, v)}
+
+	authRepo := auth.NewRepository(client.DB())
+	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
+	exports := privacidad.NewExports(client.DB())
+	registry := privacidad.NewRegistry()
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, account.NewPrivacy(users)} {
+		registry.RegisterPurger(p)
+	}
+	registry.RegisterExporter(account.NewPrivacy(users))
+	registry.RegisterExporter(auth.NewPrivacy(authRepo))
+	acc, err := account.NewService(users, svc, cities, exports, registry,
+		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
+	require.NoError(t, err)
+
+	return &Env{
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Exports: exports,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
+		modules: []httpapi.Module{
+			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
+			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
+			ciudades.NewHandler(cities, v),
+		},
+	}
 }
 
 // App construye la app real con el módulo auth montado.
@@ -77,7 +107,7 @@ func (e *Env) App() *fiber.App {
 		Redis:   e.Redis,
 		Mongo:   e.Mongo,
 		Neo4j:   testutil.DownPinger{},
-		Modules: []httpapi.Module{e.handler},
+		Modules: e.modules,
 	})
 }
 

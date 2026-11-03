@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/go-playground/validator/v10"
@@ -19,7 +21,24 @@ import (
 var rules = map[string]validator.Func{
 	"cursor":   validCursor,
 	"password": validPassword,
+	"adult":    validAdult,
+	"e164":     validE164,
+	"hhmm":     validHHMM,
+	"objectid": validObjectID,
 }
+
+// Formatos de las reglas propias (hoja A1).
+const (
+	// DateLayout es el formato de fecha de los DTOs (`fecha_nacimiento`): ISO 8601 sin hora.
+	DateLayout = "2006-01-02"
+	adultAge   = 18
+)
+
+var (
+	e164Pattern     = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
+	hhmmPattern     = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+	objectIDPattern = regexp.MustCompile(`^[0-9a-f]{24}$`)
+)
 
 // Política de contraseña (hojas A1 y J1): 8 caracteres o más con al menos una letra y un
 // número. El tope evita hashear entradas enormes con Argon2id.
@@ -73,23 +92,34 @@ func fieldName(f reflect.StructField) string {
 	return f.Name
 }
 
+// messages son los textos por etiqueta; `%s` se reemplaza por el parámetro de la regla.
+var messages = map[string]string{ // #nosec G101 -- mensajes de validación, no credenciales
+	"required":   "es obligatorio",
+	"min":        "debe ser al menos %s",
+	"max":        "debe ser como máximo %s",
+	"oneof":      "debe ser uno de: %s",
+	"startswith": "debe empezar con %s",
+	"cursor":     "cursor inválido",
+	"password":   "debe tener de 8 a 128 caracteres con al menos una letra y un número",
+	"email":      "no es un correo válido",
+	"adult":      "debes tener 18 años o más (fecha AAAA-MM-DD)",
+	"e164":       "debe estar en formato internacional, p. ej. +5215512345678",
+	"hhmm":       "debe tener el formato HH:MM",
+	"objectid":   "no es un identificador válido",
+	"url":        "no es una URL válida",
+	"gtefield":   "debe ser mayor o igual que el mínimo",
+	"unique":     "tiene elementos repetidos",
+}
+
 func message(fe validator.FieldError) string {
-	switch fe.Tag() {
-	case "required":
-		return "es obligatorio"
-	case "min":
-		return "debe ser al menos " + fe.Param()
-	case "max":
-		return "debe ser como máximo " + fe.Param()
-	case "cursor":
-		return "cursor inválido"
-	case "password":
-		return "debe tener de 8 a 128 caracteres con al menos una letra y un número"
-	case "email":
-		return "no es un correo válido"
-	default:
+	text, ok := messages[fe.Tag()]
+	if !ok {
 		return "no es válido"
 	}
+	if strings.Contains(text, "%s") {
+		return fmt.Sprintf(text, fe.Param())
+	}
+	return text
 }
 
 func validCursor(fl validator.FieldLevel) bool {
@@ -104,4 +134,26 @@ func validPassword(fl validator.FieldLevel) bool {
 		return false
 	}
 	return strings.IndexFunc(pw, unicode.IsLetter) >= 0 && strings.IndexFunc(pw, unicode.IsDigit) >= 0
+}
+
+// IsAdult dice si alguien nacido en `birth` tiene 18 años o más en la fecha `today` (UTC).
+func IsAdult(birth, today time.Time) bool {
+	return !birth.AddDate(adultAge, 0, 0).After(today)
+}
+
+// validAdult: fecha AAAA-MM-DD válida y mayoría de edad con la fecha del servidor en UTC.
+func validAdult(fl validator.FieldLevel) bool {
+	birth, err := time.Parse(DateLayout, fl.Field().String())
+	if err != nil {
+		return false
+	}
+	return IsAdult(birth, time.Now().UTC())
+}
+
+func validE164(fl validator.FieldLevel) bool { return e164Pattern.MatchString(fl.Field().String()) }
+
+func validHHMM(fl validator.FieldLevel) bool { return hhmmPattern.MatchString(fl.Field().String()) }
+
+func validObjectID(fl validator.FieldLevel) bool {
+	return objectIDPattern.MatchString(fl.Field().String())
 }

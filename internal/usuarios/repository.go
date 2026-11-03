@@ -1,11 +1,13 @@
-// Package usuarios guarda a las personas de Wherever (hoja A1). En nv-04 solo trae lo que
-// auth necesita: buscar por correo o id, crear, fijar contraseña y marcar el correo como
-// verificado. El resto del módulo (registro, perfil, gustos, privacidad) llega en nv-05.
+// Package usuarios guarda a las personas de Wherever (hoja A1, spec nv-05): registro, perfil,
+// gustos, preferencias, privacidad y derechos ARCO. Molde nv-02: handler → DTO + validator →
+// service → repository. auth (nv-04) lo usa para buscar, crear y fijar contraseñas.
 package usuarios
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"math/big"
 	"strings"
 	"time"
 
@@ -21,61 +23,175 @@ const Collection = "usuarios"
 
 // Estados de la hoja A1.
 const (
-	StatusActive = "activo"
+	StatusActive          = "activo"
+	StatusBlocked         = "bloqueado"
+	StatusPendingDeletion = "eliminacion_pendiente"
 )
 
-// ErrNotFound indica que no existe el usuario.
-var ErrNotFound = errors.New("usuario no encontrado")
+// Modos de la app (P-65).
+const (
+	ModeExplore  = "explorar"
+	ModeBusiness = "negocio"
+)
 
-// User son los campos de la hoja A1 que usa auth; el esquema completo llega con nv-05.
-type User struct {
-	ID             bson.ObjectID `bson:"_id"`
-	Name           string        `bson:"nombre"`
-	NormalizedName string        `bson:"nombre_normalizado"`
-	Email          string        `bson:"correo"`
-	EmailVerified  bool          `bson:"correo_verificado"`
-	PasswordHash   string        `bson:"password_hash,omitempty"`
-	GoogleID       string        `bson:"google_id,omitempty"`
-	BirthDate      *time.Time    `bson:"fecha_nacimiento,omitempty"`
-	Roles          []string      `bson:"roles"`
-	Status         string        `bson:"estado"`
-	Version        int           `bson:"version"`
-	CreatedAt      time.Time     `bson:"creado_en"`
-	UpdatedAt      time.Time     `bson:"actualizado_en"`
+// Valores iniciales de la hoja A1.
+const (
+	WelcomePoints = 50
+	InitialLevel  = "Explorador"
+)
+
+// friendCodeAlphabet evita caracteres que se confunden (0/O, 1/I/L); hoja A1: 8 caracteres.
+const (
+	friendCodeAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+	friendCodeLen      = 8
+	friendCodeRetries  = 5
+)
+
+// Errores del repositorio; el service los traduce a apperr.
+var (
+	ErrNotFound        = errors.New("usuario no encontrado")
+	ErrEmailTaken      = errors.New("el correo ya está registrado")
+	ErrPhoneTaken      = errors.New("el teléfono ya está registrado")
+	ErrVersionConflict = errors.New("la versión no coincide")
+)
+
+// City es la ciudad elegida a mano (`ciudad {id, nombre}`).
+type City struct {
+	ID   bson.ObjectID `bson:"id"`
+	Name string        `bson:"nombre"`
 }
 
-// Active indica si la cuenta puede iniciar sesión.
-func (u User) Active() bool { return u.Status == StatusActive }
+// Tastes son las respuestas del onboarding (P-10 a P-12).
+type Tastes struct {
+	Categories   []string `bson:"categorias"`
+	BudgetMin    int      `bson:"presupuesto_min"`
+	BudgetMax    int      `bson:"presupuesto_max"`
+	Restrictions []string `bson:"restricciones"`
+	Allergies    string   `bson:"alergias"`
+}
+
+// QuietHours es el horario silencioso de notificaciones.
+type QuietHours struct {
+	From string `bson:"desde"`
+	To   string `bson:"hasta"`
+}
+
+// Notifications dice qué notificaciones recibe; las de reservas no se apagan.
+type Notifications struct {
+	Bookings   bool `bson:"reservas"`
+	Coupons    bool `bson:"cupones"`
+	Groups     bool `bson:"grupos"`
+	Reviews    bool `bson:"resenas"`
+	Promotions bool `bson:"promociones"`
+}
+
+// Preferences son los ajustes de la app.
+type Preferences struct {
+	Mobility      string        `bson:"movilidad_default"`
+	Theme         string        `bson:"tema"`
+	Units         string        `bson:"unidades"`
+	QuietHours    *QuietHours   `bson:"horario_silencioso,omitempty"`
+	Notifications Notifications `bson:"notificaciones"`
+}
+
+// Privacy son los interruptores de P-62 y la aceptación de términos (LFPDPPP).
+type Privacy struct {
+	Location        bool      `bson:"ubicacion"`
+	Learning        bool      `bson:"aprendizaje_personalizado"`
+	Mood            bool      `bson:"estado_animo"`
+	UsageData       bool      `bson:"datos_uso"`
+	PhoneSearchable bool      `bson:"buscable_por_telefono"`
+	TermsVersion    string    `bson:"version_terminos"`
+	AcceptedAt      time.Time `bson:"fecha_aceptacion"`
+	PromoEmail      bool      `bson:"promociones_correo"`
+}
+
+// DefaultPreferences son los ajustes con los que nace una cuenta.
+func DefaultPreferences() Preferences {
+	return Preferences{
+		Mobility: "a_pie", Theme: "sistema", Units: "km",
+		Notifications: Notifications{Bookings: true, Coupons: true, Groups: true, Reviews: true, Promotions: false},
+	}
+}
+
+// User es un documento de `usuarios` (hoja A1 §1 más `version`, constitución §5).
+type User struct {
+	ID             bson.ObjectID   `bson:"_id"`
+	Name           string          `bson:"nombre"`
+	NormalizedName string          `bson:"nombre_normalizado"`
+	Email          string          `bson:"correo"`
+	EmailVerified  bool            `bson:"correo_verificado"`
+	PhoneHash      string          `bson:"telefono_hash,omitempty"`
+	PasswordHash   string          `bson:"password_hash,omitempty"`
+	GoogleID       string          `bson:"google_id,omitempty"`
+	BirthDate      *time.Time      `bson:"fecha_nacimiento,omitempty"`
+	PhotoURL       string          `bson:"foto_url,omitempty"`
+	FriendCode     string          `bson:"codigo_amigo"`
+	Roles          []string        `bson:"roles"`
+	Mode           string          `bson:"modo_actual"`
+	BusinessIDs    []bson.ObjectID `bson:"negocios_ids,omitempty"`
+	City           *City           `bson:"ciudad,omitempty"`
+	Tastes         *Tastes         `bson:"gustos,omitempty"`
+	Preferences    Preferences     `bson:"preferencias"`
+	Privacy        Privacy         `bson:"privacidad"`
+	Points         int             `bson:"puntos"`
+	Level          string          `bson:"nivel"`
+	StreakWeeks    int             `bson:"racha_semanas"`
+	Status         string          `bson:"estado"`
+	DeleteAt       *time.Time      `bson:"eliminar_en,omitempty"`
+	Version        int             `bson:"version"`
+	CreatedAt      time.Time       `bson:"creado_en"`
+	UpdatedAt      time.Time       `bson:"actualizado_en"`
+}
+
+// CanSignIn indica si la cuenta puede iniciar sesión. Una cuenta en eliminación pendiente sí
+// puede: es la única forma de entrar a cancelar el borrado dentro de los 30 días.
+func (u User) CanSignIn() bool {
+	return u.Status == StatusActive || u.Status == StatusPendingDeletion
+}
 
 // NormalizeEmail deja el correo en minúsculas y sin espacios (hoja A1: único y en minúsculas).
 func NormalizeEmail(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
 
 // Repository accede a la colección usuarios.
 type Repository struct {
-	col *mongo.Collection
+	col     *mongo.Collection
+	newCode func() (string, error)
 }
 
 // NewRepository recibe la base por constructor.
 func NewRepository(db *mongo.Database) *Repository {
-	return &Repository{col: db.Collection(Collection)}
+	return &Repository{col: db.Collection(Collection), newCode: newFriendCode}
 }
 
-// Indexes son los índices de usuarios que crea nv-04; los demás de A1 llegan con nv-05.
+// WithCodeGenerator devuelve una copia que genera códigos de amigo con gen (pruebas de colisión).
+func (r *Repository) WithCodeGenerator(gen func() (string, error)) *Repository {
+	cp := *r
+	cp.newCode = gen
+	return &cp
+}
+
+// Indexes son los índices de la hoja A1.
 func Indexes() []platformmongo.IndexSet {
+	exists := func(field string) bson.D {
+		return bson.D{{Key: field, Value: bson.D{{Key: "$exists", Value: true}}}}
+	}
 	return []platformmongo.IndexSet{{
 		Collection: Collection,
 		Models: []mongo.IndexModel{
 			{Keys: bson.D{{Key: "correo", Value: 1}}, Options: options.Index().SetName("ux_correo").SetUnique(true)},
-			{
-				Keys: bson.D{{Key: "google_id", Value: 1}},
-				Options: options.Index().SetName("ux_google_id").SetUnique(true).
-					SetPartialFilterExpression(bson.D{{Key: "google_id", Value: bson.D{{Key: "$exists", Value: true}}}}),
-			},
+			{Keys: bson.D{{Key: "google_id", Value: 1}}, Options: options.Index().SetName("ux_google_id").SetUnique(true).SetPartialFilterExpression(exists("google_id"))},
+			{Keys: bson.D{{Key: "codigo_amigo", Value: 1}}, Options: options.Index().SetName("ux_codigo_amigo").SetUnique(true)},
+			{Keys: bson.D{{Key: "nombre_normalizado", Value: 1}}, Options: options.Index().SetName("ix_nombre_busqueda")},
+			{Keys: bson.D{{Key: "ubicacion", Value: "2dsphere"}}, Options: options.Index().SetName("ix_ubicacion")},
+			{Keys: bson.D{{Key: "estado", Value: 1}, {Key: "eliminar_en", Value: 1}}, Options: options.Index().SetName("ix_eliminacion")},
+			{Keys: bson.D{{Key: "telefono_hash", Value: 1}}, Options: options.Index().SetName("ux_telefono_hash").SetUnique(true).SetPartialFilterExpression(exists("telefono_hash"))},
 		},
 	}}
 }
 
-// Create inserta un usuario nuevo; fija id, versión y fechas si faltan.
+// Create inserta un usuario nuevo: fija id, versión, fechas y un código de amigo único
+// (reintenta si choca con ux_codigo_amigo). Un correo repetido es ErrEmailTaken.
 func (r *Repository) Create(ctx context.Context, u *User) error {
 	now := time.Now().UTC()
 	if u.ID.IsZero() {
@@ -86,8 +202,20 @@ func (r *Repository) Create(ctx context.Context, u *User) error {
 	}
 	u.Email = NormalizeEmail(u.Email)
 	u.CreatedAt, u.UpdatedAt = now, now
-	_, err := r.col.InsertOne(ctx, u)
-	return err
+	generated := u.FriendCode == ""
+	for attempt := 0; ; attempt++ {
+		if generated {
+			code, err := r.newCode()
+			if err != nil {
+				return err
+			}
+			u.FriendCode = code
+		}
+		_, err := r.col.InsertOne(ctx, u)
+		if !generated || !isDuplicate(err, "ux_codigo_amigo") || attempt+1 >= friendCodeRetries {
+			return mapDuplicate(err)
+		}
+	}
 }
 
 // FindByEmail busca por correo normalizado.
@@ -100,14 +228,79 @@ func (r *Repository) FindByID(ctx context.Context, id bson.ObjectID) (User, erro
 	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}})
 }
 
+// EmailExists responde con el índice único ux_correo.
+func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error) {
+	n, err := r.col.CountDocuments(ctx, bson.D{{Key: "correo", Value: NormalizeEmail(email)}}, options.Count().SetLimit(1))
+	return n > 0, err
+}
+
 // SetPassword guarda el hash nuevo y sube la versión.
 func (r *Repository) SetPassword(ctx context.Context, id bson.ObjectID, hash string) error {
-	return r.update(ctx, id, bson.D{{Key: "password_hash", Value: hash}})
+	_, err := r.Update(ctx, id, bson.D{{Key: "password_hash", Value: hash}})
+	return err
 }
 
 // MarkEmailVerified pone correo_verificado = true.
 func (r *Repository) MarkEmailVerified(ctx context.Context, id bson.ObjectID) error {
-	return r.update(ctx, id, bson.D{{Key: "correo_verificado", Value: true}})
+	_, err := r.Update(ctx, id, bson.D{{Key: "correo_verificado", Value: true}})
+	return err
+}
+
+// Update aplica `set` sin condición de versión (la sube igual) y devuelve el documento nuevo.
+func (r *Repository) Update(ctx context.Context, id bson.ObjectID, set bson.D) (User, error) {
+	return r.apply(ctx, bson.D{{Key: "_id", Value: id}}, set, nil)
+}
+
+// UpdateIfVersion aplica `set` solo si la versión sigue siendo `version` (If-Match).
+func (r *Repository) UpdateIfVersion(ctx context.Context, id bson.ObjectID, version int, set bson.D) (User, error) {
+	u, err := r.apply(ctx, bson.D{{Key: "_id", Value: id}, {Key: "version", Value: version}}, set, nil)
+	if errors.Is(err, ErrNotFound) {
+		if _, findErr := r.FindByID(ctx, id); findErr == nil {
+			return User{}, ErrVersionConflict
+		}
+	}
+	return u, err
+}
+
+// MarkForDeletion deja la cuenta en eliminación pendiente hasta `at`.
+func (r *Repository) MarkForDeletion(ctx context.Context, id bson.ObjectID, at time.Time) (User, error) {
+	return r.Update(ctx, id, bson.D{{Key: "estado", Value: StatusPendingDeletion}, {Key: "eliminar_en", Value: at}})
+}
+
+// CancelDeletion vuelve la cuenta a activa si sigue pendiente y no ha vencido el plazo.
+func (r *Repository) CancelDeletion(ctx context.Context, id bson.ObjectID, now time.Time) (User, error) {
+	return r.apply(ctx,
+		bson.D{{Key: "_id", Value: id}, {Key: "estado", Value: StatusPendingDeletion}, {Key: "eliminar_en", Value: bson.D{{Key: "$gt", Value: now}}}},
+		bson.D{{Key: "estado", Value: StatusActive}},
+		bson.D{{Key: "eliminar_en", Value: ""}},
+	)
+}
+
+// DueForDeletion devuelve hasta `limit` cuentas cuyo plazo de borrado ya llegó (ix_eliminacion).
+func (r *Repository) DueForDeletion(ctx context.Context, now time.Time, limit int64) ([]bson.ObjectID, error) {
+	cur, err := r.col.Find(ctx,
+		bson.D{{Key: "estado", Value: StatusPendingDeletion}, {Key: "eliminar_en", Value: bson.D{{Key: "$lte", Value: now}}}},
+		options.Find().SetProjection(bson.D{{Key: "_id", Value: 1}}).SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	var docs []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	ids := make([]bson.ObjectID, len(docs))
+	for i, d := range docs {
+		ids[i] = d.ID
+	}
+	return ids, nil
+}
+
+// Delete borra el documento (lo usa el trabajo nocturno al vencer los 30 días).
+func (r *Repository) Delete(ctx context.Context, id bson.ObjectID) error {
+	_, err := r.col.DeleteOne(ctx, bson.D{{Key: "_id", Value: id}})
+	return err
 }
 
 func (r *Repository) findOne(ctx context.Context, filter bson.D) (User, error) {
@@ -119,17 +312,49 @@ func (r *Repository) findOne(ctx context.Context, filter bson.D) (User, error) {
 	return u, err
 }
 
-func (r *Repository) update(ctx context.Context, id bson.ObjectID, set bson.D) error {
+// apply hace $set (más `actualizado_en`), $unset opcional y `version + 1`, y devuelve el
+// documento nuevo.
+func (r *Repository) apply(ctx context.Context, filter, set, unset bson.D) (User, error) {
 	set = append(set, bson.E{Key: "actualizado_en", Value: time.Now().UTC()})
-	res, err := r.col.UpdateByID(ctx, id, bson.D{
-		{Key: "$set", Value: set},
-		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}},
-	})
+	update := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
+	if len(unset) > 0 {
+		update = append(update, bson.E{Key: "$unset", Value: unset})
+	}
+	var u User
+	err := r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&u)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return User{}, ErrNotFound
+	}
 	if err != nil {
+		return User{}, mapDuplicate(err)
+	}
+	return u, nil
+}
+
+func isDuplicate(err error, index string) bool {
+	return err != nil && mongo.IsDuplicateKeyError(err) && strings.Contains(err.Error(), index)
+}
+
+func mapDuplicate(err error) error {
+	switch {
+	case isDuplicate(err, "ux_correo"):
+		return ErrEmailTaken
+	case isDuplicate(err, "ux_telefono_hash"):
+		return ErrPhoneTaken
+	default:
 		return err
 	}
-	if res.MatchedCount == 0 {
-		return ErrNotFound
+}
+
+func newFriendCode() (string, error) {
+	out := make([]byte, friendCodeLen)
+	limit := big.NewInt(int64(len(friendCodeAlphabet)))
+	for i := range out {
+		n, err := rand.Int(rand.Reader, limit)
+		if err != nil {
+			return "", err
+		}
+		out[i] = friendCodeAlphabet[n.Int64()]
 	}
-	return nil
+	return string(out), nil
 }

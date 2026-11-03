@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
+.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -72,6 +72,10 @@ mutate-full:
 # Índices de MongoDB (constitución §5): idempotente, lee MONGO_URI de .env.
 indexes:
 	go run ./scripts/indexes
+
+# Catálogo de ciudades: make importar-ciudades ARCHIVO=ciudades.csv (idempotente).
+importar-ciudades:
+	go run ./scripts/importar_ciudades $(ARCHIVO)
 
 run:
 	go run -ldflags "-X main.version=$(VERSION)" ./cmd/api

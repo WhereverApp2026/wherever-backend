@@ -12,11 +12,19 @@ import (
 type Handler struct {
 	svc       *Service
 	validator *validation.Validator
+	active    fiber.Handler
 }
 
 // NewHandler recibe el service y el validador compartido por constructor.
 func NewHandler(svc *Service, v *validation.Validator) *Handler {
 	return &Handler{svc: svc, validator: v}
+}
+
+// WithActiveGuard agrega el guardia de cuenta activa (usuarios.RequireActive) a las rutas con
+// sesión, salvo logout y logout-todos: con la cuenta en eliminación pendiente responden 403.
+func (h *Handler) WithActiveGuard(guard fiber.Handler) *Handler {
+	h.active = guard
+	return h
 }
 
 // bind lee el JSON y lo valida: cuerpo ilegible → 400, reglas → 422.
