@@ -1,6 +1,6 @@
 # Checklist — nv-04 Autenticación, sesiones y recuperación de contraseña (J1)
 
-> Trazabilidad: `spec R1-R8 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Borrador con evidencia (2026-11-02), sin firma. T7 (Google) diferida.
+> Trazabilidad: `spec R1-R8 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Aprobada (2026-11-02, Osmar Reséndiz). T7 (Google) diferida.
 
 - [x] Tokens: JWT HS256 de 15 min con `sub, sid, jti, roles, iss, aud` y refresh opaco de 30 días (R1) — `internal/auth/tokens_test.go`, `TestAuthService_LoginOK`
 - [x] Sesiones por dispositivo, cierre individual y total (R2) — `TestAuth_ActiveSessionsMarkCurrent`, `TestAuth_RevokeSessionOnlyOwn`, `TestAuthService_LogoutAllClosesEverySession`
@@ -18,7 +18,7 @@
 - [x] `go build`, `go vet`, suites, cobertura ≥45 %, semgrep 0
 - [x] Dos instancias: logout en una invalida el JWT en la otra — `TestAuth_LogoutInOneInstanceRevokesInTheOther`
 - [x] `Memoria.md` con D-1, excepción `idtoken` (pendiente con T7) y deuda del proveedor de correo
-- [ ] Aprobación firmada: (pendiente de revisor)
+- [x] Aprobación firmada: Osmar Reséndiz, 2026-11-02 (T7 fuera de la aprobación)
 
 ## Evidencia (2026-11-02, Go 1.27.3, Docker 29.8.1, Windows + Git Bash)
 - `go build ./...` y `go vet ./...` sin errores; `golangci-lint@v2.15.0 run ./...` → 0 issues.

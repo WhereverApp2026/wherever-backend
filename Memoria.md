@@ -71,7 +71,7 @@
 - A evitar: Python en la consola de Windows imprime mal los acentos; el script reconfigura stdout a UTF-8.
 
 ## Ejecución nv-04 (2026-11-02)
-- Estado: T1–T6 y T8 ejecutadas en la rama `nv-04-auth` (sale de `main` con nv-03). Once endpoints de J1, colecciones `sesiones` y `tokens_un_uso`, `usuarios` mínimo, mailer en memoria y de log, índices por script y suites Database y Contract nuevas. T7 (Google) diferida. Spec en Borrador con evidencia, sin firma.
+- Estado: aprobada por Osmar Reséndiz el 2026-11-02 (PR #6), salvo T7. T1–T6 y T8 ejecutadas en la rama `nv-04-auth` (sale de `main` con nv-03). Once endpoints de J1, colecciones `sesiones` y `tokens_un_uso`, `usuarios` mínimo, mailer en memoria y de log, índices por script y suites Database y Contract nuevas. T7 (Google) diferida. Spec en Borrador con evidencia, sin firma.
 - Decisión D-1 (pendiente, no tomada aquí): Google sin `fecha_nacimiento`. Hasta que el responsable de A1 (Alexander Dominguez Zarate) apruebe la propuesta de la spec, no hay `/auth/google` ni la dependencia `google.golang.org/api/idtoken` (excepción de stack, Apache-2.0, mantenida por Google) ni `GOOGLE_CLIENT_ID`.
 - Decisión: llaves `jwt_revocado:{jti}` y `login_fallos:{correo}` aunque la spec nv-04 decía `blacklist:/attempts:/lockout:`. Porqué: la constitución §6 y la alineación del 2026-10-29 fijan esos nombres; nv-01 ya usa `jwt_revocado:`. El bloqueo es la misma llave con 5 o más y su TTL da los minutos del 423.
 - Decisión: índices declarados por módulo (`Indexes()`), reunidos en `internal/indexes` y creados solo por `scripts/indexes` (`make indexes`). Porqué: constitución §5; el plan decía "en el arranque".
@@ -98,7 +98,7 @@
 - Proveedor del modelo de lenguaje (API o modelo local).
 - D-1: cuenta nueva por Google sin `fecha_nacimiento` (propuesta en `specs/nv-04/spec.md`; dueño A1).
 - Proveedor de correo (SMTP o servicio) y su remitente (`MAIL_FROM`).
-- Nombre del revisor para firmar las specs (responsables en el Excel: Jorge Alberto Rodríguez Enriquez, hojas J; Alexander Dominguez Zarate, hojas A).
+- Firma de `nv-00…nv-03`: siguen en Borrador con evidencia. Desde nv-04 el revisor es Osmar Reséndiz (único integrante de backend; el Excel nombra a Jorge Alberto Rodríguez Enriquez para las hojas J y a Alexander Dominguez Zarate para las A como responsables del diseño).
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.
 
 ## Mapa de fases

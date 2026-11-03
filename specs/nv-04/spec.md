@@ -70,9 +70,11 @@ Respuesta de tokens: `{access_token, refresh_token, expira_en, usuario}`. Cuerpo
 - Un refresh enviado dos veces en paralelo desde el mismo teléfono se leería como reutilización. La app móvil debe serializar la renovación (un solo `Authenticator` en vuelo); queda como requisito de la spec móvil, no se resuelve aquí.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (T1–T6 y T8 ejecutadas; T7 Google diferida por D-1; sin firma)
-- **Revisores:** (pendiente de nombre; responsable de la hoja J1: Jorge Alberto Rodríguez Enriquez)
-- **Fecha:** 2026-11-02 (ejecución)
+- **Estado:** ✅ Aprobada (T1–T6 y T8). T7 (Google) sigue pendiente de la decisión D-1 y se aprueba aparte cuando se ejecute.
+- **Revisores:** Osmar Reséndiz (único integrante de backend; la hoja J1 la diseñó Jorge Alberto Rodríguez Enriquez)
+- **Fecha:** 2026-11-02 (ejecución y aprobación)
+- [x] CHECKLIST_PR.md OK
+- [x] Sin conflicto con constitución
 - **Detalle:** evidencia en `specs/nv-04/checklists/gates.md` + `Memoria.md`. Desvíos:
   - Llaves de Redis `jwt_revocado:{jti}` y `login_fallos:{correo}` (constitución §6), no `blacklist:/attempts:/lockout:`.
   - Índices solo por `scripts/indexes` (constitución §5), no al arrancar.
