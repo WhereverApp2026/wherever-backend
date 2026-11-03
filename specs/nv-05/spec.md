@@ -79,9 +79,11 @@ Una cuenta en `eliminacion_pendiente` solo puede llamar `GET /usuarios/yo`, `POS
 - Sin cuentas de comerciante ni negocios (`negocios_ids` queda vacío); sin amigos (el código de amigo solo se genera).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (T1–T8 ejecutadas; sin firma)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-03 (ejecución)
+- **Estado:** ✅ Aprobada (T1–T8)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-03 (ejecución y aprobación)
+- [x] CHECKLIST_PR.md OK
+- [x] Sin conflicto con constitución
 - **Decisiones del revisor (2026-11-03):** D-2 aprobada (enlace de un solo uso de 24 h, tipo `descargar_exportacion`); `gocron` aprobado como excepción de stack (`github.com/go-co-op/gocron/v2` v2.22.0, MIT); D-1 sigue pendiente (sin `perfil_completo`).
 - **Detalle:** evidencia en `specs/nv-05/checklists/gates.md` + `Memoria.md`. Desvíos:
   - Paquetes: `internal/usuarios` (modelo y repositorio, que también usa auth) y `internal/usuarios/account` (service, handler, DTO); juntos harían un ciclo de imports con `internal/auth`. `internal/ciudades` y `internal/privacidad` como dice la spec.

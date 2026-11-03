@@ -1,6 +1,6 @@
 # Checklist — nv-05 Usuarios, perfil, gustos y privacidad (A1)
 
-> Trazabilidad: `spec R1-R8 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Borrador con evidencia (2026-11-03), sin firma.
+> Trazabilidad: `spec R1-R8 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Aprobada (2026-11-03, Osmar Reséndiz).
 
 - [x] Registro con 18+, política de contraseña, rol, 50 puntos, verificación y tokens (R1) — `TestUsuariosService_RegisterCreatesConsumerWithWelcomePoints`, `TestUsuariosSecurity_AdulthoodByUTCDate`
 - [x] `correo-disponible` con límite (R2) — `TestUsuarios_EmailAvailability`, `TestUsuariosSecurity_RegisterAndEmailCheckAreRateLimited`
@@ -15,7 +15,7 @@
 - [x] 16 filas en `docs/endpoints.md` (15 + descarga de D-2); `check_endpoints.sh → OK` (37 rutas)
 - [x] `go build`, `go vet`, suites, cobertura ≥45 % (82,9 %), semgrep 0
 - [x] `Memoria.md` con D-1, D-2, `gocron` y la conexión pendiente de `Purger`/`Exporter`
-- [ ] Aprobación firmada: (pendiente de revisor)
+- [x] Aprobación firmada: Osmar Reséndiz, 2026-11-03
 
 ## Evidencia (2026-11-03, Go 1.27.3, Docker 29.8.1, Windows + Git Bash)
 - `go build ./...` y `go vet ./...` sin errores; `golangci-lint@v2.15.0 run ./...` → 0 issues.
