@@ -67,7 +67,9 @@ Cambio de datos: `exportaciones.aviso_enviado_en` (date, no obligatorio). Sin í
 - Aviso de privacidad: al elegir proveedor debe aparecer como encargado del tratamiento de los correos (LFPDPPP).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (T1–T8 ejecutadas; sin firma)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-03 (ejecución)
+- **Estado:** ✅ Aprobada (T1–T8)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-03 (ejecución y aprobación)
+- [x] CHECKLIST_PR.md OK
+- [x] Sin conflicto con constitución
 - **Detalle:** evidencia en `specs/nv-06/checklists/gates.md` + `Memoria.md`. Ajustes del revisor antes de ejecutar (2026-11-03): `MAIL_FROM` nuevo, `Name` en el mensaje, token en el fragmento, producción falla sin `SMTP_HOST`, aviso síncrono con reintento que invalida el token anterior, tope de 72 h y 24 h desde el aviso.

@@ -1,6 +1,6 @@
 # Checklist — nv-06 Correo saliente
 
-> Trazabilidad: `spec R1-R7 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Borrador con evidencia (2026-11-03). Revisor: Osmar Reséndiz (pendiente).
+> Trazabilidad: `spec R1-R7 ↔ plan §3-§5 ↔ task T1-T8`. Estado: Aprobada (2026-11-03, Osmar Reséndiz).
 
 - [x] Adaptador SMTP con la librería estándar; proveedor solo por configuración (R1) — `internal/platform/mailer/smtp.go`, `TestMailer_*` con Mailpit
 - [x] Ninguna petición espera al servidor de correo; un fallo no cambia la respuesta (R2) — `TestMailer_SlowOrDownServerDoesNotChangeResponses`, `TestAsync_FullQueueDropsWithoutBlocking`
@@ -15,7 +15,7 @@
 - [x] `.env.example` con las claves nuevas (incluido `MAIL_FROM`) y sin secretos — `TestEnvExample_*`
 - [x] `go build`, `go vet`, suites, cobertura ≥45 %, semgrep 0, `critic → PASS`
 - [x] `Memoria.md` con la deuda: proveedor, dominio (SPF/DKIM/DMARC), App Links, token en fragmento para la spec móvil, aviso de privacidad
-- [ ] Aprobación firmada: Osmar Reséndiz (pendiente)
+- [x] Aprobación firmada: Osmar Reséndiz, 2026-11-03
 
 ## Evidencia (2026-11-03, Go 1.27.3, Docker 29.8.1, Windows + Git Bash; suites en `golang:1.27.3`)
 - `go build ./...` y `go vet ./...` sin errores; `golangci-lint@v2.15.0 run ./...` → 0 issues.
