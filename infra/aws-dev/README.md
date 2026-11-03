@@ -9,7 +9,8 @@ lunes a viernes a las 08:00 (`America/Mexico_City`). Sin datos reales, sin CD, d
 2. **Política** `wherever-dev-deployer-policy` en IAM de la cuenta del proyecto **`816101201001`** ("Ctrl Shift Create"): pega `iam/wherever-dev-deployer-policy.json` (solo `us-east-2`, recursos `wherever-dev-*` y `/wherever/dev/*`, con `ec2:ImportKeyPair` y `ec2:DeleteKeyPair` para el par de llaves; sin permisos de administrador).
 3. **Usuario IAM** `wherever-deployer` con MFA y esa política; una clave de acceso solo para él.
 4. **Perfil local:** `aws configure --profile wherever-dev` con esa clave y región `us-east-2` (sin `login_session` en `~/.aws/config`). Comprueba que `aws sts get-caller-identity --profile wherever-dev` dé `arn:aws:iam::816101201001:user/wherever-deployer`: ni `:root` ni un usuario con `AdministratorAccess`.
-5. **Atlas:** después del `apply`, agrega la IP elástica (`terraform output public_ip`) en *Network Access* de Atlas. Mejor aún, usa un usuario de base de datos con `readWrite` solo en `wherever` (no Atlas Admin).
+5. **Atlas:** después del `apply`, agrega la IP elástica (`terraform output public_ip`) en *Network Access* de Atlas. El servidor usa **su propio usuario de base de datos** (`wherever-dev-ec2`, `readWrite` solo en `wherever`), distinto del de tu `.env` local: si se filtra uno, el otro sigue en pie.
+6. **Respaldo del estado:** `terraform.tfstate` es local y no va a Git; sin él no hay `destroy` limpio. Copia el estado (y `terraform.tfvars`) fuera del repo después de cada `apply`.
 
 ## Desplegar
 ```bash
@@ -27,8 +28,9 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 |---|---|
 | `APP_ENV` | `staging` |
 | `MONGO_URI` | cadena de Atlas con la base `wherever` |
-| `JWT_KEY`, `PHONE_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local |
+| `JWT_KEY`, `PHONE_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local (los nombres exactos: la API no lee `JWT_SECRET` ni `HMAC_SECRET`) |
 | `JWT_ISSUER`, `JWT_AUDIENCE` | `wherever-api`, `wherever-app` |
+| `TRUSTED_PROXIES` | `172.16.0.0/12` (Caddy llega por la red de Docker; solo de ahí se cree `X-Forwarded-For`) |
 | `CORS_ALLOWED_ORIGIN`, `SMTP_*`, `MAIL_FROM`, `APP_LINK_BASE` | opcionales |
 
 En Git Bash (Windows) antepón `MSYS_NO_PATHCONV=1`; si no, la ruta `/wherever/dev/...` se convierte en una ruta de Windows.
@@ -43,6 +45,13 @@ infra/aws-dev/scripts/desplegar.sh --ip "$(terraform -chdir=infra/aws-dev output
   --site "$(terraform -chdir=infra/aws-dev output -raw site_address)" --key ~/.ssh/wherever-dev
 ```
 
+Si `docker build` se cuelga en `go mod download` (red inestable hacia `proxy.golang.org`), excepción de desarrollo: compila en local y empaqueta sobre la misma base, luego corre el resto de `desplegar.sh` a mano (copiar imagen, `deploy-env.sh`, `compose up`). No es reproducible: anota el commit en `Memoria.md`.
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$(git rev-parse --short HEAD)" -o <dir>/api ./cmd/api
+# <dir>/Dockerfile: FROM gcr.io/distroless/static-debian12:nonroot / COPY api /api / USER nonroot:nonroot / ENTRYPOINT ["/api"]
+docker build -t wherever-api:dev <dir>
+```
+
 ## Verificar
 ```bash
 $(terraform -chdir=infra/aws-dev output -raw verificar)   # solo lectura; falla si algo sale del Free Tier o queda expuesto
@@ -50,14 +59,18 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw url_https)/ready"
 ```
 `/ready` da 503 si Atlas no acepta la IP elástica o falta un índice (`make indexes` contra Atlas).
 
+## CI
+`ci-pr.yml` corre en todo PR (sin filtro de rutas) y construye la imagen con el `Dockerfile`, pero no revisa Terraform: `fmt`, `validate` y Trivy de `infra/` se corren a mano.
+
 ## Pendiente: correo
 La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
 
 ## Memoria de la instancia
-`t3.micro` (1 GB): API 192 MB, Redis 96 MB (`maxmemory 64mb`), Neo4j 512 MB (heap 256 MB), Caddy 64 MB y 2 GB de swap. Sin MongoDB local, cabe con margen.
+`t3.micro` (1 GB): API 192 MB, Redis 96 MB (`maxmemory 64mb`), Neo4j 512 MB (heap 256 MB, page cache 64 MB), Caddy 64 MB y 2 GB de swap. Cada contenedor tiene tope propio: si Neo4j se pasa, el OOM mata solo ese contenedor y `unless-stopped` lo levanta. Medido en reposo (2026-11-03): Neo4j 360 MB, API 22 MB, Caddy 21 MB, Redis 3 MB; ~210 MB disponibles y ~200 MB de swap en uso. Si falta, `instance_type = "t3.small"` (elegible en esta cuenta, plan gratuito nuevo).
 
 ## Destruir
 ```bash
 terraform -chdir=infra/aws-dev destroy
 ```
+Un `destroy` + `apply` **cambia la IP elástica**: cambia la URL de sslip.io, hay que actualizar *Network Access* de Atlas (y quitar la IP vieja) y cualquier cliente que apunte a la URL anterior. Hazlo cuando nada dependa de esa URL.
 La IP elástica se libera con el destroy; una suelta cobra. Los parámetros de `/wherever/dev/` no los crea Terraform: bórralos con `aws ssm delete-parameter` si ya no sirven.
