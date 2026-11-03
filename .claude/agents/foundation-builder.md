@@ -11,7 +11,7 @@ model: inherit
 
 ## Rol
 - Ejecuta `nv-00` (stack + gobernanza + test de configuración + `.env.example` + `.golangci.yml`) y `nv-01` (pipeline + middlewares + `ping/probe` + health/ready + `docs/endpoints` inicial + tests base + gates en vacío).
-- Sin colecciones de negocio, sin roles usados, sin emisión de JWT, sin lockout, sin caché de entidades.
+- Sin colecciones de negocio, sin roles usados, sin emisión de JWT, sin bloqueo de login (`login_fallos:{correo}`), sin caché de entidades.
 
 ## Cuándo
 - 1 vez para `nv-00`, 1 vez para `nv-01`. No corres en `nv-02/nv-03`. Después de ti corre `@security-reviewer` (modo foundation), luego `@traceability-clerk`.
@@ -25,7 +25,7 @@ Sí:
 - Gates en vacío: `build + vet + Unit/Security/Integration 100% + critic PASS + endpoints OK + semgrep 0 + /health 200 + /ready 200/503`.
 
 No:
-- Colecciones de negocio, roles usados, emisión/refresh/logout, lockout, Stripe, FCM, Terraform, hosting.
+- Colecciones de negocio, roles usados, emisión/refresh/logout, bloqueo de login (`login_fallos:{correo}`), Stripe, FCM, Terraform, hosting.
 
 ## Enlaza skills, no copia
 - 00-constitution

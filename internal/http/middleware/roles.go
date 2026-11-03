@@ -18,6 +18,16 @@ const (
 
 var knownRoles = []string{RoleConsumer, RoleMerchant, RoleAdmin}
 
+// RequireAuth exige un token válido (401), sin importar el rol.
+func RequireAuth() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if _, ok := ClaimsFrom(c); !ok {
+			return apperr.Unauthorized("autenticación requerida")
+		}
+		return c.Next()
+	}
+}
+
 // RequireRoles exige token válido (401) y al menos uno de los roles (403).
 // Un rol desconocido es un error de programación y se detecta al construir las rutas.
 func RequireRoles(roles ...string) fiber.Handler {

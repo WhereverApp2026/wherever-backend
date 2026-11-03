@@ -34,6 +34,8 @@ func Config(env string) config.Config {
 		JWTKey:          []byte(SigningKey),
 		JWTIssuer:       Issuer,
 		JWTAudience:     Audience,
+		AccessTTL:       config.MaxAccessTTL,
+		RefreshTTL:      config.MaxRefreshTTL,
 		BodyLimit:       config.MaxBodyLimit,
 		RequestTimeout:  config.MaxRequestTimeout,
 		RateLimitGlobal: config.DefaultRateGlobal,

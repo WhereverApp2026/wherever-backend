@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "actual": "bool",
+      "dispositivo": {
+        "app_version": "string",
+        "modelo": "string",
+        "sistema": "string"
+      },
+      "id": "string",
+      "ultimo_uso": "string"
+    }
+  ]
+}

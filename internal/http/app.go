@@ -11,7 +11,6 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
-	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
 const (
@@ -24,6 +23,12 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// Module es un módulo de negocio (nv-04+) que registra sus rutas bajo /api/v1. Recibe el
+// limitador para sus políticas por ruta; sus dependencias llegan por su propio constructor.
+type Module interface {
+	Routes(v1 fiber.Router, limiter *middleware.Limiter)
+}
+
 // Deps son las dependencias ya construidas; se inyectan para que los tests reutilicen NewApp.
 type Deps struct {
 	Logger  *slog.Logger
@@ -31,8 +36,9 @@ type Deps struct {
 	Redis   *goredis.Client
 	Mongo   Pinger
 	Neo4j   Pinger
-	// Validator lo comparten los handlers de los módulos; sus reglas se registran en validation.New.
-	Validator *validation.Validator
+	// MongoIndexes, si viene, hace que /ready dé 503 cuando falta un índice declarado.
+	MongoIndexes Pinger
+	Modules      []Module
 }
 
 // Stage es una etapa con nombre del pipeline.
@@ -86,17 +92,20 @@ func NewApp(cfg config.Config, deps Deps) *fiber.App {
 		app.Use(s.Handler)
 	}
 
-	registerRoutes(app, cfg, deps)
+	registerRoutes(app, cfg, deps, limiter)
 	return app
 }
 
-func registerRoutes(app *fiber.App, cfg config.Config, deps Deps) {
+func registerRoutes(app *fiber.App, cfg config.Config, deps Deps, limiter *middleware.Limiter) {
 	health := newHealth(deps)
 	app.Get("/health", health.live)
 	app.Get("/ready", health.ready)
 
 	v1 := app.Group("/api/v1")
 	v1.Get("/ping", ping)
+	for _, m := range deps.Modules {
+		m.Routes(v1, limiter)
+	}
 	if !cfg.IsProd() {
 		registerProbes(v1.Group("/probe"))
 	}

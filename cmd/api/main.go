@@ -11,13 +11,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
+	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
 // version se fija al compilar: -ldflags "-X main.version=v0.1.0".
@@ -60,13 +65,27 @@ func run() error {
 		return err
 	}
 
+	// Sin proveedor de correo todavía (deuda de nv-04): el Log solo registra tipo y destinatario enmascarado.
+	authSvc, err := auth.NewService(
+		usuarios.NewRepository(mongoClient.DB()), auth.NewRepository(mongoClient.DB()), redisClient, mailer.NewLog(log),
+		auth.Config{
+			JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+			AccessTTL:  cfg.AccessTTL,
+			RefreshTTL: cfg.RefreshTTL,
+		}, log)
+	if err != nil {
+		return fmt.Errorf("auth: %w", err)
+	}
+
 	app := httpapi.NewApp(cfg, httpapi.Deps{
-		Logger:    log,
-		Version:   version,
-		Redis:     redisClient,
-		Mongo:     mongoClient,
-		Neo4j:     neo4jDriver,
-		Validator: validator,
+		Logger:  log,
+		Version: version,
+		Redis:   redisClient,
+		Mongo:   mongoClient,
+		Neo4j:   neo4jDriver,
+		// La API no crea índices (constitución §5); /ready da 503 si falta alguno.
+		MongoIndexes: mongo.NewIndexVerifier(mongoClient.DB(), indexes.All()...),
+		Modules:      []httpapi.Module{auth.NewHandler(authSvc, validator)},
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

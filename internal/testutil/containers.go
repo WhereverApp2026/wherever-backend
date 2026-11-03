@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
@@ -35,6 +37,7 @@ type Stack struct {
 	RedisAddr string
 	Neo4jURI  string
 	stop      []func(context.Context) error
+	redis     testcontainers.Container
 }
 
 // StartStack levanta MongoDB, Redis y Neo4j con puertos fijos. Las suites con contenedor
@@ -67,8 +70,23 @@ func StartStack(ctx context.Context) (*Stack, error) {
 			return nil, errors.Join(fmt.Errorf("%s: %w", spec.image, err), stack.Stop(ctx))
 		}
 		stack.stop = append(stack.stop, func(ctx context.Context) error { return c.Terminate(ctx) })
+		if spec.image == redisImage {
+			stack.redis = c
+		}
 	}
 	return stack, nil
+}
+
+// StopRedis detiene Redis sin borrarlo, para probar la caída real.
+func (s *Stack) StopRedis(ctx context.Context) error {
+	timeout := 5 * time.Second
+	return s.redis.Stop(ctx, &timeout)
+}
+
+// StartRedis vuelve a levantar Redis en el mismo puerto fijo (AGENTS.md §7), así el
+// cliente existente se reconecta sin cambiar de dirección.
+func (s *Stack) StartRedis(ctx context.Context) error {
+	return s.redis.Start(ctx)
 }
 
 // Stop apaga los contenedores levantados.
@@ -88,4 +106,28 @@ func fixedPort(containerPort, hostPort string) func(*container.HostConfig) {
 			},
 		}
 	}
+}
+
+// RunWithStack es el TestMain de una suite con bases reales: levanta el Stack, llama a
+// setup (para abrir clientes) y corre las pruebas; al terminar apaga todo. Ryuk no arranca
+// en Docker Desktop para Windows, así que ahí se desactiva y el apagado queda en el defer.
+func RunWithStack(m interface{ Run() int }, setup func(*Stack) (cleanup func(), err error)) int {
+	if runtime.GOOS == "windows" && os.Getenv("TESTCONTAINERS_RYUK_DISABLED") == "" {
+		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	stack, err := StartStack(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "no se pudieron levantar las bases:", err)
+		return 1
+	}
+	defer func() { _ = stack.Stop(context.Background()) }()
+	cleanup, err := setup(stack)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "preparar la suite:", err)
+		return 1
+	}
+	defer cleanup()
+	return m.Run()
 }

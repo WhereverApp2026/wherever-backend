@@ -1,12 +1,14 @@
 package integration
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 )
@@ -67,4 +69,24 @@ func TestReady_Neo4jDownIs503(t *testing.T) {
 	statuses, ok := decode(t, resp)["dependencias"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "error", statuses["neo4j"])
+}
+
+// La API no crea índices: si nadie corrió scripts/indexes, /ready da 503 hasta que existan.
+func TestReady_MissingIndexesIs503UntilScriptRuns(t *testing.T) {
+	ctx := context.Background()
+	db := mongoClient.DB()
+	require.NoError(t, db.Drop(ctx))
+	deps := realDeps()
+	deps.MongoIndexes = mongo.NewIndexVerifier(db, indexes.All()...)
+	app := newApp("prod", deps)
+
+	missing := get(t, app, "/ready")
+	raw := readAll(t, missing)
+	assert.Equal(t, http.StatusServiceUnavailable, missing.StatusCode)
+	assert.JSONEq(t, `{"estado":"error","dependencias":{"mongodb":"ok","redis":"ok","neo4j":"ok","indices_mongodb":"error"}}`, raw)
+
+	require.NoError(t, mongo.EnsureIndexes(ctx, db, indexes.All()...))
+	ready := get(t, app, "/ready")
+	assert.Equal(t, http.StatusOK, ready.StatusCode)
+	assert.Equal(t, "ok", obj(t, decode(t, ready)["dependencias"])["indices_mongodb"])
 }

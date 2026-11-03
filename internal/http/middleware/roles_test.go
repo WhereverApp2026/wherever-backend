@@ -22,6 +22,14 @@ func TestRequireRoles_AnonymousIs401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, anonymous.StatusCode)
 }
 
+func TestRequireAuth_AnonymousIs401(t *testing.T) {
+	jwtCfg := middleware.JWTConfig{Key: []byte(testutil.SigningKey), Issuer: testutil.Issuer, Audience: testutil.Audience}
+	app := newTestApp(true, discardLogger(), middleware.JWT(jwtCfg, testutil.DeadRedis(t)))
+	app.Get("/yo", middleware.RequireAuth(), okHandler)
+
+	assert.Equal(t, http.StatusUnauthorized, get(t, app, "/yo").StatusCode)
+}
+
 func TestRequireRoles_UnknownRolePanicsAtBuild(t *testing.T) {
 	assert.Panics(t, func() { middleware.RequireRoles("superusuario") })
 }

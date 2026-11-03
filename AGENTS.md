@@ -41,7 +41,8 @@
 - `scripts/critic-guardrails.sh → PASS`, `scripts/check_sdd.sh → SDD-OK`, `scripts/check_endpoints.sh → OK`, `scripts/check_coverage.sh --min 45`, `check_delta_coverage.py --min 80 --advisory` informa (no bloquea), `semgrep scan --config=auto --config=.semgrep/semgrep.yaml --error` 0 nuevos.
 - Mutación PR advisory (solo archivos cambiados, `continue-on-error`) + nightly opcional; tras ella siempre `go build ./...`.
 - Contract con `CONTRACT_CAPTURE=1` para regenerar; sin la variable solo valida.
-- `curl /ready` 200 con las tres bases, 503 si cae MongoDB o Neo4j; Redis caído = 200 `degraded`.
+- `curl /ready` 200 con las tres bases, 503 si cae MongoDB o Neo4j o si falta un índice declarado (correr `make indexes`); Redis caído = 200 `degraded`.
+- Mutación: `scripts/mutation.sh` trabaja en una copia temporal del árbol, nunca en el de trabajo; en PR solo `MUTATION_SCOPE` (service y tokens de auth), la completa en `nightly.yml`.
 
 ## 5. Convenciones técnicas
 - Rutas `/api/v1/<recurso>`; DTOs + validator; `version` e `If-Match` en Update/Delete.
@@ -65,7 +66,8 @@
 ## 7. Testing quirks
 - `testing` + `testify`; mocks solo de interfaces externas; Integration y Security usan la app real en proceso.
 - `Security` reutiliza el helper `internal/testutil` (tokens válidos/vencidos/sin firma).
-- Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan).
+- Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`).
+- El service de un módulo se prueba en `tests/integration` contra bases reales (no en `internal/<modulo>`, que es Unit sin Docker); el armado del módulo para pruebas va en `internal/testutil/<modulo>test`.
 - Los tests de integración que reinician un contenedor deben fijar el puerto del host; si no, el puerto cambia y la conexión queda obsoleta.
 - El proceso local se mata por nombre del binario, no por `go`.
 - JSON `snake_case` medido; sin mezclas.

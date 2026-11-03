@@ -1,0 +1,39 @@
+# Mutación completa nocturna (constitución §7: mutación nightly u opcional, no bloquea).
+# Línea base medida en nv-04: score 0,62 (31 min en Windows). Límite: go-mutesting solo muta
+# archivos con `_test.go` del mismo nombre (12 de 36 en internal/); el service de auth, que se
+# prueba en tests/integration, no entra. Ver Memoria.md.
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 03:00 en America/Mexico_City
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+
+      - name: deps
+        run: go mod download
+
+      - name: mutation completa
+        run: bash scripts/mutation.sh --full
+
+      - name: resumen
+        if: always()
+        run: |
+          grep -E '^The mutation score' bin/mutation.log >> "$GITHUB_STEP_SUMMARY" || echo "sin score" >> "$GITHUB_STEP_SUMMARY"

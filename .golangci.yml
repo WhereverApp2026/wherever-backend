@@ -21,6 +21,13 @@ linters:
     errcheck:
       check-type-assertions: true
 
+  exclusions:
+    rules:
+      # Las pruebas usan contraseñas y tokens de prueba a propósito (no son secretos).
+      - path: _test\.go
+        linters: [gosec]
+        text: G101
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

@@ -3,14 +3,23 @@
   "info": {
     "title": "Wherever API",
     "version": "v1",
-    "description": "Arquitectura base (nv-01). Las rutas de negocio llegan con sus specs nv-04+."
+    "description": "Arquitectura base (nv-01) y autenticación (nv-04, hoja J1). POST /auth/google queda diferido (D-1)."
   },
   "paths": {
     "/health": {
       "get": {
         "summary": "Liveness: no consulta bases",
         "responses": {
-          "200": {"description": "Viva", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}
+          "200": {
+            "description": "Viva",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -18,8 +27,26 @@
       "get": {
         "summary": "Readiness: MongoDB, Redis y Neo4j (1 s cada una)",
         "responses": {
-          "200": {"description": "Lista u operando sin Redis (degraded)", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ready"}}}},
-          "503": {"description": "MongoDB o Neo4j no responden", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ready"}}}}
+          "200": {
+            "description": "Lista u operando sin Redis (degraded)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "MongoDB o Neo4j no responden, o falta un índice de MongoDB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -27,56 +54,755 @@
       "get": {
         "summary": "Comprueba que v1 resuelve",
         "responses": {
-          "200": {"description": "pong", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Ping"}}}}
+          "200": {
+            "description": "pong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ping"
+                }
+              }
+            }
+          }
         }
       }
     },
-    "/api/v1/probe/timeout": {"get": {"summary": "Sonda 408 (no-prod)", "responses": {"408": {"$ref": "#/components/responses/Error"}}}},
-    "/api/v1/probe/error": {"get": {"summary": "Sonda 500 (no-prod)", "responses": {"500": {"$ref": "#/components/responses/Error"}}}},
-    "/api/v1/probe/forbidden": {"get": {"summary": "Sonda 403 (no-prod)", "responses": {"403": {"$ref": "#/components/responses/Error"}}}},
-    "/api/v1/probe/conflict": {"get": {"summary": "Sonda 409 (no-prod)", "responses": {"409": {"$ref": "#/components/responses/Error"}}}},
-    "/api/v1/probe/invalid": {"get": {"summary": "Sonda 422 (no-prod)", "responses": {"422": {"$ref": "#/components/responses/Error"}}}}
+    "/api/v1/probe/timeout": {
+      "get": {
+        "summary": "Sonda 408 (no-prod)",
+        "responses": {
+          "408": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/probe/error": {
+      "get": {
+        "summary": "Sonda 500 (no-prod)",
+        "responses": {
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/probe/forbidden": {
+      "get": {
+        "summary": "Sonda 403 (no-prod)",
+        "responses": {
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/probe/conflict": {
+      "get": {
+        "summary": "Sonda 409 (no-prod)",
+        "responses": {
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/probe/invalid": {
+      "get": {
+        "summary": "Sonda 422 (no-prod)",
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Inicia sesión con correo y contraseña (5 fallos del mismo correo → 423 por 15 min)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "summary": "Rota el refresh token; uno ya usado revoca la familia",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens nuevos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Cierra la sesión actual",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sesión cerrada"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout-todos": {
+      "post": {
+        "summary": "Cierra todas las sesiones del usuario",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sesiones cerradas"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sesiones": {
+      "get": {
+        "summary": "Sesiones abiertas; marca la actual",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesiones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Sesion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sesiones/{id}": {
+      "delete": {
+        "summary": "Cierra una sesión propia (ajena o inexistente = 404)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sesión cerrada"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/recuperar": {
+      "post": {
+        "summary": "Manda el enlace de recuperación (1 h); siempre 202",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorreoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Aceptado, sin cuerpo"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/restablecer": {
+      "post": {
+        "summary": "Cambia la contraseña con el enlace (un solo uso) y abre sesión",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestablecerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verificar-correo": {
+      "post": {
+        "summary": "Confirma el correo con el enlace (24 h, un solo uso)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenEnlaceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correo verificado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "correo_verificado": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reenviar-verificacion": {
+      "post": {
+        "summary": "Reenvía la verificación (máx. 1 cada 60 s)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Aceptado, sin cuerpo"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "put": {
+        "summary": "Cambia la contraseña conociendo la actual; cierra las otras sesiones",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Contraseña cambiada"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
   },
   "components": {
     "responses": {
-      "Error": {"description": "Error uniforme", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+      "Error": {
+        "description": "Error uniforme",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
     },
     "schemas": {
       "Health": {
         "type": "object",
-        "required": ["estado", "version"],
-        "properties": {"estado": {"type": "string", "enum": ["ok"]}, "version": {"type": "string"}}
+        "required": [
+          "estado",
+          "version"
+        ],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        }
       },
       "Ready": {
         "type": "object",
-        "required": ["estado", "dependencias"],
+        "required": [
+          "estado",
+          "dependencias"
+        ],
         "properties": {
-          "estado": {"type": "string", "enum": ["ok", "degraded", "error"]},
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "error"
+            ]
+          },
           "dependencias": {
             "type": "object",
             "properties": {
-              "mongodb": {"type": "string", "enum": ["ok", "error"]},
-              "redis": {"type": "string", "enum": ["ok", "error"]},
-              "neo4j": {"type": "string", "enum": ["ok", "error"]}
+              "mongodb": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "error"
+                ]
+              },
+              "redis": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "error"
+                ]
+              },
+              "neo4j": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "error"
+                ]
+              },
+              "indices_mongodb": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "error"
+                ],
+                "description": "Índices declarados presentes (nv-04); error = falta correr scripts/indexes"
+              }
             }
           }
         }
       },
       "Ping": {
         "type": "object",
-        "required": ["estado"],
-        "properties": {"estado": {"type": "string", "enum": ["pong"]}}
+        "required": [
+          "estado"
+        ],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pong"
+            ]
+          }
+        }
       },
       "Error": {
         "type": "object",
-        "required": ["codigo", "mensaje", "campos", "traza_id"],
+        "required": [
+          "codigo",
+          "mensaje",
+          "campos",
+          "traza_id"
+        ],
         "properties": {
-          "codigo": {"type": "string"},
-          "mensaje": {"type": "string"},
-          "campos": {"type": "array", "items": {"type": "object", "properties": {"campo": {"type": "string"}, "mensaje": {"type": "string"}}}},
-          "detalle": {"type": "string", "description": "Solo fuera de prod"},
-          "traza_id": {"type": "string"}
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "campos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campo": {
+                  "type": "string"
+                },
+                "mensaje": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "detalle": {
+            "type": "string",
+            "description": "Solo fuera de prod"
+          },
+          "traza_id": {
+            "type": "string"
+          }
         }
+      },
+      "Dispositivo": {
+        "type": "object",
+        "required": [
+          "modelo",
+          "sistema"
+        ],
+        "properties": {
+          "modelo": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sistema": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        }
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "correo_verificado": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "consumidor",
+                "comerciante",
+                "administrador"
+              ]
+            }
+          }
+        }
+      },
+      "Tokens": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT HS256 de 15 min"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Opaco, 30 días, rota en cada uso"
+          },
+          "expira_en": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Vencimiento del access token (UTC)"
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/Usuario"
+          }
+        }
+      },
+      "Sesion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dispositivo": {
+            "$ref": "#/components/schemas/Dispositivo"
+          },
+          "ultimo_uso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actual": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "correo",
+          "password",
+          "dispositivo"
+        ],
+        "properties": {
+          "correo": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "dispositivo": {
+            "$ref": "#/components/schemas/Dispositivo"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "CorreoRequest": {
+        "type": "object",
+        "required": [
+          "correo"
+        ],
+        "properties": {
+          "correo": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          }
+        }
+      },
+      "RestablecerRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "password_nuevo"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "password_nuevo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Al menos una letra y un número"
+          },
+          "dispositivo": {
+            "$ref": "#/components/schemas/Dispositivo"
+          }
+        }
+      },
+      "TokenEnlaceRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "PasswordRequest": {
+        "type": "object",
+        "required": [
+          "password_actual",
+          "password_nuevo"
+        ],
+        "properties": {
+          "password_actual": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "password_nuevo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Al menos una letra y un número"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   }

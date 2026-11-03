@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"sort"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
@@ -27,7 +28,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	app := httpapi.NewApp(cfg, httpapi.Deps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Redis: rdb})
+	// Los módulos se registran sin service: aquí solo importan sus rutas, nunca se atienden.
+	modules := []httpapi.Module{auth.NewHandler(nil, nil)}
+	app := httpapi.NewApp(cfg, httpapi.Deps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Redis: rdb, Modules: modules})
 
 	var lines []string
 	for _, route := range app.GetRoutes(true) {

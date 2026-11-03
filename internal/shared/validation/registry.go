@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"github.com/go-playground/validator/v10"
 
@@ -16,8 +17,16 @@ import (
 
 // rules son las reglas propias de la API, por etiqueta.
 var rules = map[string]validator.Func{
-	"cursor": validCursor,
+	"cursor":   validCursor,
+	"password": validPassword,
 }
+
+// Política de contraseña (hojas A1 y J1): 8 caracteres o más con al menos una letra y un
+// número. El tope evita hashear entradas enormes con Argon2id.
+const (
+	passwordMinLen = 8
+	passwordMaxLen = 128
+)
 
 // Validator envuelve al validador ya configurado; es seguro para uso concurrente.
 type Validator struct {
@@ -74,6 +83,10 @@ func message(fe validator.FieldError) string {
 		return "debe ser como máximo " + fe.Param()
 	case "cursor":
 		return "cursor inválido"
+	case "password":
+		return "debe tener de 8 a 128 caracteres con al menos una letra y un número"
+	case "email":
+		return "no es un correo válido"
 	default:
 		return "no es válido"
 	}
@@ -82,4 +95,13 @@ func message(fe validator.FieldError) string {
 func validCursor(fl validator.FieldLevel) bool {
 	_, _, err := pagination.Decode(fl.Field().String())
 	return err == nil
+}
+
+func validPassword(fl validator.FieldLevel) bool {
+	pw := fl.Field().String()
+	n := len([]rune(pw))
+	if n < passwordMinLen || n > passwordMaxLen {
+		return false
+	}
+	return strings.IndexFunc(pw, unicode.IsLetter) >= 0 && strings.IndexFunc(pw, unicode.IsDigit) >= 0
 }
