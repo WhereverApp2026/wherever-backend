@@ -12,7 +12,7 @@
 - Sin datos de ciudades en el código.
 
 3. Pruebas
-- Las de la spec §Tests, con MongoDB y Redis reales y dos instancias de la app para el candado.
+- Las de la spec §Tests, con MongoDB y Redis reales y dos instancias de la app para el candado. Las del service (`Integration/Usuarios service`) viven en `tests/integration`; `DELETE /yo/historial` da 503 si falla un módulo y una prueba comprueba que reintentar termina el borrado.
 
 4. Secuencia
 1. Validators nuevos y `usuarios` completo (índices).

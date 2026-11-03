@@ -118,6 +118,26 @@ func TestUsuarios_PatchUsesVersionAndIfMatch(t *testing.T) {
 	assert.Equal(t, `"2"`, first.Header.Get(fiber.HeaderETag))
 	stale := sendWithHeaders(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]any{"nombre": "Otra"}, access, map[string]string{fiber.HeaderIfMatch: `"1"`})
 	assert.Equal(t, http.StatusConflict, stale.StatusCode, "otro dispositivo ya cambió el perfil")
+
+	statuses := make([]int, 4)
+	var wg sync.WaitGroup
+	for i := range statuses {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			statuses[i] = sendWithHeaders(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]any{"nombre": "Concurrente"}, access, map[string]string{fiber.HeaderIfMatch: `"2"`}).StatusCode
+		}()
+	}
+	wg.Wait()
+	won := 0
+	for _, s := range statuses {
+		if s == http.StatusOK {
+			won++
+		} else {
+			assert.Equal(t, http.StatusConflict, s)
+		}
+	}
+	assert.Equal(t, 1, won, "con la misma versión a la vez solo una escritura gana: %v", statuses)
 	insecure := sendWithHeaders(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]any{"foto_url": "http://x.test/a.jpg"}, access, map[string]string{fiber.HeaderIfMatch: `"2"`})
 	assert.Equal(t, http.StatusUnprocessableEntity, insecure.StatusCode)
 }
@@ -190,7 +210,9 @@ func TestUsuarios_PhoneDuplicateIs409(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnprocessableEntity, sendJSON(t, app, http.MethodPut, "/api/v1/usuarios/yo/telefono", map[string]string{"telefono": "55 1234 5678"}, ana).StatusCode)
 	assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodPut, "/api/v1/usuarios/yo/telefono", phone, ana).StatusCode)
-	assert.Equal(t, http.StatusConflict, sendJSON(t, app, http.MethodPut, "/api/v1/usuarios/yo/telefono", phone, beto).StatusCode)
+	formatted := map[string]string{"telefono": "+52 1 (55) 1234-5678"}
+	assert.Equal(t, http.StatusConflict, sendJSON(t, app, http.MethodPut, "/api/v1/usuarios/yo/telefono", formatted, beto).StatusCode,
+		"el mismo número con espacios y guiones se normaliza a E.164 y choca")
 }
 
 func TestUsuarios_ModeChange(t *testing.T) {

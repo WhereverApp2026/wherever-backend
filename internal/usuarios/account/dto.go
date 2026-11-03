@@ -1,6 +1,7 @@
 package account
 
 import (
+	"strings"
 	"time"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
@@ -83,9 +84,21 @@ type PrivacyRequest struct {
 	TermsVersion    *string `json:"version_terminos" validate:"omitempty,max=20"`
 }
 
-// PhoneRequest es el cuerpo de PUT /usuarios/yo/telefono.
+// PhoneRequest es el cuerpo de PUT /usuarios/yo/telefono. Se valida ya normalizado.
 type PhoneRequest struct {
 	Phone string `json:"telefono" validate:"required,e164"`
+}
+
+// NormalizePhone quita espacios, guiones, puntos y paréntesis: "+52 (55) 1234-5678" →
+// "+525512345678". Lo que quede debe ser E.164 (con `+` y lada del país).
+func NormalizePhone(raw string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case ' ', '\t', '-', '.', '(', ')':
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(raw))
 }
 
 // ModeRequest es el cuerpo de POST /usuarios/yo/modo.

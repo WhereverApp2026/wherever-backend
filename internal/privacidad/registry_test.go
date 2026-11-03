@@ -77,3 +77,48 @@ func TestRegistry_EmptyIsNoOp(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, out)
 }
+
+// flaky falla en el primer intento y funciona en los siguientes; anota qué usuarios borró.
+type flaky struct {
+	name     string
+	attempts *int
+	purged   map[bson.ObjectID]bool
+}
+
+func (f flaky) Name() string { return f.name }
+
+func (f flaky) PurgeHistory(_ context.Context, userID bson.ObjectID) error {
+	*f.attempts++
+	if *f.attempts == 1 {
+		return errors.New("tiempo agotado")
+	}
+	f.purged[userID] = true
+	return nil
+}
+
+func (f flaky) PurgeAccount(ctx context.Context, userID bson.ObjectID) error {
+	return f.PurgeHistory(ctx, userID)
+}
+
+// DELETE /usuarios/yo/historial da 503 si un módulo falla a medias; reintentar termina el
+// borrado porque cada Purger es idempotente (volver a borrar lo ya borrado no falla).
+func TestRegistry_RetryAfterPartialFailureFinishes(t *testing.T) {
+	var calls []string
+	attempts := 0
+	purged := map[bson.ObjectID]bool{}
+	r := NewRegistry()
+	r.RegisterPurger(module{name: "sesiones", calls: &calls})
+	r.RegisterPurger(flaky{name: "planes", attempts: &attempts, purged: purged})
+	r.RegisterPurger(module{name: "usuarios", calls: &calls})
+	user := bson.NewObjectID()
+
+	first := r.PurgeHistory(context.Background(), user)
+	require.Error(t, first)
+	assert.Contains(t, first.Error(), "planes: tiempo agotado")
+	assert.False(t, purged[user])
+	assert.Equal(t, []string{"sesiones:historial", "usuarios:historial"}, calls, "los demás módulos sí corrieron")
+
+	require.NoError(t, r.PurgeHistory(context.Background(), user), "el reintento termina el trabajo")
+	assert.True(t, purged[user])
+	assert.Equal(t, []string{"sesiones:historial", "usuarios:historial", "sesiones:historial", "usuarios:historial"}, calls)
+}

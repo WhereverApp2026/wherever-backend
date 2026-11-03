@@ -33,7 +33,7 @@
 | PUT | `/api/v1/usuarios/yo/gustos` → `{categorias[3..10], presupuesto_min, presupuesto_max, restricciones[], alergias}`; no suma puntos (se dan al registrarse) | JWT consumidor | global | 200/400/401/403/422 | nv-05 (A1) |
 | PATCH | `/api/v1/usuarios/yo/preferencias` → parcial `{movilidad_default, tema, unidades, horario_silencioso{desde, hasta}, notificaciones{}}`; `reservas: false` = 422 | JWT, dueño | global | 200/400/401/422 | nv-05 (A1) |
 | PATCH | `/api/v1/usuarios/yo/privacidad` → parcial `{ubicacion, aprendizaje_personalizado, estado_animo, datos_uso, buscable_por_telefono, promociones_correo, version_terminos}` | JWT, dueño | global | 200/400/401/422 | nv-05 (A1) |
-| PUT | `/api/v1/usuarios/yo/telefono` → `{telefono}` E.164; se guarda solo su HMAC-SHA-256; repetido = 409 | JWT, dueño | global | 200/400/401/409/422 | nv-05 (A1) |
+| PUT | `/api/v1/usuarios/yo/telefono` → `{telefono}`; se quitan espacios, guiones, puntos y paréntesis y debe quedar E.164 (`+` y lada del país); se guarda solo su HMAC-SHA-256; repetido = 409 | JWT, dueño | global | 200/400/401/409/422 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/yo/modo` → `{modo: explorar|negocio}`; negocio sin rol `comerciante` = 403 | JWT | global | 200/400/401/403/422 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/yo/exportar` → 202; una por día (429 con `Retry-After`); la arma el trabajo nocturno y manda un enlace de 24 h (D-2) | JWT, dueño | global | 202/401/429 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/exportaciones/descargar` → `{token}` → el JSON de "mis datos"; enlace de un solo uso (D-2); al descargarlo el archivo se borra de la base | token del enlace | 10/min por IP | 200/400/410/422/429 | nv-05 (A1) |

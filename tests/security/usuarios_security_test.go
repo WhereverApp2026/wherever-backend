@@ -11,8 +11,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
+	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
 )
@@ -125,6 +128,36 @@ func TestUsuariosSecurity_ExportLinkWorksOnce(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, second.status)
 	assert.Equal(t, http.StatusBadRequest, forged.status)
 	assert.NotContains(t, env.Logs.String(), link.Token)
+
+	var doc privacidad.Export
+	require.NoError(t, env.Mongo.DB().Collection(privacidad.ExportsCollection).FindOne(t.Context(), bson.D{}).Decode(&doc))
+	assert.Empty(t, doc.Data, "el archivo con datos personales se borra al descargarlo")
+	assert.Equal(t, privacidad.ExportDownloaded, doc.Status)
+}
+
+// El enlace de descarga vence a las 24 h aunque no se haya usado.
+func TestUsuariosSecurity_ExportLinkExpiresAfter24h(t *testing.T) {
+	env := authEnv(t)
+	app := env.App()
+	access := signUp(t, app, victim)
+	require.Equal(t, http.StatusAccepted, send(t, app, http.MethodPost, "/api/v1/usuarios/yo/exportar", nil, access).status)
+	_, err := env.Job.RunOnce(t.Context())
+	require.NoError(t, err)
+	link, ok := env.Mail.Last(victim, mailer.KindExport)
+	require.True(t, ok)
+
+	var token struct {
+		ExpiresAt time.Time `bson:"expira_en"`
+		CreatedAt time.Time `bson:"creado_en"`
+	}
+	require.NoError(t, env.Mongo.DB().Collection(auth.TokensCollection).FindOne(t.Context(), bson.D{{Key: "tipo", Value: string(mailer.KindExport)}}).Decode(&token))
+	assert.InDelta(t, (24 * time.Hour).Seconds(), token.ExpiresAt.Sub(token.CreatedAt).Seconds(), 1, "vida del enlace")
+
+	user, err := env.Users.FindByEmail(t.Context(), victim)
+	require.NoError(t, err)
+	env.ExpireLinks(t, user.ID)
+	expired := send(t, app, http.MethodPost, "/api/v1/usuarios/exportaciones/descargar", map[string]string{"token": link.Token}, "")
+	assert.Equal(t, http.StatusBadRequest, expired.status, "vencido no descarga")
 }
 
 // Al pedir la eliminación se cierran las sesiones: el JWT y el refresh de antes ya no sirven.
