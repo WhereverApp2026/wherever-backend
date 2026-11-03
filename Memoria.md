@@ -129,6 +129,24 @@
 - A evitar: Mailpit lista los correos del más nuevo al más viejo; elegir por enlace o asunto, no por posición.
 - A evitar: en el Bash de la herramienta, un heredoc de Python con `"\r\n"` se escribe como salto de línea real; para cadenas con escapes usar el editor o un archivo de script.
 
+## Ejecución nv-07 (en curso, 2026-11-03)
+- Estado: rama `nv-07-aws-dev` desde `main` (con nv-06 y la firma de nv-05). `infra/aws-dev` escrito y validado (`fmt`, `validate`, Trivy, critic). Perfil `wherever-dev` = `arn:aws:iam::816101201001:user/wherever-deployer` (sin `iam:ListUsers`). Permisos con cuenta comprobados antes del `apply` (IAM, Scheduler, Budgets y SSM responden "no existe", no "acceso denegado") y `run-instances --dry-run` → `DryRunOperation` (ya sin `OptInRequired`). `terraform apply` hecho el 2026-11-03 (21 recursos; un segundo `plan` sin cambios): instancia `i-056aba7efc9f57205`, IP elástica `18.227.230.50`, `https://18-227-230-50.sslip.io`. Arranque terminado (Docker 25, Compose v2.39.4, swap 2 GB), SSM `Online`, `verificar.sh` → OK. Desplegado el mismo día: IP en Atlas, parámetros en `/wherever/dev/` (`APP_ENV=staging`, `TRUSTED_PROXIES=172.16.0.0/12` para confiar solo en Caddy por la red de Docker, llaves JWT/HMAC nuevas distintas de las locales), `/ready` 200 por HTTPS con las cuatro dependencias. Falta: ciclo de apagado/encendido, `verificar.sh` con la instancia apagada, `destroy` y firma. En `/wherever/dev/` hay `HMAC_SECRET` y `JWT_SECRET` que no creó este flujo y la API no lee: decidir si se borran.
+- Cuentas AWS (nueva experiencia: cada proyecto es una cuenta). `051904434716` = "IntegradOps", la que se creó el 2026-11-03 con el plan gratuito (US$100 de crédito, **vence el 2027-05-02**; al vencer, o se cierra el entorno o se actualiza el plan). El entorno se despliega en el proyecto **"Ctrl Shift Create" = `816101201001`** (creado el 2026-11-02).
+- Decisión: MongoDB en Atlas (la EC2 solo corre API, Redis, Neo4j y Caddy); la IP elástica va al Network Access de Atlas. Imagen construida en local y copiada por SSH (repo privado, sin registro). `APP_ENV=staging`.
+- Decisión: nada se aplica con el usuario raíz ni con un usuario administrador. Usuario IAM `wherever-deployer` en `816101201001` con `wherever-dev-deployer-policy` (`infra/aws-dev/iam/`: región `us-east-2` y prefijos `wherever-dev-*` / `/wherever/dev/*`, más `ec2:ImportKeyPair` y `ec2:DeleteKeyPair`). El `dev-user` del proyecto tiene `AdministratorAccess`: no se usa para Terraform ni para el MCP.
+- Decisión: el presupuesto no descuenta créditos (`include_credit = false`). Porqué: en el plan nuevo todo sale del crédito y, contándolo, la alerta nunca sonaría. La IP elástica (IPv4 pública) cuesta unos US$0.005/h ≈ US$3.6 al mes del crédito aunque la instancia esté apagada.
+- Excepción Trivy AWS-0104: salida a 0.0.0.0/0 solo por 443, 80 y 27017 (las IPs de Atlas, Let's Encrypt y repositorios cambian).
+- Deuda: la salida no abre SMTP (587/465). Al elegir proveedor de correo, se agrega ese puerto a `egress_ports` en `main.tf`; hasta entonces el correo no sale desde la EC2.
+- Lección: `terraform plan` solo lee EC2 y no detecta permisos de IAM, Scheduler, Budgets o SSM atados a otra cuenta; se prueban con lecturas de nombres inexistentes antes del `apply`.
+- Lección: la descripción de una regla de Security Group solo acepta `a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*` (sin apóstrofo ni acentos); `plan` no lo valida y el `apply` falló a la mitad en dos reglas.
+- Lección: en Windows la CLI de AWS con `--output text` termina en CRLF; `verificar.sh` lo quita con `tr -d '\r'`.
+- Lección: `docker build` en esta máquina se colgó dos veces en `go mod download` (más de una hora, `unexpected EOF` del proxy) aunque `curl` al proxy respondía. Alternativa usada: `CGO_ENABLED=0 GOOS=linux go build` en local con la caché de módulos y una imagen de una sola etapa sobre la misma base distroless. Si se repite, conviene una opción en `desplegar.sh`.
+- Lección: `MSYS_NO_PATHCONV=1` rompe las rutas `/d/...` que se pasan a programas de Windows (`git -C`); úsalo solo en el comando `aws ssm`.
+- Memoria de la `t3.micro` con todo arriba: ~96 MB libres y swap en uso; si la API crece, pasar a `t3.small`.
+- Lección: en Git Bash, `aws ssm ... --name /wherever/dev/X` se convierte en ruta de Windows (`parameter/C`). Usar `MSYS_NO_PATHCONV=1`.
+- Si cambia la IP de casa se pierde SSH (solo `ssh_cidr`); queda Systems Manager. Se actualiza `ssh_cidr` y se vuelve a aplicar.
+- Agent Toolkit de AWS configurado: 25 skills en `~/.claude/skills` y `aws-mcp` en `~/.claude.json` y OpenCode con `AWS_MCP_PROXY_PROFILES=wherever-dev`. Reglas de AWS fuera de CLAUDE.md (decisión del usuario).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

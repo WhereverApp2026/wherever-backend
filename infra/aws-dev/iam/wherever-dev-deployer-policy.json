@@ -1,0 +1,103 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EC2SoloEnLaRegion",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ec2:RunInstances", "ec2:TerminateInstances", "ec2:StartInstances", "ec2:StopInstances",
+        "ec2:ModifyInstanceAttribute", "ec2:ModifyInstanceMetadataOptions", "ec2:ModifyInstanceCreditSpecification",
+        "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress", "ec2:RevokeSecurityGroupEgress", "ec2:ModifySecurityGroupRules",
+        "ec2:AllocateAddress", "ec2:ReleaseAddress", "ec2:AssociateAddress", "ec2:DisassociateAddress",
+        "ec2:CreateVolume", "ec2:DeleteVolume", "ec2:AttachVolume", "ec2:DetachVolume",
+        "ec2:ImportKeyPair", "ec2:DeleteKeyPair",
+        "ec2:CreateTags", "ec2:DeleteTags"
+      ],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "us-east-2" } }
+    },
+    {
+      "Sid": "VerificarBalanceadores",
+      "Effect": "Allow",
+      "Action": "elasticloadbalancing:DescribeLoadBalancers",
+      "Resource": "*"
+    },
+    {
+      "Sid": "RolesYPerfilesSoloConPrefijo",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole", "iam:UntagRole", "iam:UpdateAssumeRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
+        "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile", "iam:GetInstanceProfile", "iam:TagInstanceProfile",
+        "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile"
+      ],
+      "Resource": [
+        "arn:aws:iam::816101201001:role/wherever-dev-*",
+        "arn:aws:iam::816101201001:instance-profile/wherever-dev-*"
+      ]
+    },
+    {
+      "Sid": "SoloAdjuntarSSMCore",
+      "Effect": "Allow",
+      "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
+      "Resource": "arn:aws:iam::816101201001:role/wherever-dev-*",
+      "Condition": { "ArnEquals": { "iam:PolicyARN": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore" } }
+    },
+    {
+      "Sid": "PasarRolesSoloAEc2YScheduler",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::816101201001:role/wherever-dev-*",
+      "Condition": { "StringEquals": { "iam:PassedToService": ["ec2.amazonaws.com", "scheduler.amazonaws.com"] } }
+    },
+    {
+      "Sid": "SchedulerSoloConPrefijo",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule", "scheduler:GetSchedule",
+        "scheduler:TagResource", "scheduler:UntagResource", "scheduler:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-2:816101201001:schedule/default/wherever-dev-*"
+    },
+    {
+      "Sid": "SchedulerListar",
+      "Effect": "Allow",
+      "Action": "scheduler:ListSchedules",
+      "Resource": "*"
+    },
+    {
+      "Sid": "PresupuestoSoloConPrefijo",
+      "Effect": "Allow",
+      "Action": ["budgets:ViewBudget", "budgets:ModifyBudget", "budgets:TagResource", "budgets:UntagResource", "budgets:ListTagsForResource"],
+      "Resource": "arn:aws:budgets::816101201001:budget/wherever-dev-*"
+    },
+    {
+      "Sid": "LeerAmiPublica",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:us-east-2::parameter/aws/service/ami-amazon-linux-latest/*"
+    },
+    {
+      "Sid": "SecretosDelProyecto",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath",
+        "ssm:DeleteParameter", "ssm:AddTagsToResource", "ssm:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:ssm:us-east-2:816101201001:parameter/wherever/dev",
+        "arn:aws:ssm:us-east-2:816101201001:parameter/wherever/dev/*"
+      ]
+    },
+    {
+      "Sid": "EntrarPorSystemsManager",
+      "Effect": "Allow",
+      "Action": ["ssm:StartSession", "ssm:TerminateSession", "ssm:ResumeSession", "ssm:DescribeSessions", "ssm:DescribeInstanceInformation"],
+      "Resource": "*"
+    }
+  ]
+}

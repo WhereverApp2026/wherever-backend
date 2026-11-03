@@ -1,0 +1,11 @@
+# Copiar a terraform.tfvars (ignorado por Git) y llenar. Sin secretos: los secretos van a
+# Parameter Store (ver README).
+ssh_cidr       = "203.0.113.10/32" # tu IP pública actual, terminada en /32
+ssh_public_key = "ssh-ed25519 AAAA... wherever-dev" # contenido de ~/.ssh/wherever-dev.pub
+budget_email   = "tu-correo@ejemplo.com"
+
+# Opcionales
+# instance_type = "t3.micro"   # t3.small si la cuenta es del plan gratuito nuevo y t3.micro no alcanza
+# volume_gb     = 20
+# domain_name   = ""           # vacío = <ip-con-guiones>.sslip.io
+# start_enabled = true
