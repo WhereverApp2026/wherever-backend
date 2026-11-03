@@ -48,7 +48,7 @@
 - A evitar: heredocs largos con comillas en el Bash de la herramienta se rompen; escribir el archivo directo.
 - A evitar: `semgrep --config=auto` no corre con `--metrics=off`.
 - A evitar: govulncheck v1.1.4 (x/tools v0.29) entra en pánico con `unexpected expr: *ast.KeyValueExpr` al analizar como Linux con Go 1.27; en Windows pasaba porque se compilan otros archivos. Usar ≥ v1.9.0 y, para reproducir CI en local, instalar la herramienta nativa y correrla con `GOOS=linux`.
-- Deuda: Go local 1.27.0 con 9 vulnerabilidades de la librería estándar (actualizar a ≥1.27.3); `make` no está instalado en esta máquina; `TRUSTED_PROXIES` vacío hasta tener balanceador.
+- Deuda: `make` no está instalado en esta máquina; `TRUSTED_PROXIES` vacío hasta tener balanceador.
 
 ## Ejecución nv-02 (2026-11-02)
 - Estado: T1 ejecutada en la rama `nv-02-molde` (sale de `nv-01-foundation`, aún sin merge). Paginación por cursor, registro único de validators (`go-playground/validator` v10.30.6), contrato `service.Lister[T]` y test de arquitectura; cero rutas nuevas. Unit 46 verdes, cobertura 48,3 %; lint, critic, endpoints, sdd y semgrep en 0. Spec en Borrador con evidencia, sin firma.
@@ -64,6 +64,9 @@
 - Estado: T2 ejecutada en la rama `nv-03-puerta` (sale de `nv-02-molde`; `main` ya tiene nv-01 y nv-02 por el merge del PR #3). Cobertura global bloqueante, delta y mutación advisory, en CI y en el `Makefile`. Spec en Borrador con evidencia, sin firma.
 - Piloto (código de nv-02): cobertura global 79,6 % (Unit + Integration + Security con `-coverpkg`; solo Unit 56,1 %), delta 93,8 % (60/64 líneas), mutación 0,56 (23/41) en 107 s. Porqué se registra: el umbral de mutación no se fija hasta tener más slices medidos (§2.5); el 80 % de delta sigue informativo.
 - Decisión: cada suite escribe su perfil con `-coverpkg=./internal/...,./cmd/...` y `check_coverage.sh` los une. Porqué: no repetir las suites para medir y contar lo que cubre un test de otro paquete (p. ej. `internal/arch`). `go tool cover` suma los bloques repetidos.
+- Cifras de cobertura, para no confundirlas (las tres pasan el 45 %): el gate del CI une Unit + Integration + Security y midió 80,2 % en el PR #4 (Linux); en local la misma unión dio 79,6 %; `make cover` o `check_coverage.sh` sin perfiles mide solo Unit y da 56,1 %. Comparar siempre la cifra del CI con la unión, no con la de Unit.
+- Primera corrida en CI (PR #4): `check_coverage` OK 80,2 %, 9 pruebas de scripts OK, delta vacío y mutación sin archivos (el PR solo cambió scripts y CI), como se esperaba.
+- Go local actualizado a 1.27.3 (2026-11-02): `govulncheck` 0 vulnerabilidades y Unit verde.
 - Decisión: `delta-check` y `mutation` son pasos del job `pipeline`, no jobs aparte. Porqué: respetan el orden §8 (antes de `semgrep`) y reutilizan `bin/coverage.out` sin artifacts.
 - Decisión: go-mutesting = fork `avito-tech` con pseudo-versión fijada (no publica tags) y solo en `pull_request`. Porqué: el original de zimmski está abandonado; en `push` a main el delta es vacío.
 - A evitar: go-mutesting deja `report.json` en la raíz aunque `json_output` sea false; `mutation.sh` lo borra y `.gitignore` lo ignora.
