@@ -1,0 +1,5 @@
+# HTTPS automático con Let's Encrypt para <ip-con-guiones>.sslip.io o el dominio propio.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}

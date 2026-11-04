@@ -20,3 +20,10 @@ go-mutesting-report.html
 *.swp
 .DS_Store
 Thumbs.db
+
+# Terraform (nv-07): estado y variables locales, nunca a Git
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan

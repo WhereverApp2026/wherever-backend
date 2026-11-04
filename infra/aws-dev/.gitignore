@@ -1,0 +1,7 @@
+# Estado y variables locales de Terraform: nunca a Git.
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
+crash.log
