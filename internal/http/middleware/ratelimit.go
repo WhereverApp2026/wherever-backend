@@ -87,7 +87,8 @@ func (l *Limiter) hit(ctx context.Context, key string, window time.Duration) (in
 	if !l.redisAvailable() {
 		return l.memory.hit(key, window)
 	}
-	pipe := l.redis.TxPipeline()
+	// Sin MULTI/EXEC: Upstash los cobra (nv-11). Si se corta a medias, el siguiente ExpireNX pone el TTL.
+	pipe := l.redis.Pipeline()
 	incr := pipe.Incr(ctx, key)
 	pipe.ExpireNX(ctx, key, window)
 	ttl := pipe.PTTL(ctx, key)
@@ -103,7 +104,7 @@ func (l *Limiter) acquire(ctx context.Context, key string) (int64, func()) {
 	if !l.redisAvailable() {
 		return l.memory.acquire(key), func() { l.memory.release(key) }
 	}
-	pipe := l.redis.TxPipeline()
+	pipe := l.redis.Pipeline()
 	incr := pipe.Incr(ctx, key)
 	pipe.Expire(ctx, key, writesTTL)
 	if _, err := pipe.Exec(ctx); err != nil {

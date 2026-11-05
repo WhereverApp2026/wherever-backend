@@ -5,7 +5,7 @@
 
 | Método | Ruta | Auth | Rate | Códigos | Spec |
 |---|---|---|---|---|---|
-| GET | `/health` → `{estado:"ok", version}` | no | global | 200 | nv-01 |
+| GET | `/health` → `{estado:"ok", version}` | no | — | 200 | nv-01, nv-11 |
 | GET | `/ready` → `{estado, dependencias}` (MongoDB, Redis, Neo4j e `indices_mongodb`; 1 s c/u; Redis caído = 200 `degraded`; falta un índice declarado = 503 hasta correr `scripts/indexes`) | no; también público en staging, sin direcciones | global | 200/503 | nv-01, nv-04 |
 | GET | `/api/v1/ping` | no | global | 200 | nv-01 |
 | GET | `/api/v1/probe/timeout` (no-prod) | no | global | 408/404 | nv-01 |

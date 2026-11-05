@@ -3,6 +3,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -19,13 +20,16 @@ const (
 	urlSchemeSep = "://"
 )
 
+var errInvalidURL = errors.New("la URL de Redis no es válida")
+
 // New crea el cliente desde `host:puerto` o una URL `redis://` / `rediss://`.
 func New(addr string) (*goredis.Client, error) {
 	opts := &goredis.Options{Addr: addr}
 	if strings.Contains(addr, urlSchemeSep) {
 		parsed, err := goredis.ParseURL(addr)
 		if err != nil {
-			return nil, err
+			// El error original repite la URL, que trae la contraseña, y acabaría en el log.
+			return nil, errInvalidURL
 		}
 		opts = parsed
 	}
@@ -35,6 +39,8 @@ func New(addr string) (*goredis.Client, error) {
 	opts.PoolTimeout = poolTimeout
 	opts.MaxRetries = maxRetries
 	opts.DialerRetries = dialRetries
+	// Sin CLIENT SETINFO al abrir cada conexión: no sirve aquí y el proveedor puede cobrarlo.
+	opts.DisableIdentity = true
 	return goredis.NewClient(opts), nil
 }
 

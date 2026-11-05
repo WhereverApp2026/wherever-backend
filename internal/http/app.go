@@ -16,6 +16,7 @@ import (
 const (
 	idleTimeout  = 120 * time.Second
 	globalWindow = time.Minute
+	healthPath   = "/health"
 )
 
 // Pinger es lo que /ready necesita de cada base.
@@ -59,9 +60,20 @@ func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage
 		stage("request_timeout", middleware.RequestTimeout(cfg.RequestTimeout)),
 		stage("proxy_headers", middleware.ProxyHeaders()),
 		stage("cors", middleware.CORS(cfg.CORSAllowedOrigin)),
-		stage("rate_limit_global", limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow)),
+		stage("rate_limit_global", exceptPath(healthPath, limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow))),
 		stage("rate_limit_writes", limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites)),
 		stage("jwt", middleware.JWT(jwtCfg, deps.Redis)),
+	}
+}
+
+// exceptPath salta el manejador en una ruta. /health no toca bases y lo consulta el balanceador
+// cada pocos segundos: contarlo en Redis agotaría la cuota del plan gratuito (nv-11).
+func exceptPath(path string, handler fiber.Handler) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if c.Path() == path {
+			return c.Next()
+		}
+		return handler(c)
 	}
 }
 
@@ -98,7 +110,7 @@ func NewApp(cfg config.Config, deps Deps) *fiber.App {
 
 func registerRoutes(app *fiber.App, cfg config.Config, deps Deps, limiter *middleware.Limiter) {
 	health := newHealth(deps)
-	app.Get("/health", health.live)
+	app.Get(healthPath, health.live)
 	app.Get("/ready", health.ready)
 
 	v1 := app.Group("/api/v1")

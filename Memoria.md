@@ -202,6 +202,22 @@
 - Prueba intermitente con dato nuevo: `TestMailer_RegisterSendsVerification` sin correo en 10 s en el primer envío de la suite; 1 de 4 corridas locales.
 - Lección: la IP pública de casa alterna y cierra el SSH; lo que se pueda configurar por Parameter Store no depende de ella.
 
+## NV-11 — Datos gestionados externos
+- Estado (2026-11-05): el servidor ya usa Upstash y Aura; Redis y Neo4j salieron de la instancia, con sus volúmenes. `verificar.sh` OK y `terraform plan` sin cambios. La reducción de comandos llega al fusionar y publicarse la imagen. Falta firmar y contrastar el 40 % con la consola de Upstash.
+- Latencia desde el servidor: `/ready` con las tres bases 88 ms en caliente y 352 ms en frío, bajo el límite de 1 s; el 503 del arranque que se vio desde la máquina local no se repitió ahí.
+- Medición con `scripts/medir-redis.sh` (comandos que Upstash cobra), antes → después: `/health` 5 → 0; `/ready` 5 → 3; lectura autenticada 6 → 4; escritura autenticada 11 → 7; registro 15 → 9; login correcto 17 → 11; login fallido 18 → 12; refresh 16 → 10; logout 12 → 8.
+- Estimación: 2000 peticiones por día laborable (22 días, supuesto, sin tráfico real medido) y 4.6 comandos de promedio dan 202 000 al mes, el 40 % de la cuota. El tope del 60 % equivale a unas 65 000 peticiones al mes. Dos APIs no suben el costo por petición.
+- Decisión: `Pipeline` en vez de `TxPipeline` en el limitador. Porqué: Upstash cobra `MULTI` y `EXEC`; el TTL se repara solo porque cada golpe vuelve a mandar `ExpireNX`.
+- Decisión: `/health` fuera del límite global. Porqué: el chequeo del balanceador de nv-12 agotaría la cuota por sí solo. **nv-12 debe chequear `/health`, no `/ready`**: serían 887 000 comandos al mes, y una pausa de Aura sacaría a las dos instancias.
+- Decisión: `REDIS_ADDR` y `NEO4J_URI` en vez de las cuatro claves de la spec original. Porqué: la API ya las lee y acepta TLS; no hace falta código.
+- Aura (2026-11-05): `make siembra` idempotente, 9 nodos y 9 relaciones. Latencia desde la máquina local: 164 ms de mediana y 1 s en la primera conexión, justo en el límite de `/ready`; falta medirla desde el servidor.
+- API local contra Upstash y Aura (2026-11-05): registro 201, login 200, perfil 200, refresh 200, logout 204 y token revocado 401; `/ready` 200 en 235-351 ms. Sin credenciales en los logs. Neo4j con clave errónea o inalcanzable: `/ready` 503, `/health` 200.
+- Redis desde la máquina local: 85 ms de mediana y 545 ms en la primera conexión. Upstash quedó en `us-east-2`, según su IP.
+- Lección: Upstash rechazó con `WRONGPASS` varias claves hasta copiar la cadena de Connect → TCP; no se aclaró la causa. No armes la URL a mano.
+- Lección: con una clave mala, `go-redis` muestra `i/o timeout` y no `WRONGPASS`, porque Upstash deja de responder tras el error de `AUTH`. Para diagnosticar, usa `redis-cli`.
+- Lección: el grupo de seguridad limita la salida; los puertos de un servicio externo nuevo se abren en `egress_ports` o la API no llega.
+- Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

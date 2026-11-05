@@ -52,7 +52,7 @@ wait_ready() {
 	return 1
 }
 
-# Sin esto, el arranque de Neo4j o una caída de Atlas parecerían un fallo de la imagen nueva.
+# Sin esto, una caída de Atlas o una pausa de Aura parecerían un fallo de la imagen nueva.
 if ! ready_now; then
 	echo "actualizar: la versión actual no da /ready 200; se reintenta en la siguiente revisión"
 	exit 0

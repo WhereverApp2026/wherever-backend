@@ -12,10 +12,14 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 )
 
-var mongoClient *mongo.Client
+var (
+	mongoClient *mongo.Client
+	neo4jURI    string
+)
 
 func TestMain(m *testing.M) {
 	os.Exit(testutil.RunWithStack(m, func(s *testutil.Stack) (func(), error) {
+		neo4jURI = s.Neo4jURI
 		var err error
 		if mongoClient, err = mongo.New(s.MongoURI); err != nil {
 			return nil, err

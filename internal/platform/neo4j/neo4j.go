@@ -3,6 +3,7 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"time"
 
@@ -15,6 +16,8 @@ const (
 	acquireTimeout    = 2 * time.Second
 	connectionTimeout = 2 * time.Second
 )
+
+var errInvalidURI = errors.New("la URI de Neo4j no es válida")
 
 // Driver envuelve al driver oficial para exponer Ping y Close.
 type Driver struct {
@@ -42,7 +45,8 @@ func New(uri string) (*Driver, error) {
 func splitAuth(raw string) (string, neo4j.AuthToken, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", neo4j.NoAuth(), err
+		// El error original repite la URI, que trae la contraseña, y acabaría en el log.
+		return "", neo4j.NoAuth(), errInvalidURI
 	}
 	if u.User == nil {
 		return raw, neo4j.NoAuth(), nil

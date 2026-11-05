@@ -45,7 +45,7 @@ variable "volume_gb" {
 }
 
 variable "swap_gb" {
-  description = "Swap en el disco, para que API, Redis y Neo4j quepan en 1 GB."
+  description = "Swap en el disco, como reserva de memoria en 1 GB."
   type        = number
   default     = 2
 }
