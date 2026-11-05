@@ -1592,6 +1592,10 @@
           "estado_animo": {
             "type": "boolean"
           },
+          "datos_sensibles": {
+            "type": "boolean",
+            "description": "Consentimiento expreso para guardar alergias (US-010). Al retirarlo se borran."
+          },
           "datos_uso": {
             "type": "boolean"
           },

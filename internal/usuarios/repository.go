@@ -99,6 +99,7 @@ type Privacy struct {
 	Location        bool      `bson:"ubicacion"`
 	Learning        bool      `bson:"aprendizaje_personalizado"`
 	Mood            bool      `bson:"estado_animo"`
+	SensitiveData   bool      `bson:"datos_sensibles"`
 	UsageData       bool      `bson:"datos_uso"`
 	PhoneSearchable bool      `bson:"buscable_por_telefono"`
 	TermsVersion    string    `bson:"version_terminos"`

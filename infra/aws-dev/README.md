@@ -31,6 +31,8 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 | `JWT_KEY`, `PHONE_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local (los nombres exactos: la API no lee `JWT_SECRET` ni `HMAC_SECRET`) |
 | `JWT_ISSUER`, `JWT_AUDIENCE` | `wherever-api`, `wherever-app` |
 | `TRUSTED_PROXIES` | `172.16.0.0/12` (Caddy llega por la red de Docker; solo de ahí se cree `X-Forwarded-For`) |
+| `JOB_HOUR` | `21`: la instancia se apaga a las 22:00; a las 03:00 el trabajo de privacidad nunca correría (nv-15) |
+| `HIDE_INTERNALS` | `true`: servidor público, sin `detalle` ni sondas (nv-15) |
 | `CORS_ALLOWED_ORIGIN`, `SMTP_*`, `MAIL_FROM`, `APP_LINK_BASE` | opcionales |
 
 En Git Bash (Windows) antepón `MSYS_NO_PATHCONV=1`; si no, la ruta `/wherever/dev/...` se convierte en una ruta de Windows.

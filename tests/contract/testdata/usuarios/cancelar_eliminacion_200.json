@@ -44,6 +44,7 @@
     "privacidad": {
       "aprendizaje_personalizado": "bool",
       "buscable_por_telefono": "bool",
+      "datos_sensibles": "bool",
       "datos_uso": "bool",
       "estado_animo": "bool",
       "fecha_aceptacion": "string",

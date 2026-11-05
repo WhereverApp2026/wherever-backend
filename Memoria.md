@@ -195,6 +195,13 @@
 - Hallazgo: cada publicación crea 2 versiones en GHCR (`imagetools create` envuelve la imagen en un índice), así que `min-versions-to-keep: 5` guardaba unos 2 o 3 despliegues. Subido a 10.
 - En GHCR queda la etiqueta `prueba-rota` hasta que la limpieza la borre; su digest sigue en `failed_digest` y no estorba.
 
+## Ejecución nv-15 (2026-11-05)
+- Corrige tres hallazgos de la auditoría: trabajo nocturno que nunca corría en AWS (`JOB_HOUR=21`), alergias sin consentimiento (`privacidad.datos_sensibles`, 422 en gustos) y `detalle` y sondas públicos (`HIDE_INTERNALS=true`). Parámetros en Parameter Store; los toma `deploy-env.sh` al instalar la imagen.
+- Se numeró nv-15 porque el usuario agregó nv-11 a nv-14 (Aura y Upstash, balanceador, CloudWatch, infraestructura en el pipeline), sin ejecutar.
+- Cambio para la app: pedir `datos_sensibles` antes de mandar alergias.
+- Prueba intermitente con dato nuevo: `TestMailer_RegisterSendsVerification` sin correo en 10 s en el primer envío de la suite; 1 de 4 corridas locales.
+- Lección: la IP pública de casa alterna y cierra el SSH; lo que se pueda configurar por Parameter Store no depende de ella.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

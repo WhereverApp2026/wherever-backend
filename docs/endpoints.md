@@ -6,7 +6,7 @@
 | Método | Ruta | Auth | Rate | Códigos | Spec |
 |---|---|---|---|---|---|
 | GET | `/health` → `{estado:"ok", version}` | no | global | 200 | nv-01 |
-| GET | `/ready` → `{estado, dependencias}` (MongoDB, Redis, Neo4j e `indices_mongodb`; 1 s c/u; Redis caído = 200 `degraded`; falta un índice declarado = 503 hasta correr `scripts/indexes`) | no, red interna | global | 200/503 | nv-01, nv-04 |
+| GET | `/ready` → `{estado, dependencias}` (MongoDB, Redis, Neo4j e `indices_mongodb`; 1 s c/u; Redis caído = 200 `degraded`; falta un índice declarado = 503 hasta correr `scripts/indexes`) | no; también público en staging, sin direcciones | global | 200/503 | nv-01, nv-04 |
 | GET | `/api/v1/ping` | no | global | 200 | nv-01 |
 | GET | `/api/v1/probe/timeout` (no-prod) | no | global | 408/404 | nv-01 |
 | GET | `/api/v1/probe/error` (no-prod) | no | global | 500/404 | nv-01 |
@@ -30,9 +30,9 @@
 | GET | `/api/v1/usuarios/yo` → perfil completo (sin `password_hash`, `telefono_hash` ni `google_id`) con `version` y `ETag` | JWT | global | 200/401 | nv-05 (A1) |
 | PATCH | `/api/v1/usuarios/yo` → `{nombre?, foto_url? (https), ciudad_id?}` con `If-Match: "<version>"`; sin `If-Match` 400, versión vieja 409 | JWT, dueño | global | 200/400/401/409/422 | nv-05 (A1) |
 | PUT | `/api/v1/usuarios/yo/correo` → `{correo_nuevo, password}`; queda sin verificar y manda verificación | JWT, dueño | global | 200/400/401/409/422 | nv-05 (A1) |
-| PUT | `/api/v1/usuarios/yo/gustos` → `{categorias[3..10], presupuesto_min, presupuesto_max, restricciones[], alergias}`; no suma puntos (se dan al registrarse) | JWT consumidor | global | 200/400/401/403/422 | nv-05 (A1) |
+| PUT | `/api/v1/usuarios/yo/gustos` → `{categorias[3..10], presupuesto_min, presupuesto_max, restricciones[], alergias}`; `alergias` no vacío exige `privacidad.datos_sensibles` (422 si no, US-010); no suma puntos (se dan al registrarse) | JWT consumidor | global | 200/400/401/403/422 | nv-05 (A1) |
 | PATCH | `/api/v1/usuarios/yo/preferencias` → parcial `{movilidad_default, tema, unidades, horario_silencioso{desde, hasta}, notificaciones{}}`; `reservas: false` = 422 | JWT, dueño | global | 200/400/401/422 | nv-05 (A1) |
-| PATCH | `/api/v1/usuarios/yo/privacidad` → parcial `{ubicacion, aprendizaje_personalizado, estado_animo, datos_uso, buscable_por_telefono, promociones_correo, version_terminos}` | JWT, dueño | global | 200/400/401/422 | nv-05 (A1) |
+| PATCH | `/api/v1/usuarios/yo/privacidad` → parcial `{ubicacion, aprendizaje_personalizado, estado_animo, datos_sensibles, datos_uso, buscable_por_telefono, promociones_correo, version_terminos}` | JWT, dueño | global | 200/400/401/422 | nv-05 (A1) |
 | PUT | `/api/v1/usuarios/yo/telefono` → `{telefono}`; se quitan espacios, guiones, puntos y paréntesis y debe quedar E.164 (`+` y lada del país); se guarda solo su HMAC-SHA-256; repetido = 409 | JWT, dueño | global | 200/400/401/409/422 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/yo/modo` → `{modo: explorar|negocio}`; negocio sin rol `comerciante` = 403 | JWT | global | 200/400/401/403/422 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/yo/exportar` → 202; una por día (429 con `Retry-After`); la arma el trabajo nocturno y manda un enlace de 24 h (D-2) | JWT, dueño | global | 202/401/429 | nv-05 (A1) |
@@ -45,6 +45,10 @@
 Convención JSON: `snake_case`. `PageResult{items, siguiente_cursor, limite}` (desde nv-02). Errores `{codigo, mensaje, campos[], detalle?, traza_id}`.
 
 Tokens (nv-04): `{access_token, refresh_token, expira_en, usuario{id, nombre, correo, correo_verificado, roles}}`; `expira_en` = vencimiento del access token (ISO 8601 UTC, 15 min); refresh opaco de 30 días. Contraseña nueva: 8 a 128 caracteres con letra y número (422 si no). Cuerpo ilegible = 400.
+
+Sondas y `detalle` (nv-15): solo fuera de prod y sin `HIDE_INTERNALS=true`. El servidor público de AWS los oculta: `/probe/*` da 404 y los errores no traen `detalle`.
+
+Consentimiento (nv-15): al retirar `datos_sensibles` se borran las alergias guardadas.
 
 Concurrencia (nv-05): `GET /usuarios/yo` y cada cambio devuelven `version` y `ETag`. `PATCH /usuarios/yo` exige `If-Match: "<version>"`: sin la cabecera = **400**; con una versión vieja = **409**, que la app debe mostrar como "tus datos cambiaron en otro dispositivo, recarga" y volver a pedir `GET /usuarios/yo` (la constitución §5 no usa 412 ni 428).
 

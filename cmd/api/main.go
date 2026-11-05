@@ -72,7 +72,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	stopJob, err := job.Start()
+	stopJob, err := job.Start(cfg.JobHour)
 	if err != nil {
 		return fmt.Errorf("trabajo nocturno: %w", err)
 	}

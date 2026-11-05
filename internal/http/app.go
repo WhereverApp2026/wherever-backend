@@ -50,7 +50,7 @@ type Stage struct {
 // Pipeline devuelve las etapas en el orden constitucional. El critic (B3) y los tests
 // verifican este orden; no se reordena sin enmendar la constitución.
 func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage {
-	errorHandler := middleware.NewErrorHandler(!cfg.IsProd(), deps.Logger)
+	errorHandler := middleware.NewErrorHandler(cfg.ExposeInternals(), deps.Logger)
 	jwtCfg := middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience}
 	return []Stage{
 		stage("security_headers", middleware.SecurityHeaders(cfg.Env)),
@@ -81,7 +81,7 @@ func NewApp(cfg config.Config, deps Deps) *fiber.App {
 		ReadTimeout:             cfg.RequestTimeout,
 		WriteTimeout:            cfg.RequestTimeout,
 		IdleTimeout:             idleTimeout,
-		ErrorHandler:            middleware.NewErrorHandler(!cfg.IsProd(), deps.Logger),
+		ErrorHandler:            middleware.NewErrorHandler(cfg.ExposeInternals(), deps.Logger),
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
 		TrustedProxies:          cfg.TrustedProxies,
@@ -106,7 +106,7 @@ func registerRoutes(app *fiber.App, cfg config.Config, deps Deps, limiter *middl
 	for _, m := range deps.Modules {
 		m.Routes(v1, limiter)
 	}
-	if !cfg.IsProd() {
+	if cfg.ExposeInternals() {
 		registerProbes(v1.Group("/probe"))
 	}
 	if cfg.IsDev() {
