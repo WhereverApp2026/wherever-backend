@@ -3,6 +3,7 @@ package account
 import (
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -93,12 +94,11 @@ type PhoneRequest struct {
 // "+525512345678". Lo que quede debe ser E.164 (con `+` y lada del país).
 func NormalizePhone(raw string) string {
 	return strings.Map(func(r rune) rune {
-		switch r {
-		case ' ', '\t', '-', '.', '(', ')':
+		if unicode.IsSpace(r) || strings.ContainsRune("-.()", r) {
 			return -1
 		}
 		return r
-	}, strings.TrimSpace(raw))
+	}, raw)
 }
 
 // ModeRequest es el cuerpo de POST /usuarios/yo/modo.

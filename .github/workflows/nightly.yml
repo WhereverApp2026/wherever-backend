@@ -1,4 +1,4 @@
-# Corrida nocturna: mutación completa (constitución §7: no bloquea) y DAST con ZAP (nv-09).
+# Corrida nocturna: mutación completa (constitución §7: no bloquea), DAST con ZAP (nv-09) y fuzz (nv-10).
 # Línea base medida en nv-04: score 0,62 (31 min en Windows). Límite: go-mutesting solo muta
 # archivos con `_test.go` del mismo nombre (12 de 36 en internal/); el service de auth, que se
 # prueba en tests/integration, no entra. Ver Memoria.md.
@@ -9,10 +9,11 @@ on:
     - cron: "0 9 * * *" # 03:00 en America/Mexico_City
   workflow_dispatch:
     inputs:
-      solo_dast:
-        description: Correr solo ZAP, sin la mutación completa
-        type: boolean
-        default: false
+      solo:
+        description: Correr solo un job, para probarlo sin esperar la mutación completa
+        type: choice
+        default: todo
+        options: [todo, dast, fuzz]
 
 permissions:
   contents: read
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   mutation:
-    if: ${{ !inputs.solo_dast }}
+    if: ${{ !inputs.solo || inputs.solo == 'todo' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -46,6 +47,7 @@ jobs:
 
   # La API corre con APP_ENV=staging y llaves de un solo uso: no hay secretos ni datos reales.
   dast-zap:
+    if: ${{ !inputs.solo || inputs.solo == 'todo' || inputs.solo == 'dast' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -105,5 +107,31 @@ jobs:
         with:
           name: zap-reporte
           path: zap-reporte
+          retention-days: 14
+          if-no-files-found: warn
+
+  # 60 s por objetivo y unos 15 min en total (nv-10). Un fallo deja su caso en testdata/fuzz:
+  # se baja del artefacto, se versiona como semilla y se corrige en el mismo PR.
+  fuzz:
+    if: ${{ !inputs.solo || inputs.solo == 'todo' || inputs.solo == 'fuzz' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+
+      - name: objetivos de fuzz
+        run: bash scripts/ci/fuzz.sh 60s bin/fuzz
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: fuzz
+          path: |
+            bin/fuzz
+            **/testdata/fuzz/**
           retention-days: 14
           if-no-files-found: warn

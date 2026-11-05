@@ -18,6 +18,13 @@ const (
 	argonThreads   = 2
 	argonKeyLen    = 32
 	argonSaltLen   = 16
+
+	// Topes para verificar: holgados para subir los parámetros sin migrar, y lejos de agotar la memoria.
+	argonMaxMemoryKiB = 256 * 1024
+	argonMaxTime      = 10
+	argonMaxThreads   = 16
+	argonMinSaltLen   = 8
+	argonMaxSaltLen   = 64
 )
 
 var errBadHash = errors.New("hash de contraseña con formato inválido")
@@ -65,27 +72,64 @@ func (h *Hasher) Verify(password, encoded string) bool {
 }
 
 func (h *Hasher) verify(password, encoded string) (bool, error) {
-	parts := strings.Split(encoded, "$")
-	if len(parts) != 6 || parts[1] != "argon2id" {
-		return false, errBadHash
-	}
-	var version int
-	var memory, iterations uint32
-	var threads uint8
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return false, errBadHash
-	}
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &threads); err != nil {
-		return false, errBadHash
-	}
-	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
+	parsed, err := parseHash(encoded)
 	if err != nil {
-		return false, errBadHash
+		return false, err
 	}
-	want, err := base64.RawStdEncoding.DecodeString(parts[5])
-	if err != nil || len(want) != argonKeyLen {
-		return false, errBadHash
+	got := argon2.IDKey([]byte(password), parsed.salt, parsed.iterations, parsed.memory, parsed.threads, argonKeyLen)
+	return subtle.ConstantTimeCompare(got, parsed.key) == 1, nil
+}
+
+// parsedHash es un hash PHC ya validado: sus parámetros son seguros para argon2.IDKey.
+type parsedHash struct {
+	memory, iterations uint32
+	threads            uint8
+	salt, key          []byte
+}
+
+// parseHash valida el formato y los parámetros. El hash viene de la base, pero un valor
+// corrupto no debe tumbar la API: con t=0 o p=0 argon2.IDKey entra en pánico, y con una
+// memoria enorme el proceso muere sin que recover pueda atraparlo.
+func parseHash(encoded string) (parsedHash, error) {
+	parts := strings.Split(encoded, "$")
+	if len(parts) != 6 || parts[0] != "" || parts[1] != "argon2id" || parts[2] != fmt.Sprintf("v=%d", argon2.Version) {
+		return parsedHash{}, errBadHash
 	}
-	got := argon2.IDKey([]byte(password), salt, iterations, memory, threads, argonKeyLen)
-	return subtle.ConstantTimeCompare(got, want) == 1, nil
+	out, err := parseParams(parts[3])
+	if err != nil {
+		return parsedHash{}, err
+	}
+	if out.salt, err = decodeLen(parts[4], argonMinSaltLen, argonMaxSaltLen); err != nil {
+		return parsedHash{}, err
+	}
+	if out.key, err = decodeLen(parts[5], argonKeyLen, argonKeyLen); err != nil {
+		return parsedHash{}, err
+	}
+	return out, nil
+}
+
+func decodeLen(encoded string, minLen, maxLen int) ([]byte, error) {
+	raw, err := base64.RawStdEncoding.DecodeString(encoded)
+	if err != nil || len(raw) < minLen || len(raw) > maxLen {
+		return nil, errBadHash
+	}
+	return raw, nil
+}
+
+func parseParams(params string) (parsedHash, error) {
+	var out parsedHash
+	if _, err := fmt.Sscanf(params, "m=%d,t=%d,p=%d", &out.memory, &out.iterations, &out.threads); err != nil {
+		return parsedHash{}, errBadHash
+	}
+	// Sscanf acepta basura al final: se exige la forma canónica.
+	if params != fmt.Sprintf("m=%d,t=%d,p=%d", out.memory, out.iterations, out.threads) || !out.safeParams() {
+		return parsedHash{}, errBadHash
+	}
+	return out, nil
+}
+
+func (p parsedHash) safeParams() bool {
+	return p.iterations >= 1 && p.iterations <= argonMaxTime &&
+		p.threads >= 1 && p.threads <= argonMaxThreads &&
+		p.memory >= 8*uint32(p.threads) && p.memory <= argonMaxMemoryKiB
 }
