@@ -1,8 +1,8 @@
-# CI de PR (constitución §8). Orden vigente:
-#   deps → build → unit → integration → security → database → contract → critic → endpoints
-#   → sdd → coverage → delta-check → mutation → semgrep
-# database y contract llegan con nv-04 (primer módulo con índices y contrato).
-# delta-check y mutation son advisory (nv-03): informan y nunca bloquean.
+# CI de PR (constitución §8). Jobs en paralelo; pr-gate los reúne y escribe el reporte (nv-09):
+#   changes (filtro) → guardrails, semgrep · pipeline, go-security, image-scan (solo si hay código)
+# pipeline: deps → build → unit → integration → security → database → contract → coverage
+#   → delta-check → mutation. delta-check y mutation son advisory (nv-03): no bloquean.
+# Un push a main corre todo, sin filtro: de ese resultado depende cd-dev.
 # Sin deploy.
 name: ci-pr
 
@@ -20,7 +20,199 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filtro.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: filtro por rutas
+        id: filtro
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$EVENTO" != "pull_request" ]]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          rutas="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          printf '%s\n' "$rutas" | bash scripts/ci/cambios.sh >> "$GITHUB_OUTPUT"
+
+  # Corre siempre: secretos, rutas y estructura de specs también aplican a un cambio de documentos.
+  guardrails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+
+      - name: critic
+        run: bash scripts/critic-guardrails.sh
+
+      - name: endpoints
+        run: bash scripts/check_endpoints.sh
+
+      - name: sdd
+        run: bash scripts/check_sdd.sh
+
+  # Corre siempre: un secreto en un .md también cuenta. Sin cuenta ni token: --metrics=off.
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      hallazgos: ${{ steps.conteo.outputs.hallazgos }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: instalar
+        run: python3 -m pip install --quiet semgrep==1.95.0
+
+      # Registro público: bloquea con severidad ERROR (decisión c de nv-09).
+      - name: reglas del registro
+        run: >-
+          semgrep scan --metrics=off --error --severity=ERROR
+          --config=p/golang --config=p/owasp-top-ten --config=p/secrets
+          --json --output=semgrep-registro.json
+
+      # Reglas propias: bloquean con cualquier severidad, como antes de nv-09. Corren aunque
+      # falle el paso anterior: si no, el gate contaría de menos.
+      - name: reglas propias
+        if: ${{ !cancelled() }}
+        run: semgrep scan --metrics=off --error --config=.semgrep/semgrep.yaml --json --output=semgrep-propias.json
+
+      - name: contar
+        id: conteo
+        if: always()
+        run: |
+          total=0
+          for f in semgrep-registro.json semgrep-propias.json; do
+            [[ -f "$f" ]] && total=$((total + $(jq '.results | length' "$f")))
+          done
+          echo "hallazgos=$total" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: semgrep
+          path: semgrep-*.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  go-security:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      hallazgos: ${{ steps.conteo.outputs.hallazgos }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+
+      - name: golangci-lint
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+
+      # Corren aunque falle el paso anterior: si no, el gate contaría de menos.
+      - name: gosec
+        if: ${{ !cancelled() }}
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet -fmt=json -out=gosec.json ./...
+
+      # Falla solo con vulnerabilidades alcanzables desde el código: es lo que hace por defecto.
+      - name: govulncheck
+        if: ${{ !cancelled() }}
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      - name: contar
+        id: conteo
+        if: always()
+        run: |
+          total=0
+          [[ -s gosec.json ]] && total="$(jq '.Issues | length' gosec.json)"
+          echo "hallazgos=$total" >> "$GITHUB_OUTPUT"
+
+  image-scan:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      hallazgos: ${{ steps.conteo.outputs.hallazgos }}
+    env:
+      IMAGEN: wherever-api:ci
+      # Fijadas por digest: corren con acceso al socket de Docker.
+      DOCKLE: goodwithtech/dockle:v0.4.15@sha256:eade932f793742de0aa8755406c7677cd7696f8675b6180926f7eeffa7abe6b9
+      TRIVY: aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: construir sin publicar
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMAGEN }}
+          build-args: VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: dockle
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$DOCKLE"
+          --exit-code 1 --exit-level fatal "$IMAGEN"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ !cancelled() }}
+        with:
+          path: .cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: trivy
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p .cache/trivy reporte
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/.cache/trivy:/root/.cache/trivy" -v "$PWD/.trivyignore:/.trivyignore:ro" -v "$PWD/reporte:/reporte" \
+            "$TRIVY" image --quiet --ignore-unfixed --severity HIGH,CRITICAL --ignorefile /.trivyignore \
+            --db-repository ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2 --skip-java-db-update \
+            --exit-code 1 --format json --output /reporte/trivy.json "$IMAGEN"
+
+      - name: contar
+        id: conteo
+        if: always()
+        run: |
+          total=0
+          [[ -s reporte/trivy.json ]] && total="$(jq '[.Results[]?.Vulnerabilities // [] | length] | add // 0' reporte/trivy.json)"
+          echo "hallazgos=$total" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: trivy
+          path: reporte/trivy.json
+          retention-days: 14
+          if-no-files-found: ignore
+
   pipeline:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Testcontainers exige Linux (AGENTS.md §1).
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -43,12 +235,6 @@ jobs:
         run: |
           go build ./...
           go vet ./...
-
-      - name: lint
-        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
-
-      - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
       # Cada suite deja su perfil; coverage los une (constitución §7).
       - name: unit
@@ -77,15 +263,6 @@ jobs:
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
-      - name: critic
-        run: bash scripts/critic-guardrails.sh
-
-      - name: endpoints
-        run: bash scripts/check_endpoints.sh
-
-      - name: sdd
-        run: bash scripts/check_sdd.sh
-
       - name: coverage
         run: >-
           bash scripts/check_coverage.sh --min 45 bin/coverage-unit.out bin/coverage-integration.out
@@ -112,12 +289,37 @@ jobs:
       - name: build tras mutation
         run: go build ./...
 
-      - name: semgrep
-        run: |
-          python3 -m pip install --quiet semgrep==1.95.0
-          semgrep scan --config=auto --config=.semgrep/semgrep.yaml --error
+      - name: compose
+        run: docker compose -f deployments/docker-compose.yml config --quiet
 
-      - name: compose y docker build
+  # Reúne todo. Si changes falla, los jobs de código se omiten: por eso changes entra al gate.
+  pr-gate:
+    needs: [changes, guardrails, semgrep, go-security, image-scan, pipeline]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: reporte y resultado
+        env:
+          R_CHANGES: ${{ needs.changes.result }}
+          R_GUARDRAILS: ${{ needs.guardrails.result }}
+          R_SEMGREP: ${{ needs.semgrep.result }}
+          R_GO: ${{ needs.go-security.result }}
+          R_IMAGE: ${{ needs.image-scan.result }}
+          R_PIPELINE: ${{ needs.pipeline.result }}
+          H_SEMGREP: ${{ needs.semgrep.outputs.hallazgos }}
+          H_GO: ${{ needs.go-security.outputs.hallazgos }}
+          H_IMAGE: ${{ needs.image-scan.outputs.hallazgos }}
         run: |
-          docker compose -f deployments/docker-compose.yml config --quiet
-          docker build --build-arg VERSION=${{ github.sha }} -t wherever-api:ci .
+          # changes no se puede omitir: si no corrió, el filtro no decidió nada.
+          if [[ "$R_CHANGES" == "skipped" ]]; then R_CHANGES=failure; fi
+          bash scripts/ci/resumen-gate.sh <<FIN
+          Filtro de rutas|$R_CHANGES|-
+          Guardarraíles (critic, endpoints, sdd)|$R_GUARDRAILS|-
+          Semgrep|$R_SEMGREP|$H_SEMGREP
+          gosec, golangci-lint, govulncheck|$R_GO|$H_GO
+          Imagen (Dockle, Trivy)|$R_IMAGE|$H_IMAGE
+          Suites y cobertura|$R_PIPELINE|-
+          FIN

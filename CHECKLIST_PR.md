@@ -11,7 +11,7 @@
 - [ ] Endpoints: `docs/endpoints.md` actualizado
 - [ ] Rate limits: `docs/rate-limit-matrix.md` verificado
 - [ ] ASVS: `docs/asvs-l2-checklist.md` verificado
-- [ ] Semgrep sin altos; `gosec` y `govulncheck` sin hallazgos nuevos
+- [ ] Gate del PR en verde: Semgrep, `gosec`, `govulncheck`, Dockle y Trivy sin hallazgos nuevos; excepciones con motivo y fecha
 - [ ] Cobertura ≥45% (`scripts/check_coverage.sh --min 45`)
 - [ ] Headers + `/ready` + `401` verificados manualmente
 - [ ] `make infra-up` y `docker build .` sin errores
