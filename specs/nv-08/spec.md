@@ -95,7 +95,7 @@ Constitución (enmienda): §3 fila CI y §8 pasan a decir "`ci-pr.yml` sin deplo
 - Los cambios de `infra/` (Terraform, `compose.yml`, `Caddyfile`) siguen siendo manuales; el CD solo actualiza la imagen de la API.
 - El regreso automático no deshace índices ya creados ni cambios en datos: los cambios de esquema deben ser compatibles con la versión anterior.
 - Solo se regresa a SHA desde la fusión de nv-08: los anteriores no traen `/indexes`.
-- Una versión con más de 5 versiones de antigüedad ya no está en GHCR y hay que reconstruirla.
+- Una versión con más de unos 5 despliegues de antigüedad ya no está en GHCR y hay que reconstruirla.
 - Solo desarrollo: sin aprobación humana, sin canary ni cero tiempo de caída (la API se reinicia unos segundos).
 - El estado de Terraform sigue siendo local y es el único registro de la infraestructura: se copia fuera del repositorio antes de cada `apply`.
 - El contenedor `wherever-sin-limites` (excepción temporal de pruebas) se retira antes de firmar.
