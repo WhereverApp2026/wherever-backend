@@ -48,6 +48,7 @@
 - Rutas `/api/v1/<recurso>`; DTOs + validator; `version` e `If-Match` en Update/Delete.
 - Health `/health` y `/ready`. OpenAPI solo en desarrollo. Sin `/metrics` completo por ahora.
 - Claves de Redis (constitución §6): `jwt_revocado:{jti}` (TTL = vida remanente del token), `login_fallos:{correo}` (TTL 15 min), `rate:{politica}:{sujeto}`, `idem:{llave}`, `lock:{recurso}`, `cuota:{usuario}:{fecha}`. Todas con TTL. La contraseña nunca va a caché.
+- Comandos de Redis (nv-11): Upstash Free da 500 000 al mes y cobra `MULTI`/`EXEC`. El limitador usa `Pipeline` y `/health` no pasa por él. `TestPresupuestoRedis_*` fija el costo por operación: si sube, rehaz la estimación de `specs/nv-11`. No uses `/ready` como chequeo frecuente: gasta cuota.
 - Redis caído: solo el rate limit usa memoria por instancia; revocados, bloqueo, idempotencia y candados son fail-closed (`503`).
 - Roles: `consumidor`, `comerciante`, `administrador`. "Dueño" = rol + el recurso es suyo (se valida en el service).
 - Contratos de negocio: `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9); cada spec `nv-04+` copia sus filas a `docs/endpoints.md` antes de programar.
@@ -81,7 +82,8 @@
 - Sin OTel/Prometheus/Grafana completos por ahora.
 
 ## 9. Operación manual — sin hosting aún
-- Bases de desarrollo con `make infra-up`; índices con `scripts/indexes`.
+- Bases de desarrollo con `make infra-up`; índices con `scripts/indexes`; esquema y demostración de Neo4j con `make siembra`.
+- Servidor de AWS: Redis en Upstash y Neo4j en Aura (nv-11). Antes de una demostración, comprueba que Aura no esté en pausa.
 - Imagen lista con `docker build`, no desplegada. Cuando haya hosting se añade runbook con variables y verificación post-subida.
 - Una sola instancia local para desarrollo; la multi-instancia se valida en la spec de infraestructura.
 

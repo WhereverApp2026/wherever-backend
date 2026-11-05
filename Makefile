@@ -73,6 +73,10 @@ mutate-full:
 indexes:
 	go run ./scripts/indexes
 
+# Esquema y datos de demostración de Neo4j (nv-11): idempotente, lee NEO4J_URI de .env.
+siembra:
+	go run ./scripts/siembra
+
 # Catálogo de ciudades: make importar-ciudades ARCHIVO=ciudades.csv (idempotente).
 importar-ciudades:
 	go run ./scripts/importar_ciudades $(ARCHIVO)

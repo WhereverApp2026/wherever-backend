@@ -73,6 +73,8 @@ locals {
     https = { port = 443, why = "HTTPS: Lets Encrypt, imagenes, paquetes y AWS" }
     http  = { port = 80, why = "HTTP: repositorios de paquetes de Amazon Linux" }
     atlas = { port = 27017, why = "MongoDB Atlas (Cluster0)" }
+    redis = { port = 6379, why = "Upstash Redis con TLS (nv-11)" }
+    neo4j = { port = 7687, why = "Neo4j Aura con TLS (nv-11)" }
   }
 }
 

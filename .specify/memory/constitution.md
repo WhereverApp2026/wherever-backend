@@ -1,7 +1,7 @@
 ---
-version: 1.1.0
+version: 1.2.0
 ratified: 2026-10-28
-last_amended: 2026-11-04
+last_amended: 2026-11-05
 status: borrador (pendiente de firma del revisor)
 source_of_truth: .specify/memory/constitution.md
 mirror: ./constitution.md
@@ -46,7 +46,7 @@ methodology: SDD
 | Logs | `slog` JSON + `request_id` |
 | SAST | Semgrep + `gosec` + `golangci-lint` + `govulncheck` |
 | CI | GitHub Actions: `ci-pr.yml` sin deploy; `cd-dev.yml` publica la imagen y el entorno de desarrollo se actualiza solo (nv-08); `ci-pr.yml` incluye análisis estático, de imagen y gate, y `nightly.yml` incluye DAST (nv-09); producción sin CD |
-| Infra de desarrollo | Docker Compose (`deployments/docker-compose.yml`: MongoDB, Redis, Neo4j) con `make infra-up`/`infra-down`; `Dockerfile` multi-etapa en la raíz |
+| Infra de desarrollo | Docker Compose (`deployments/docker-compose.yml`: MongoDB, Redis, Neo4j) con `make infra-up`/`infra-down`; el servidor de desarrollo usa servicios gestionados: Atlas, Upstash y Aura (nv-11); `Dockerfile` multi-etapa en la raíz |
 | Infra (posterior) | Docker, Terraform, AWS (ALB con SSL, ≥2 instancias en zonas distintas, S3 + CDN, Secrets Manager) |
 
 No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla de excepción en `nv-00`.
@@ -57,7 +57,7 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 - Rutas `/api/v1/<recurso>`, v1 estricta; sin versión → 404.
 - JSON `snake_case`. Errores `{ codigo, mensaje, campos[], detalle?, traza_id }`; `traza_id` = `request_id` (cabecera `X-Request-ID`).
 - Pipeline fijo: `SecurityHeaders outermost → Recover/ErrorHandler → RequestID → ProxyHeaders → CORS 1 origen → RateLimiter antes de Auth → JWT → Roles → Handlers`.
-- Health: `/health` (liveness, siempre 200 `{estado:"ok", version}`, sin consultar bases) y `/ready` (check real de MongoDB, Redis y Neo4j con 1 s máximo cada una; responde `{estado, dependencias}`; 503 si cae MongoDB o Neo4j; Redis caído = `degraded` con 200). Ambos fuera de `/api/v1`; `/ready` es para la red interna y el balanceador.
+- Health: `/health` (liveness, siempre 200 `{estado:"ok", version}`, sin consultar bases y fuera del límite global, para que el balanceador no gaste Redis) y `/ready` (check real de MongoDB, Redis y Neo4j con 1 s máximo cada una; responde `{estado, dependencias}`; 503 si cae MongoDB o Neo4j; Redis caído = `degraded` con 200). Ambos fuera de `/api/v1`; `/ready` es para la red interna y el balanceador.
 - OpenAPI solo en desarrollo.
 - DTOs validados; códigos `200/201/202/204/400/401/403/404/408/409/410/422/423/429/500/503`. `400` = petición mal formada, `422` = falla de validación o regla de negocio, `410` = vencido, `423` = bloqueado. Paginación por cursor `?cursor=&limite=` → `PageResult{items, siguiente_cursor, limite}` (por defecto 20, máx. 50; `siguiente_cursor` vacío = no hay más).
 - Versionado: un cambio que rompa la app crea `/api/v2` sin retirar `/api/v1`.
@@ -121,3 +121,4 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 |---|---|---|
 | 1.0.0 | 2026-10-28 | Versión inicial |
 | 1.1.0 | 2026-10-29 | Alineada con `Wherever_Endpoints_CRUD.xlsx` y los documentos de diseño: roles, vida de los tokens, llaves de Redis, códigos 410/423/503, `traza_id`, idempotencia, borrado lógico, zonas horarias, nombres de índices, Docker Compose de desarrollo y regla fail-closed con Redis caído |
+| 1.2.0 | 2026-11-05 | Redis y Neo4j gestionados externos en el servidor de desarrollo; `/health` fuera del límite global (nv-11) |
