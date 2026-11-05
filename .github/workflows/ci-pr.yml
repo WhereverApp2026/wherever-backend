@@ -83,8 +83,10 @@ jobs:
           --config=p/golang --config=p/owasp-top-ten --config=p/secrets
           --json --output=semgrep-registro.json
 
-      # Reglas propias: bloquean con cualquier severidad, como antes de nv-09.
+      # Reglas propias: bloquean con cualquier severidad, como antes de nv-09. Corren aunque
+      # falle el paso anterior: si no, el gate contaría de menos.
       - name: reglas propias
+        if: ${{ !cancelled() }}
         run: semgrep scan --metrics=off --error --config=.semgrep/semgrep.yaml --json --output=semgrep-propias.json
 
       - name: contar
@@ -122,11 +124,14 @@ jobs:
       - name: golangci-lint
         run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
 
+      # Corren aunque falle el paso anterior: si no, el gate contaría de menos.
       - name: gosec
+        if: ${{ !cancelled() }}
         run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet -fmt=json -out=gosec.json ./...
 
       # Falla solo con vulnerabilidades alcanzables desde el código: es lo que hace por defecto.
       - name: govulncheck
+        if: ${{ !cancelled() }}
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
       - name: contar
@@ -173,12 +178,14 @@ jobs:
           --exit-code 1 --exit-level fatal "$IMAGEN"
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ !cancelled() }}
         with:
           path: .cache/trivy
           key: trivy-db-${{ github.run_id }}
           restore-keys: trivy-db-
 
       - name: trivy
+        if: ${{ !cancelled() }}
         run: |
           mkdir -p .cache/trivy reporte
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
