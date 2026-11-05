@@ -36,6 +36,7 @@ echo "desplegar: subiendo compose, Caddyfile y deploy-env.sh"
 scp "${ssh_opts[@]}" "$here/server/compose.yml" "$here/server/Caddyfile" "$here/scripts/deploy-env.sh" "$remote:/opt/wherever/"
 
 echo "desplegar: armando .env desde Parameter Store y levantando contenedores"
-ssh "${ssh_opts[@]}" "$remote" "chmod +x /opt/wherever/deploy-env.sh && /opt/wherever/deploy-env.sh '$path' '$site' && cd /opt/wherever && docker compose up -d --remove-orphans && docker compose ps"
+# Salida de emergencia (nv-08): apaga el actualizador para que no pise esta versión.
+ssh "${ssh_opts[@]}" "$remote" "sudo systemctl disable --now wherever-actualizar.timer 2>/dev/null || true; rm -f /opt/wherever/imagen.env; chmod +x /opt/wherever/deploy-env.sh && /opt/wherever/deploy-env.sh '$path' '$site' && cd /opt/wherever && docker compose up -d --remove-orphans && docker compose ps"
 
 echo "desplegar: listo. Prueba: curl -i https://$site/ready"

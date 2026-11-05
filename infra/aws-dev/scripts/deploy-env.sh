@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Corre EN la instancia: arma /opt/wherever/.env desde Parameter Store (spec nv-07).
 # Lee todos los parámetros de la ruta (SecureString descifrados) sin mostrar sus valores.
+# GHCR_TOKEN no va al .env: es del actualizador (nv-08) y la API no debe verlo.
 #   uso: deploy-env.sh /wherever/dev/ [sitio]
 set -euo pipefail
 umask 077
@@ -15,6 +16,7 @@ trap 'rm -f "$tmp"' EXIT
 aws ssm get-parameters-by-path --region "$region" --path "$path" --recursive --with-decryption \
   --query 'Parameters[].[Name,Value]' --output text |
   while IFS=$'\t' read -r name value; do
+    [ "${name##*/}" = "GHCR_TOKEN" ] && continue
     printf '%s=%s\n' "${name##*/}" "$value"
   done > "$tmp"
 

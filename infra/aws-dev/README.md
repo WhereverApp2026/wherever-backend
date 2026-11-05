@@ -52,6 +52,26 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main
 docker build -t wherever-api:dev <dir>
 ```
 
+## Actualización automática (spec nv-08)
+Cada `push` a `main` con CI en verde publica la imagen en GHCR (`cd-dev.yml`); el servidor la detecta y se instala sola, con regreso automático.
+
+Una sola vez:
+1. Crea un PAT clásico con solo `read:packages` y cárgalo tú, sin pegarlo en ningún chat:
+```bash
+MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east-2 --name /wherever/dev/GHCR_TOKEN --type SecureString --value '<token>'
+```
+2. Define la variable del repositorio `API_URL` con la URL del servidor.
+3. Activa el timer (repítelo si cambian estos archivos; requiere que `ssh_cidr` tenga tu IP vigente):
+```bash
+infra/aws-dev/scripts/instalar-actualizador.sh --ip "$(terraform -chdir=infra/aws-dev output -raw public_ip)" --key ~/.ssh/wherever-dev
+```
+
+- **Ver qué pasó:** `journalctl -u wherever-actualizar -n 50`.
+- **Regresar:** en Actions, `cd-dev` → Run workflow con el SHA completo; el servidor la instala solo.
+- **Reintentar una versión fallida:** borra su línea de `/var/log/wherever/failed_digest`.
+- **Si el workflow termina en rojo con un SHA antiguo:** el servidor regresó, o venció `GHCR_TOKEN`.
+- **Emergencia:** `desplegar.sh` apaga el timer; se reactiva con `instalar-actualizador.sh`.
+
 ## Verificar
 ```bash
 $(terraform -chdir=infra/aws-dev output -raw verificar)   # solo lectura; falla si algo sale del Free Tier o queda expuesto
