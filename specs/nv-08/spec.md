@@ -19,7 +19,7 @@ Hoy el backend tiene CI (`ci-pr.yml`, `nightly.yml`) y despliegue manual (`infra
 11. Toda entrada `sha` debe cumplir `^[0-9a-f]{40}$` antes de usarse y nunca se interpola en un comando.
 12. Volver a ejecutar el workflow del mismo SHA no falla: si la etiqueta ya existe, se salta la construcción.
 13. Todo rol que cree Terraform lleva el permissions boundary `wherever-dev-boundary`.
-14. GHCR conserva solo las últimas 5 versiones.
+14. GHCR conserva unos 5 despliegues: 10 versiones, porque cada publicación crea 2 (la imagen y el índice de `dev`).
 15. El workflow informa el resultado consultando `/health` por HTTPS, según la tabla de Contratos.
 
 ## Diseño
@@ -84,7 +84,7 @@ Constitución (enmienda): §3 fila CI y §8 pasan a decir "`ci-pr.yml` sin deplo
 - `terraform plan` solo cambia los dos roles; no reemplaza la EC2 ni la IP elástica.
 - Del merge a `/health` con el SHA nuevo, sin intervención humana, con la instancia encendida.
 - Una versión rota nunca deja el servidor caído ni se reintenta en bucle.
-- GHCR dentro del plan gratuito (imagen de unos 45 MB, máximo 5 versiones).
+- GHCR dentro del plan gratuito (imagen de unos 45 MB, máximo 10 versiones).
 
 ## Límites
 - **Riesgo aceptado (revisor, 2026-11-04):** `main` no se puede proteger en este plan de GitHub (la API pide Pro o repositorio público). Quien pueda hacer push a `main` publica en el servidor con solo pasar CI. Aceptable sin datos reales; **no lo sería en producción**.
@@ -95,7 +95,7 @@ Constitución (enmienda): §3 fila CI y §8 pasan a decir "`ci-pr.yml` sin deplo
 - Los cambios de `infra/` (Terraform, `compose.yml`, `Caddyfile`) siguen siendo manuales; el CD solo actualiza la imagen de la API.
 - El regreso automático no deshace índices ya creados ni cambios en datos: los cambios de esquema deben ser compatibles con la versión anterior.
 - Solo se regresa a SHA desde la fusión de nv-08: los anteriores no traen `/indexes`.
-- Una versión con más de 5 versiones de antigüedad ya no está en GHCR y hay que reconstruirla.
+- Una versión con más de unos 5 despliegues de antigüedad ya no está en GHCR y hay que reconstruirla.
 - Solo desarrollo: sin aprobación humana, sin canary ni cero tiempo de caída (la API se reinicia unos segundos).
 - El estado de Terraform sigue siendo local y es el único registro de la infraestructura: se copia fuera del repositorio antes de cada `apply`.
 - El contenedor `wherever-sin-limites` (excepción temporal de pruebas) se retira antes de firmar.
