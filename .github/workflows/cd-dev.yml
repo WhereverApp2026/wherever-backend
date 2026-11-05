@@ -62,7 +62,7 @@ jobs:
         run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
       # Volver a ejecutar el mismo SHA no reconstruye; un regreso a una imagen ya borrada sí,
-      # y solo si ese SHA pertenece a main.
+      # y solo si ese SHA pertenece a main. El checkout con fetch-depth 0 ya trae origin/main.
       - name: publicar imagen del sha
         env:
           SHA: ${{ steps.entrada.outputs.sha }}
@@ -71,7 +71,6 @@ jobs:
             echo "la imagen $SHA ya existe; no se reconstruye"
             exit 0
           fi
-          git fetch --no-tags origin main
           if ! git merge-base --is-ancestor "$SHA" origin/main; then
             echo "::error::$SHA no es ancestro de main"
             exit 1

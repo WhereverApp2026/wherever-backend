@@ -159,6 +159,7 @@
 - Decisión: se cancela OIDC + ECR + Systems Manager. Una SCP de la organización (`o-97o0ojcjt7`, cuenta `988573432780`, política `p-d16tlddp`) niega `iam:GetOpenIDConnectProvider` y Organizations no está disponible para el proyecto. Diseño por sondeo: GHCR y timer de systemd en la EC2. GitHub queda sin ningún acceso a AWS.
 - Decisión: `deploy-env.sh` excluye `GHCR_TOKEN`; vuelca toda la ruta al `.env` y si no el token llegaría a la API.
 - Decisión: antes de actualizar se exige `/ready` 200 de la versión actual, y un digest se registra como fallido solo si la anterior queda sana. Porqué: al arrancar, Neo4j tarda más que `OnBootSec=1min`, y sin esto una imagen buena quedaría marcada para siempre.
+- Lección: `persist-credentials: false` impide cualquier `git fetch` posterior en un repo privado; con `fetch-depth: 0` no hace falta. Las dos primeras corridas de `cd-dev` fallaron por eso. `cd-dev` solo se puede probar desde `main`: `workflow_run` usa el workflow de la rama por defecto.
 - Límite: `actualizar.sh`, las unidades de systemd y `deploy-env.sh` viven en el servidor y su mantenimiento en `infra/` es manual (`instalar-actualizador.sh`, por SSH desde la IP vigente).
 - Límite: `main` no se puede proteger en este plan de GitHub (la API pide Pro o repositorio público); riesgo aceptado solo para desarrollo. El PAT caduca: al vencer, el servidor deja de actualizarse y el workflow termina en rojo.
 - Límite: GitHub no distingue una instancia apagada de una caída; ambas dan verde con aviso.
