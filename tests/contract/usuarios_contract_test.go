@@ -56,6 +56,8 @@ func TestContract_Usuarios(t *testing.T) {
 	status, body = callWith(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]string{"nombre": "Otra"}, access, `"1"`)
 	check(t, "usuarios/yo_patch_409", status, body)
 
+	status, _ = call(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"datos_sensibles": true}, access)
+	require.Equal(t, http.StatusOK, status)
 	status, body = call(t, app, http.MethodPut, "/api/v1/usuarios/yo/gustos", map[string]any{
 		"categorias": []string{"cafe", "tacos", "museos"}, "presupuesto_min": 100, "presupuesto_max": 300, "restricciones": []string{"vegano"}, "alergias": "nueces",
 	}, access)

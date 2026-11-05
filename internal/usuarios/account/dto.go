@@ -79,6 +79,7 @@ type PrivacyRequest struct {
 	Location        *bool   `json:"ubicacion"`
 	Learning        *bool   `json:"aprendizaje_personalizado"`
 	Mood            *bool   `json:"estado_animo"`
+	SensitiveData   *bool   `json:"datos_sensibles"`
 	UsageData       *bool   `json:"datos_uso"`
 	PhoneSearchable *bool   `json:"buscable_por_telefono"`
 	PromoEmail      *bool   `json:"promociones_correo"`
@@ -160,6 +161,7 @@ type PrivacyResponse struct {
 	Location        bool      `json:"ubicacion"`
 	Learning        bool      `json:"aprendizaje_personalizado"`
 	Mood            bool      `json:"estado_animo"`
+	SensitiveData   bool      `json:"datos_sensibles"`
 	UsageData       bool      `json:"datos_uso"`
 	PhoneSearchable bool      `json:"buscable_por_telefono"`
 	TermsVersion    string    `json:"version_terminos"`
@@ -250,6 +252,10 @@ func profileResponse(u usuarios.User) ProfileResponse {
 	}
 	if u.City != nil {
 		out.City = &CityResponse{ID: u.City.ID.Hex(), Name: u.City.Name}
+	}
+	// Las alergias guardadas antes de pedir este consentimiento tampoco se usan ni se muestran.
+	if out.Tastes != nil && !u.Privacy.SensitiveData {
+		out.Tastes.Allergies = ""
 	}
 	return out
 }

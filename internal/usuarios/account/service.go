@@ -195,12 +195,46 @@ func (s *Service) SetTastes(ctx context.Context, claims *middleware.Claims, req 
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireSensitiveConsent(ctx, claims, req.Allergies); err != nil {
+		return nil, err
+	}
 	tastes := usuarios.Tastes{Categories: req.Categories, BudgetMin: req.BudgetMin, BudgetMax: req.BudgetMax, Restrictions: req.Restrictions, Allergies: req.Allergies}
 	user, err := s.users.Update(ctx, userID, bson.D{{Key: "gustos", Value: tastes}})
 	if err != nil {
 		return nil, s.userError(err)
 	}
 	return tastesResponse(user.Tastes), nil
+}
+
+// requireSensitiveConsent aplica US-010: sin consentimiento expreso las alergias no se guardan.
+func (s *Service) requireSensitiveConsent(ctx context.Context, claims *middleware.Claims, allergies string) error {
+	if strings.TrimSpace(allergies) == "" {
+		return nil
+	}
+	user, err := s.current(ctx, claims)
+	if err != nil {
+		return err
+	}
+	if !user.Privacy.SensitiveData {
+		return apperr.Validation("datos inválidos", apperr.FieldError{Field: "alergias", Message: "requiere el consentimiento de datos sensibles"})
+	}
+	return nil
+}
+
+// clearAllergiesOnRevoke borra las alergias al retirar el consentimiento. Si la cuenta no tiene
+// gustos no hay nada que borrar, y fijar un subcampo sobre `gustos` nulo fallaría en MongoDB.
+func (s *Service) clearAllergiesOnRevoke(ctx context.Context, claims *middleware.Claims, consent *bool, set *bson.D) error {
+	if consent == nil || *consent {
+		return nil
+	}
+	user, err := s.current(ctx, claims)
+	if err != nil {
+		return err
+	}
+	if user.Tastes != nil {
+		*set = append(*set, bson.E{Key: "gustos.alergias", Value: ""})
+	}
+	return nil
 }
 
 // PatchPreferences cambia solo los ajustes que llegan; las notificaciones de reservas no se apagan.
@@ -242,6 +276,10 @@ func (s *Service) PatchPrivacy(ctx context.Context, claims *middleware.Claims, r
 	setIf(&set, "privacidad.ubicacion", req.Location)
 	setIf(&set, "privacidad.aprendizaje_personalizado", req.Learning)
 	setIf(&set, "privacidad.estado_animo", req.Mood)
+	setIf(&set, "privacidad.datos_sensibles", req.SensitiveData)
+	if err := s.clearAllergiesOnRevoke(ctx, claims, req.SensitiveData, &set); err != nil {
+		return PrivacyResponse{}, err
+	}
 	setIf(&set, "privacidad.datos_uso", req.UsageData)
 	setIf(&set, "privacidad.buscable_por_telefono", req.PhoneSearchable)
 	setIf(&set, "privacidad.promociones_correo", req.PromoEmail)

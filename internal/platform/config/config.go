@@ -21,15 +21,18 @@ const (
 
 // Límites fijados por la constitución (§3, §6). Se pueden bajar, nunca subir.
 const (
-	MaxBodyLimit       = 10 * 1024 * 1024
-	MaxRequestTimeout  = 60 * time.Second
-	DefaultRateGlobal  = 1000
-	DefaultRateWrites  = 10
-	MinJWTKeyBytes     = 32
-	MaxAccessTTL       = 15 * time.Minute
-	MaxRefreshTTL      = 30 * 24 * time.Hour
-	MinPhoneKeyBytes   = 32
-	MaxArcoGraceDays   = 30
+	MaxBodyLimit      = 10 * 1024 * 1024
+	MaxRequestTimeout = 60 * time.Second
+	DefaultRateGlobal = 1000
+	DefaultRateWrites = 10
+	MinJWTKeyBytes    = 32
+	MaxAccessTTL      = 15 * time.Minute
+	MaxRefreshTTL     = 30 * 24 * time.Hour
+	MinPhoneKeyBytes  = 32
+	MaxArcoGraceDays  = 30
+	// DefaultJobHour es la madrugada de America/Mexico_City; un servidor que se apaga de noche la cambia.
+	DefaultJobHour     = 3
+	maxJobHour         = 23
 	defaultSMTPPort    = 587
 	defaultMailTimeout = 5 * time.Second
 	maxMailTimeout     = 30 * time.Second
@@ -71,6 +74,8 @@ const (
 	KeyMailWorkers     = "MAIL_WORKERS"
 	KeyMailQueueSize   = "MAIL_QUEUE_SIZE"
 	KeyAppLinkBase     = "APP_LINK_BASE"
+	KeyJobHour         = "JOB_HOUR"
+	KeyHideInternals   = "HIDE_INTERNALS"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -89,6 +94,7 @@ var optionalKeys = []string{
 	KeyJWTAccessTTL, KeyJWTRefreshTTL, KeyArcoGraceDays,
 	KeySMTPHost, KeySMTPPort, KeySMTPUser, KeySMTPPassword, KeySMTPTLS, KeyMailFrom,
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
+	KeyJobHour, KeyHideInternals,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -117,6 +123,8 @@ type Config struct {
 	RequestTimeout    time.Duration
 	RateLimitGlobal   int
 	RateLimitWrites   int
+	JobHour           int
+	HideInternals     bool
 }
 
 // Mail es la configuración del correo saliente (nv-06). Sin SMTPHost no hay servidor: dev y
@@ -142,6 +150,10 @@ func (c Config) IsProd() bool { return c.Env == EnvProd }
 
 // IsDev indica si corre en desarrollo.
 func (c Config) IsDev() bool { return c.Env == EnvDev }
+
+// ExposeInternals indica si se muestran `detalle` y las sondas. Nunca en prod, y tampoco en un
+// servidor público de otro entorno que pida ocultarlos con HIDE_INTERNALS (spec nv-15).
+func (c Config) ExposeInternals() bool { return !c.IsProd() && !c.HideInternals }
 
 // Load lee y valida la configuración con la función de lectura dada (os.Getenv en main).
 func Load(getenv func(string) string) (Config, error) {
@@ -174,6 +186,7 @@ func Load(getenv func(string) string) (Config, error) {
 		},
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
+		HideInternals:     strings.EqualFold(strings.TrimSpace(getenv(KeyHideInternals)), "true"),
 	}
 	errs = append(errs, cfg.parseNumbers(getenv)...)
 	errs = append(errs, cfg.validate()...)
@@ -198,6 +211,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeySMTPPort, &c.Mail.SMTPPort, defaultSMTPPort},
 		{KeyMailWorkers, &c.Mail.Workers, defaultMailWorkers},
 		{KeyMailQueueSize, &c.Mail.QueueSize, defaultMailQueue},
+		{KeyJobHour, &c.JobHour, DefaultJobHour},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -241,6 +255,9 @@ func (c Config) validate() []error {
 	}
 	if err := validateOrigin(c.CORSAllowedOrigin); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", KeyCORSOrigin, err))
+	}
+	if c.JobHour < 0 || c.JobHour > maxJobHour {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 0 y %d", KeyJobHour, maxJobHour))
 	}
 	errs = append(errs, c.validateMail()...)
 	return append(errs, c.validateLimits()...)

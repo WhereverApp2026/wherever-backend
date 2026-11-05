@@ -19,7 +19,6 @@ const (
 	LockKey     = "lock:borrado_nocturno"
 	lockTTL     = 30 * time.Minute
 	batchSize   = 200
-	runHour     = 3
 	runTimezone = "America/Mexico_City"
 )
 
@@ -62,9 +61,10 @@ func NewJob(rdb *goredis.Client, accounts DueAccounts, exports *Exports, registr
 	return &Job{rdb: rdb, accounts: accounts, exports: exports, registry: registry, links: links, log: log}
 }
 
-// Start programa el trabajo todos los días a las 03:00 de America/Mexico_City con gocron.
-// Devuelve la función que lo detiene.
-func (j *Job) Start() (stop func() error, err error) {
+// Start programa el trabajo todos los días a esa hora de America/Mexico_City con gocron. La hora
+// debe caer con la instancia encendida: apagada no corre y no se recupera. Devuelve la función
+// que lo detiene.
+func (j *Job) Start(hour int) (stop func() error, err error) {
 	loc, err := time.LoadLocation(runTimezone)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (j *Job) Start() (stop func() error, err error) {
 		return nil, err
 	}
 	_, err = s.NewJob(
-		gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(runHour, 0, 0))),
+		gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(hour), 0, 0))),
 		gocron.NewTask(func() { _, _ = j.RunOnce(context.Background()) }),
 		gocron.WithSingletonMode(gocron.LimitModeReschedule),
 	)
