@@ -1,6 +1,6 @@
 # Checklist — nv-07 Despliegue de desarrollo en AWS
 
-> Trazabilidad: `spec R1-R9 ↔ plan §3-§5 ↔ task T1-T7`. Estado: Borrador con evidencia (aplicado el 2026-11-03; faltan ciclo de apagado, `destroy` y firma).
+> Trazabilidad: `spec R1-R9 ↔ plan §3-§5 ↔ task T1-T7`. Estado: Aprobada con pendientes (2026-11-05, Osmar Reséndiz).
 
 - [x] Una sola instancia de tipo elegible; créditos de CPU `standard`; IMDSv2 (R1) — `verificar.sh`: `t3.micro` FreeTierEligible, `standard`, `required`
 - [x] Disco gp3 cifrado de máximo 30 GB (R2) — 20 GB gp3 cifrado
@@ -14,7 +14,7 @@
 - [x] Una IP elástica asociada, ninguna suelta, sin NAT ni balanceador — `verificar.sh`
 - [x] Ciclo de apagado y encendido probado: misma IP elástica (misma URL), contenedores vuelven solos, Caddy conserva el certificado, swap activa, `/ready` responde — apagado 22:00 del 2026-11-03, encendido 08:00 del 2026-11-04; 4 contenedores `Up` sin intervención, `/swapfile 2G`, `/ready` 200 con certificado válido, misma IP `18.227.230.50`
 - [x] `Memoria.md` con fecha de fin del plan gratuito, excepción de Parameter Store y deuda de producción
-- [ ] Aprobación firmada: (pendiente de revisor; no antes del ciclo de apagado y del `destroy`)
+- [x] Aprobación firmada: Osmar Reséndiz, 2026-11-05. El revisor firma sin el `destroy`, que antes pedía como condición.
 
 ## Evidencia (2026-11-03, Terraform 1.16.6, AWS provider 6.x, perfil `wherever-deployer` en `816101201001`)
 - `terraform apply`: 21 recursos (19 en el primer intento; 2 reglas fallaron por el apóstrofo en la descripción y se crearon tras corregirla). Un `plan` posterior: sin cambios.

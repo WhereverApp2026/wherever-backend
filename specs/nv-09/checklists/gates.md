@@ -1,19 +1,21 @@
 # gates.md — NV-09 CI de seguridad
 
+> Estado: Aprobada con pendientes (2026-11-05, Osmar Reséndiz).
+
 | Gate | Criterio | Evidencia | Estado |
 |---|---|---|---|
-| critic B1 | Sin secretos ni cuentas nuevas | salida de `critic` | pendiente |
-| critic B2 | Sin tokens en logs | salida de `critic` | pendiente |
-| critic B3 | Orden de middlewares HTTP intacto (no revisa CI) | salida de `critic` | pendiente |
-| critic B4 | Sin endpoints nuevos | salida de `critic` | pendiente |
-| Cobertura | Gate de 45 % intacto | corrida de `ci-pr` | pendiente |
+| critic B1 | Sin secretos ni cuentas nuevas | salida de `critic` | OK |
+| critic B2 | Sin tokens en logs | salida de `critic` | OK |
+| critic B3 | Orden de middlewares HTTP intacto (no revisa CI) | salida de `critic` | OK |
+| critic B4 | Sin endpoints nuevos | salida de `critic` | OK |
+| Cobertura | Gate de 45 % intacto | corrida de `ci-pr` | OK |
 | Línea base | Hallazgos existentes corregidos o exceptuados con motivo y fecha | ver abajo | OK: 0 hallazgos, 0 excepciones nuevas |
 | Duración | PR de referencia ≤ 8 min | runs 41980208217 y 41981293629 del PR #13 | OK: 5 min 5 s y 5 min 12 s |
 | Frena | PR con hallazgo plantado sale rojo | runs 41980221219 y 41981311730 del PR #14 (cerrado sin fusionar) | OK: `pr-gate` en rojo con Semgrep 1 y go-security 3; critic B1 y Semgrep marcan `plantado.go:9`, gosec marca G101 en :9 y G204 en :13. Semgrep no marca el `exec.Command`: lo cubre gosec. |
 | Filtro | PR solo de documentos sale verde sin Go ni imagen | run 42081911464 del PR #17 | OK: 52 s; `go-security`, `image-scan` y `pipeline` omitidos; `guardrails`, `semgrep` y `pr-gate` corrieron |
 | Reporte | Tabla del gate visible en el resumen | valores leídos del paso `pr-gate` en ambas corridas | Valores correctos; falta ver la tabla publicada en Summary (GitHub no la expone por API) |
 | ZAP | Corrida manual con reporte como artefacto | run 41980205730 | OK: 4 min, 35 URL, 0 altas, 1 baja; artefacto `zap-reporte` |
-| `check_sdd` / `actionlint` | Sin errores | salida | pendiente |
+| `check_sdd` / `actionlint` | Sin errores | salida | OK; `actionlint` solo con 5 avisos informativos que ya existían |
 
 ## Línea base (2026-11-05, Go 1.27.3, en contenedores)
 - `golangci-lint` v2.15.0: 0. `govulncheck` v1.9.0: 0 alcanzables.
