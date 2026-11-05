@@ -215,6 +215,7 @@
 - Redis desde la máquina local: 85 ms de mediana y 545 ms en la primera conexión. Upstash quedó en `us-east-2`, según su IP.
 - Lección: Upstash rechazó con `WRONGPASS` varias claves hasta copiar la cadena de Connect → TCP; no se aclaró la causa. No armes la URL a mano.
 - Lección: con una clave mala, `go-redis` muestra `i/o timeout` y no `WRONGPASS`, porque Upstash deja de responder tras el error de `AUTH`. Para diagnosticar, usa `redis-cli`.
+- `main` falló en `govulncheck` tras fusionar el PR 21, con el del PR en verde minutos antes: GO-2026-6888 (`brotli`) y GO-2026-6865 (`klauspost/compress`), ambas indirectas. Se subieron a v1.2.7 y v1.20.2. Sin CI verde en `main` no se publica imagen.
 - Lección: el grupo de seguridad limita la salida; los puertos de un servicio externo nuevo se abren en `egress_ports` o la API no llega.
 - Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
 
