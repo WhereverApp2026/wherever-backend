@@ -44,9 +44,10 @@ Sin endpoints nuevos ni cambios de contrato. Si el fuzzing revela un 5xx por ent
 - El fuzzing no sustituye una revisión de seguridad.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada en la rama `nv-10-fuzzing`; falta la corrida en Actions y firma
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada con pendientes (fuzz nocturno y pruebas de bordes activos)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-05 (aprobación)
 - **Correcciones al ejecutar (2026-11-05):** no hay repositorios simulados y la spec contradecía `AGENTS.md`; `critic B3` no revisa `nightly.yml`; la mutación ya existía; las caídas ya estaban cubiertas en auth y `/ready`, y faltaban lo lento y los demás módulos. **Hallazgos corregidos:** el pánico y el agotamiento de memoria al verificar un hash corrupto, y `NormalizePhone`, que dejaba saltos de línea entre separadores (encontrado por el fuzz).
 - **Decisiones del revisor, dadas al ordenar ejecutarla el 2026-11-05 (confirmar al firmar):** (a) usar el mecanismo de contenedores que ya tienen las suites y Testcontainers-go solo donde falte; (b) tiempo nocturno máximo de fuzzing (propuesta: 15 min); (c) Pact fuera y la mutación sin cambios.
 - **Detalle:** la evidencia irá en `specs/nv-10/checklists/gates.md` + `Memoria.md`.
+- **Pendientes aceptados al firmar (2026-11-05):** `FuzzHandlers` da pocas ejecuciones en Actions (unas 6 000 por noche); `detalle` visible en staging, por decidir aparte.

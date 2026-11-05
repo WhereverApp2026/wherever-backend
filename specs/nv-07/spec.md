@@ -58,8 +58,9 @@ Rutas que el despliegue debe responder por HTTPS: `GET /health` (200), `GET /rea
 - Producción real (multi-AZ, TLS administrado, estado remoto, CD) será una spec posterior.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador sin ejecutar
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada con pendientes (desplegada en AWS con evidencia en `gates.md`)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-05 (aprobación)
 - **Ajustes del revisor antes de ejecutar (2026-11-03):** MongoDB en Atlas en lugar de Docker en la EC2; región `us-east-2`; perfil `wherever-dev` sin usuario raíz (usuario IAM `wherever-deployer` con la política `wherever-dev-deployer`). Cuenta creada el 2026-11-03 (plan gratuito nuevo: US$100 de crédito, vence el 2027-05-02): `t3.micro`, y el presupuesto no descuenta créditos.
 - **Detalle:** especificada; tareas aún sin ejecutar. La evidencia irá en `specs/nv-07/checklists/gates.md` + `Memoria.md`.
+- **Pendientes aceptados al firmar (2026-11-05):** `terraform destroy` y `apply` sin probar: cambia la IP, la URL, la lista de Atlas y `API_URL`, y hoy la usa el front. Presupuesto de US$5 en lugar de US$1, por decisión del revisor.

@@ -25,8 +25,8 @@
 - [x] T14 `AGENTS.md`, `CHECKLIST_PR.md`, `Memoria.md`.
 
 ## Fase 5 — Pruebas y PR
-- [ ] T15 `actionlint`, `yaml.safe_load`, `go build`, `go vet`, cinco suites, `check_sdd`, `critic`.
+- [x] T15 `actionlint`, `yaml.safe_load`, `go build`, `go vet`, cinco suites, `check_sdd`, `critic`.
 - [x] T16 PR de referencia: medir duración (≤ 8 min).
 - [x] T17 PR de prueba con hallazgo plantado → rojo; cerrar sin fusionar.
 - [x] T18 PR solo de documentos (#17) → verde sin Go ni imagen.
-- [ ] T19 Evidencia en `gates.md`; el revisor firma. `critic B3` no aplica: revisa el orden HTTP, no CI.
+- [x] T19 Evidencia en `gates.md`; firmó el revisor el 2026-11-05. `critic B3` no aplica: revisa el orden HTTP, no CI.

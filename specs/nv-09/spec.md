@@ -51,9 +51,10 @@ Sin endpoints ni cambios de código de la API. Enmienda de la constitución: §3
 - Consume minutos del plan gratuito de Actions; lo lento va a la corrida nocturna.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada en la rama `nv-09-ci-seguridad`; faltan pruebas reales y firma
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada con pendientes (CI de seguridad activa, con gate y ZAP nocturno)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-05 (aprobación)
 - **Correcciones al ejecutar (2026-11-05):** `critic B3` revisa el orden de los middlewares HTTP, no CI, así que no marca este cambio; `.golangci.yml` ya existía; compose no levanta la API; `zap-baseline` no vería rutas; `.semgrepignore` quitaría exclusiones; `ci-pr` solo corre en PR hacia `main`, por lo que nv-09 sale de nv-08 y el PR apunta a `main`.
 - **Decisiones del revisor, dadas al ordenar ejecutarla el 2026-11-05 (confirmar al firmar):** (a) Semgrep con reglas del registro público, sin cuenta ni token; (b) el gate del PR informa pero no bloquea la fusión (`main` no se puede proteger); (c) umbrales de fallo: Semgrep ERROR, Trivy HIGH/CRITICAL con corrección, Dockle FATAL, ZAP alto; (d) enmienda de la constitución §3.
 - **Detalle:** la evidencia irá en `specs/nv-09/checklists/gates.md` + `Memoria.md`.
+- **Pendientes aceptados al firmar (2026-11-05):** ver publicada la tabla del gate en Summary: los valores que recibe se leyeron del paso `pr-gate` y el script se probó en local, pero la tabla no se ha visto.

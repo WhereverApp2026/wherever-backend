@@ -140,7 +140,6 @@
 - Lección: `terraform plan` solo lee EC2 y no detecta permisos de IAM, Scheduler, Budgets o SSM atados a otra cuenta; se prueban con lecturas de nombres inexistentes antes del `apply`.
 - Lección: la descripción de una regla de Security Group solo acepta `a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*` (sin apóstrofo ni acentos); `plan` no lo valida y el `apply` falló a la mitad en dos reglas.
 - Lección: en Windows la CLI de AWS con `--output text` termina en CRLF; `verificar.sh` lo quita con `tr -d '\r'`.
-- **Excepción temporal (2026-11-04, pedida por el usuario para las pruebas del front móvil):** en la EC2 corre el contenedor `wherever-sin-limites` (`/opt/wherever/sin-limites.sh`, fuera de Git) que cada 10 s borra en Redis `rate:*` (menos `rate:writes:*`) y `login_fallos:*`: en staging no hay límite por ruta ni bloqueo de login 423. Quitar al terminar las pruebas: `docker rm -f wherever-sin-limites`. No va a prod ni al repo; la firma de nv-07 no se da con él activo.
 - Entorno local para demos (2026-11-04): el 27017 lo ocupa un `mongod.exe` (servicio de Windows, no es del proyecto) y Atlas rechaza a la API local cuando cambia la IP pública, que alterna entre dos. `.claude/launch.json` (`api-local`, sin commit) arranca la API con Mongo de Docker en 27018 (`MONGO_HOST_PORT=27018 docker compose ... --profile dev up -d --wait`) y Mailpit como SMTP, sin editar `.env`. Esa base local trae índices y 5 ciudades de ejemplo.
 - Diagnóstico del 429 del front (2026-11-04): ningún intento llegó a crear cuenta; el registro no mandaba `version_terminos` (422) y el login no mandaba `dispositivo` o enviaba JSON ilegible (400). Cada intento fallido cuenta para el límite.
 - Excepción de desarrollo (2026-11-03): la imagen desplegada en la EC2 no salió del `Dockerfile`; es el binario compilado en local desde `d2dc808` (código Go de `main` tras nv-06; nv-07 no toca Go) con la caché de módulos local, sobre `distroless/static-debian12:nonroot`. No es reproducible; el siguiente despliegue vuelve al `Dockerfile` (CI lo construye bien).
@@ -190,6 +189,8 @@
 - Lección: `go test` con Docker limitado a 512 MB mata al compilador; se compila con `-c` y se ejecuta con el límite.
 
 ## Estado de CI/CD (2026-11-05)
+- Firmas: nv-07 a nv-10 aprobadas por Osmar Reséndiz el 2026-11-05, con pendientes aceptados en cada `spec.md`. La de nv-07 se dio sin el `destroy`, que antes era condición.
+- `wherever-sin-limites` retirado el 2026-11-05: límites y bloqueo de login vuelven a aplicar en staging.
 - CD funciona: del merge a `/health` en unos 9 min. Regreso automático probado con una imagen rota: 2 min de caída, vuelve sola y no reintenta. Evidencia en `specs/nv-08/checklists/gates.md`.
 - Hallazgo: cada publicación crea 2 versiones en GHCR (`imagetools create` envuelve la imagen en un índice), así que `min-versions-to-keep: 5` guardaba unos 2 o 3 despliegues. Subido a 10.
 - En GHCR queda la etiqueta `prueba-rota` hasta que la limpieza la borre; su digest sigue en `failed_digest` y no estorba.

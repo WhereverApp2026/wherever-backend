@@ -1,18 +1,20 @@
 # gates.md — NV-10 Fuzzing nativo y pruebas de bordes
 
+> Estado: Aprobada (2026-11-05, Osmar Reséndiz).
+
 | Gate | Criterio | Evidencia | Estado |
 |---|---|---|---|
-| critic B1 | Sin secretos en semillas ni pruebas | salida de `critic` | pendiente |
-| critic B2 | Sin tokens reales en logs ni semillas | salida de `critic` | pendiente |
-| critic B3 | Orden de middlewares HTTP intacto (no revisa `nightly.yml`) | salida de `critic` | pendiente |
-| critic B4 | Endpoints sin cambios, o fila actualizada si cambió un error | salida de `critic` | pendiente |
+| critic B1 | Sin secretos en semillas ni pruebas | salida de `critic` | OK |
+| critic B2 | Sin tokens reales en logs ni semillas | salida de `critic` | OK |
+| critic B3 | Orden de middlewares HTTP intacto (no revisa `nightly.yml`) | salida de `critic` | OK |
+| critic B4 | Endpoints sin cambios, o fila actualizada si cambió un error | salida de `critic` | OK |
 | Cobertura | No baja de 45 % | run 41993911344 del PR #16 | OK: 83,4 % (delta 80,6 %) |
 | Inventario | Objetivos y huecos listados en `plan.md` | `plan.md` | OK: 11 objetivos, 6 huecos cubiertos |
 | Semillas | `go test` pasa con las semillas | Unit: 575 pruebas y subpruebas | OK |
 | Detecta | Error plantado encontrado por fuzz o semillas | prueba local, ver abajo | OK: pánico con `{"correo":""}`, encontrado por `FuzzHandlers` en 46 s; las semillas no lo veían |
 | Bordes | Mongo, Redis y Neo4j caídos cubiertos | `tests/integration/bordes_test.go` | OK: caídos y lentos |
 | Nocturno | Job `fuzz` dentro del tiempo previsto | run 41993909194 | OK: 15 min 6 s, 11 objetivos sin fallos, artefacto `fuzz`. `FuzzHandlers` da solo 6 077 ejecuciones en 60 s con 2 CPU |
-| `check_sdd` | Sin errores | salida | pendiente |
+| `check_sdd` | Sin errores | salida | OK |
 
 ## Evidencia local (2026-11-05, Go 1.27.3)
 - Suites: Unit 575, Integration 105, Security 46, Database 4, Contract 3; sin fallos. Incluyen subpruebas.

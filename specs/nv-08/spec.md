@@ -102,8 +102,9 @@ Constitución (enmienda): §3 fila CI y §8 pasan a decir "`ci-pr.yml` sin deplo
 - `terraform destroy` de nv-07 se prueba al final: cambia la IP elástica, la URL de sslip.io, la lista de Atlas y la variable `API_URL`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con implementación local, sin desplegar
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada con pendientes (CD funcionando en el entorno de desarrollo, con regreso automático probado)
+- **Revisores:** Osmar Reséndiz
+- **Fecha:** 2026-11-05 (aprobación)
 - **Control de cambios (2026-11-04):** se cancela el diseño con OIDC, ECR y Systems Manager porque una SCP lo impide. El revisor define el diseño por sondeo: GHCR, PAT en Parameter Store, timer de systemd, `failed_digest`, re-etiquetado para el regreso manual, 5 versiones y evaluación de `/health`. Agregados al revisarlo: exclusión del token en `deploy-env.sh`, comprobación previa de `/ready`, regla para registrar fallos solo si la anterior queda sana, `--provenance=false` y aviso en la ventana de apagado.
 - **Pendiente para ejecutar:** ver el ciclo real de apagado y encendido con el boundary; el dueño crea el PAT y carga `/wherever/dev/GHCR_TOKEN`.
+- **Pendientes aceptados al firmar (2026-11-05):** sin ver: rojo de `cd-dev` cuando el servidor regresa (y por eso la fila de SHA antiguo de `/health`), arranque con una versión nueva esperando, ventana de 21:50 a 22:00, reconstrucción de un SHA sin imagen, CI cancelado, dos despliegues a la vez y limpieza al pasar de 10 versiones.
