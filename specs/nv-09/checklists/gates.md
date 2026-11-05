@@ -8,11 +8,11 @@
 | critic B4 | Sin endpoints nuevos | salida de `critic` | pendiente |
 | Cobertura | Gate de 45 % intacto | corrida de `ci-pr` | pendiente |
 | Línea base | Hallazgos existentes corregidos o exceptuados con motivo y fecha | ver abajo | OK: 0 hallazgos, 0 excepciones nuevas |
-| Duración | PR de referencia ≤ 8 min | enlace a la corrida | pendiente |
-| Frena | PR con hallazgo plantado sale rojo | enlace a la corrida | pendiente |
+| Duración | PR de referencia ≤ 8 min | runs 41980208217 y 41981293629 del PR #13 | OK: 5 min 5 s y 5 min 12 s |
+| Frena | PR con hallazgo plantado sale rojo | runs 41980221219 y 41981311730 del PR #14 (cerrado sin fusionar) | OK: `pr-gate` en rojo con Semgrep 1 y go-security 3; critic B1 y Semgrep marcan `plantado.go:9`, gosec marca G101 en :9 y G204 en :13. Semgrep no marca el `exec.Command`: lo cubre gosec. |
 | Filtro | PR solo de `docs/` sale verde sin Go ni imagen | enlace a la corrida | pendiente |
-| Reporte | Tabla del gate visible en el resumen | captura o enlace | pendiente |
-| ZAP | Corrida manual con reporte como artefacto | enlace a la corrida | local OK; falta la corrida en Actions |
+| Reporte | Tabla del gate visible en el resumen | valores leídos del paso `pr-gate` en ambas corridas | Valores correctos; falta ver la tabla publicada en Summary (GitHub no la expone por API) |
+| ZAP | Corrida manual con reporte como artefacto | run 41980205730 | OK: 4 min, 35 URL, 0 altas, 1 baja; artefacto `zap-reporte` |
 | `check_sdd` / `actionlint` | Sin errores | salida | pendiente |
 
 ## Línea base (2026-11-05, Go 1.27.3, en contenedores)

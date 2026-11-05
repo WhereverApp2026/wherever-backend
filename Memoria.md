@@ -166,7 +166,7 @@
 - PR #11 de nv-07 ya fusionado; su firma sigue pendiente (falta `destroy` y retirar `wherever-sin-limites`).
 
 ## Ejecución nv-09 (2026-11-05)
-- Estado: rama `nv-09-ci-seguridad`, sale de `nv-08-cd`. CI de seguridad en jobs paralelos con gate, y ZAP nocturno. Falta: PR de referencia, hallazgo plantado, corrida de ZAP en Actions y, tras fusionar nv-08 y nv-09, PR solo de `docs/`.
+- Estado: rama `nv-09-ci-seguridad`, sale de `nv-08-cd`. CI de seguridad en jobs paralelos con gate, y ZAP nocturno. Probado en Actions: PR #13 en verde en unos 5 min, PR #14 con hallazgos plantados en rojo (cerrado sin fusionar), ZAP con 0 altas. Falta ver la tabla en Summary y, tras fusionar nv-08 y nv-09, el PR solo de `docs/`.
 - Línea base sin hallazgos: `specs/nv-09/checklists/gates.md`.
 - Decisión: se movieron a jobs propios lint, govulncheck, semgrep y `docker build`, en lugar de repetirlos. `critic`, `endpoints` y `sdd` van en `guardrails` porque aplican también a documentos.
 - Decisión: ZAP con `.zap/plan.yaml` y el OpenAPI, no `zap-baseline.py`: la API no tiene páginas y el baseline solo vería la raíz. Vio 33 rutas.
