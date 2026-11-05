@@ -191,7 +191,7 @@
 
 ## Estado de CI/CD (2026-11-05)
 - CD funciona: del merge a `/health` en unos 9 min. Regreso automático probado con una imagen rota: 2 min de caída, vuelve sola y no reintenta. Evidencia en `specs/nv-08/checklists/gates.md`.
-- Hallazgo: cada publicación crea 2 versiones en GHCR (`imagetools create` envuelve la imagen en un índice), así que `min-versions-to-keep: 5` guarda unos 2 o 3 despliegues. Pendiente subirlo a 10.
+- Hallazgo: cada publicación crea 2 versiones en GHCR (`imagetools create` envuelve la imagen en un índice), así que `min-versions-to-keep: 5` guardaba unos 2 o 3 despliegues. Subido a 10.
 - En GHCR queda la etiqueta `prueba-rota` hasta que la limpieza la borre; su digest sigue en `failed_digest` y no estorba.
 
 ## Pendientes de decidir

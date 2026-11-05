@@ -15,7 +15,7 @@
 - [x] `sha` inválido rechazado antes de tocar GHCR; nunca interpolado en un comando (R11) — run 42081539887: `abc;touch /tmp/x` falla en `validar sha` y salta todo lo demás
 - [x] Repetir el mismo SHA termina en verde sin construir (R12) — run 42081641837: "ya existe; no se reconstruye"
 - [ ] `wherever-dev-boundary` en los dos roles; `plan` revisado, estado respaldado, ciclo de apagado comprobado (R13) — aplicado el 2026-11-04: 2 cambios, nada reemplazado, `plan` posterior sin cambios, SSM `Online`, `/ready` 200, `verificar.sh` OK; ciclo real visto: encendió sola el 2026-11-05 a las 08:00:47 de México con el boundary puesto, SSM `Online` y `/ready` 200
-- [ ] GHCR con 5 versiones como máximo y la imagen activa intacta tras limpiar (R14) — **Hallazgo:** cada publicación crea 2 versiones (imagen e índice de `dev`), así que 5 versiones son unos 2 o 3 despliegues
+- [ ] GHCR con 10 versiones como máximo y la imagen activa intacta tras limpiar (R14) — **Hallazgo corregido:** cada publicación crea 2 versiones (imagen e índice de `dev`), así que 5 versiones eran unos 2 o 3 despliegues; ahora son 10. Falta ver la limpieza al pasar de 10
 - [ ] Tabla de `/health` comprobada: SHA nuevo, sin conexión y SHA antiguo (R15)
 - [ ] `actionlint`, `yaml.safe_load`, acciones fijadas por SHA, `critic`, `check_sdd`, `check_endpoints`, `terraform fmt`/`validate`
 - [ ] Enmienda de la constitución §3 y §8, incluida la frase "`main` protegida"
