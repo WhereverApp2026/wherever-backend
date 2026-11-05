@@ -5,7 +5,7 @@ name: wherever
 
 services:
   api:
-    image: wherever-api:dev
+    image: ${API_IMAGE:-wherever-api:dev} # imagen.env la fija por digest (nv-08)
     env_file: .env
     environment:
       REDIS_ADDR: redis:6379

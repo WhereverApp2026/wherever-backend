@@ -1,6 +1,6 @@
 # CHECKLIST_PR.md — Obligatorio
 
-> Constitución §8. 1 revisor. `main` protegida.
+> Constitución §8. 1 revisor. `main` protegida por acuerdo (el plan de GitHub no permite exigirlo). Fusionar a `main` publica en el entorno de desarrollo (nv-08).
 
 - [ ] Spec en `specs/nv-0X` aprobada y enlazada (sin cambio de contrato sin spec)
 - [ ] `go build ./...` y `golangci-lint run` sin errores

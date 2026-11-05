@@ -9,7 +9,8 @@ bin
 docs
 specs
 tests
-scripts
+scripts/*
+!scripts/indexes
 deployments
 configs
 *.md

@@ -1,0 +1,11 @@
+# Al arrancar y cada minuto (spec nv-08). Si la instancia estuvo apagada, se pone al día al encender.
+[Unit]
+Description=Revisa cada minuto si hay una versión nueva de la API
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

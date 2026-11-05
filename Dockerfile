@@ -7,13 +7,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY scripts/indexes ./scripts/indexes
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" \
     -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /out/indexes ./scripts/indexes
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/api /api
+COPY --from=build /out/indexes /indexes
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

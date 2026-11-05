@@ -1,0 +1,139 @@
+# CD del entorno de desarrollo (spec nv-08). Publica la imagen en GHCR; el servidor la detecta y se
+# actualiza solo con wherever-actualizar.timer. GitHub no tiene ningún acceso a AWS.
+name: cd-dev
+
+on:
+  workflow_run:
+    workflows: [ci-pr]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: SHA completo de main al que regresar
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+# Uno a la vez; el siguiente espera sin cancelar al que está en curso.
+concurrency:
+  group: cd-dev
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/whereverapp2026/wherever-backend
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    steps:
+      - name: validar sha
+        id: entrada
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          sha="${INPUT_SHA:-$HEAD_SHA}"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::el sha debe tener 40 caracteres hexadecimales en minúscula"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.entrada.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: entrar a GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # Volver a ejecutar el mismo SHA no reconstruye; un regreso a una imagen ya borrada sí,
+      # y solo si ese SHA pertenece a main.
+      - name: publicar imagen del sha
+        env:
+          SHA: ${{ steps.entrada.outputs.sha }}
+        run: |
+          if docker manifest inspect "$IMAGE:$SHA" >/dev/null 2>&1; then
+            echo "la imagen $SHA ya existe; no se reconstruye"
+            exit 0
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::$SHA no es ancestro de main"
+            exit 1
+          fi
+          docker buildx build --provenance=false --sbom=false --push \
+            --build-arg VERSION="$SHA" \
+            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -t "$IMAGE:$SHA" .
+
+      - name: mover la etiqueta dev
+        env:
+          SHA: ${{ steps.entrada.outputs.sha }}
+        run: docker buildx imagetools create -t "$IMAGE:dev" "$IMAGE:$SHA"
+
+      - name: conservar las últimas 5 versiones
+        if: github.event_name == 'workflow_run'
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: wherever-backend
+          package-type: container
+          min-versions-to-keep: 5
+
+      # Tabla de spec nv-08 §Contratos: el servidor revisa cada minuto y tarda hasta unos 3 minutos.
+      - name: comprobar el servidor
+        env:
+          SHA: ${{ steps.entrada.outputs.sha }}
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [[ -z "$API_URL" ]]; then
+            echo "::error::falta la variable del repositorio API_URL"
+            exit 1
+          fi
+          hora="$(TZ=America/Mexico_City date +%H%M)"
+          if ((10#$hora >= 2150 && 10#$hora < 2200)); then
+            echo "::notice::ventana de apagado: el servidor se actualizará al encender a las 08:00"
+            exit 0
+          fi
+          vio_respuesta=false
+          codigo=000
+          version=""
+          limite=$((SECONDS + 300))
+          while ((SECONDS < limite)); do
+            codigo="$(curl -s -o health.json -w '%{http_code}' --max-time 10 "$API_URL/health" || true)"
+            if [[ "$codigo" != "000" ]]; then
+              vio_respuesta=true
+            fi
+            if [[ "$codigo" == "200" ]]; then
+              version="$(jq -r '.version // ""' health.json || true)"
+              if [[ "$version" == "$SHA" ]]; then
+                echo "el servidor ya sirve $SHA"
+                exit 0
+              fi
+            fi
+            sleep 15
+          done
+          if [[ "$vio_respuesta" == "false" ]]; then
+            echo "::notice::sin conexión con el servidor: si está apagado, se actualizará al encender"
+            exit 0
+          fi
+          if [[ "$codigo" != "200" ]]; then
+            echo "::error::/health respondió $codigo tras 5 minutos"
+            exit 1
+          fi
+          echo "::error::el servidor sigue en $version y no en $SHA: revisa si regresó (failed_digest) o si venció GHCR_TOKEN"
+          exit 1

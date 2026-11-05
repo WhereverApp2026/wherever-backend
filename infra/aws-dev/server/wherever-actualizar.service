@@ -1,0 +1,10 @@
+# Revisa si hay una versión nueva de la API en GHCR y la instala (spec nv-08).
+[Unit]
+Description=Actualizador de la API de Wherever
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/wherever/actualizar.sh

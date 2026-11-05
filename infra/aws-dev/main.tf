@@ -16,6 +16,8 @@ locals {
   param_path    = "/${var.project}/${var.environment}/"
   app_port_cidr = var.app_port_cidr != "" ? var.app_port_cidr : var.ssh_cidr
   site_address  = var.domain_name != "" ? var.domain_name : "${replace(aws_eip.api.public_ip, ".", "-")}.sslip.io"
+  # Tope de permisos de todo rol del proyecto (nv-08). Lo crea el administrador en la consola.
+  boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.name}-boundary"
 }
 
 # --- Red: solo 80/443 públicos; 22 y el puerto de la API solo desde tu IP; ninguna base. ---
@@ -98,8 +100,9 @@ data "aws_iam_policy_document" "ec2_assume" {
 }
 
 resource "aws_iam_role" "instance" {
-  name               = "${local.name}-instance"
-  assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
+  name                 = "${local.name}-instance"
+  assume_role_policy   = data.aws_iam_policy_document.ec2_assume.json
+  permissions_boundary = local.boundary_arn
 }
 
 resource "aws_iam_role_policy_attachment" "ssm_core" {
@@ -215,8 +218,9 @@ data "aws_iam_policy_document" "scheduler_assume" {
 }
 
 resource "aws_iam_role" "scheduler" {
-  name               = "${local.name}-scheduler"
-  assume_role_policy = data.aws_iam_policy_document.scheduler_assume.json
+  name                 = "${local.name}-scheduler"
+  assume_role_policy   = data.aws_iam_policy_document.scheduler_assume.json
+  permissions_boundary = local.boundary_arn
 }
 
 data "aws_iam_policy_document" "start_stop" {
