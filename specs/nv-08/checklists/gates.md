@@ -3,9 +3,9 @@
 > Trazabilidad: `spec R1-R15 ↔ plan §3-§5 ↔ task T1-T9`. Estado: Borrador con implementación local, sin desplegar.
 
 - [ ] Solo publica un `push` a `main` con `ci-pr` en verde; PR, rama, fork o CI cancelado no publican (R1)
-- [ ] Imagen del `Dockerfile` con el SHA del commit, visible en `/health` (R2)
+- [ ] Imagen del `Dockerfile` con el SHA del commit, visible en `/health` (R2) — publicada por el run 41988428645 (`7433d30`); falta verla en `/health`
 - [ ] GitHub sin credenciales de AWS y sin forma de mandar comandos al servidor (R3) — **evidencia en el reporte**
-- [ ] GHCR privado con `GITHUB_TOKEN`; la EC2 baja con PAT `read:packages` que no llega a la API (R4)
+- [ ] GHCR privado con `GITHUB_TOKEN`; la EC2 baja con PAT `read:packages` que no llega a la API (R4) — publicar y bajar con el PAT probados en local; la imagen trae `/api` y `/indexes`, ligada al repo, sin secretos; falta en la EC2
 - [ ] El timer revisa cada minuto y al arrancar; el arranque no registra fallos falsos (R5)
 - [ ] `/indexes` corre antes de cambiar la API y es idempotente (R6)
 - [ ] Una versión rota regresa sola, queda en `failed_digest` y no se reintenta; el workflow termina en rojo (R7) — **evidencia en el reporte**

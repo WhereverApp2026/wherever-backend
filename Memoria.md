@@ -155,7 +155,7 @@
 - Agent Toolkit de AWS configurado: 25 skills en `~/.claude/skills` y `aws-mcp` en `~/.claude.json` y OpenCode con `AWS_MCP_PROXY_PROFILES=wherever-dev`. Reglas de AWS fuera de CLAUDE.md (decisión del usuario).
 
 ## Spec nv-08 (2026-11-04)
-- Estado: rama `nv-08-cd`, implementación local sin desplegar. Boundary y política recortados activos, y boundary aplicado a los dos roles (2026-11-04). Falta: ver el ciclo real de 22:00 y 08:00 con el boundary, PAT en `/wherever/dev/GHCR_TOKEN`, variable `API_URL`, PR, `instalar-actualizador.sh` y pruebas reales.
+- Estado (2026-11-05): nv-08 y nv-09 fusionados (PR #12, #13, #15). `cd-dev` publica en GHCR: run 41988428645 en verde con aviso de sin conexión; `dev` = `7433d30`; se baja con el PAT. El servidor sigue en `d2dc808` porque el timer no está instalado. Lo que sigue en esta entrada es previo. Antes: rama `nv-08-cd`, implementación local sin desplegar. Boundary y política recortados activos, y boundary aplicado a los dos roles (2026-11-04). Falta: ver el ciclo real de 22:00 y 08:00 con el boundary, PAT en `/wherever/dev/GHCR_TOKEN`, variable `API_URL`, PR, `instalar-actualizador.sh` y pruebas reales.
 - Decisión: se cancela OIDC + ECR + Systems Manager. Una SCP de la organización (`o-97o0ojcjt7`, cuenta `988573432780`, política `p-d16tlddp`) niega `iam:GetOpenIDConnectProvider` y Organizations no está disponible para el proyecto. Diseño por sondeo: GHCR y timer de systemd en la EC2. GitHub queda sin ningún acceso a AWS.
 - Decisión: `deploy-env.sh` excluye `GHCR_TOKEN`; vuelca toda la ruta al `.env` y si no el token llegaría a la API.
 - Decisión: antes de actualizar se exige `/ready` 200 de la versión actual, y un digest se registra como fallido solo si la anterior queda sana. Porqué: al arrancar, Neo4j tarda más que `OnBootSec=1min`, y sin esto una imagen buena quedaría marcada para siempre.
@@ -176,6 +176,15 @@
 - Lección: el proxy de ZAP usa el 8080 por defecto; con `--network host` choca con la API.
 - Lección: un `.semgrepignore` reemplaza las exclusiones por defecto de Semgrep.
 - Límite: ZAP no ve respuestas autenticadas. Las reglas `p/` de Semgrep no tienen versión fija.
+
+## Ejecución nv-10 (2026-11-05)
+- Estado: rama `nv-10-fuzzing`. 11 objetivos de fuzz y 7 pruebas de bordes. Falta la corrida en Actions y la firma.
+- Hallazgo corregido: `verify` leía `m`, `t` y `p` del hash sin topes. `t=0` y `p=0` causaban pánico y una `m` enorme mataba el proceso (exit 137, probado con 512 MB). Solo se dispara con un hash alterado en la base. `parseHash` lo valida; los hashes actuales siguen verificando.
+- Hallazgo corregido por el fuzz: `NormalizePhone` solo recortaba espacios en los extremos antes de quitar separadores; `"0\n("` dejaba el salto. Sin riesgo: E.164 lo rechazaba después.
+- Decisión: sin repositorios simulados, que la spec pedía: no hay interfaces y `AGENTS.md` limita los mocks. `FuzzHandlers` usa la app real con las bases caídas.
+- Decisión pendiente del usuario: con `APP_ENV=staging`, `detalle` trae el texto del driver; ante una caída de Atlas, el servidor público mostraría nombres de host. Por diseño (constitución §2), sin cambiar.
+- Lección: `app.Test` no reproduce el rechazo por `BodyLimit`; hace falta un servidor real.
+- Lección: `go test` con Docker limitado a 512 MB mata al compilador; se compila con `-c` y se ejecuta con el límite.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

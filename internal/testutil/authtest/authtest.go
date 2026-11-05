@@ -75,12 +75,12 @@ func NewWithMail(t *testing.T, client *platformmongo.Client, rdb *goredis.Client
 }
 
 // Build arma el módulo sin limpiar nada (para una segunda instancia o un Redis caído).
-func Build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config) *Env {
+func Build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config) *Env {
 	t.Helper()
 	return build(t, client, rdb, cfg, nil)
 }
 
-func build(t *testing.T, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config, factory MailFactory) *Env {
+func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg config.Config, factory MailFactory) *Env {
 	t.Helper()
 	log, logs := testutil.Logger()
 	mail := mailer.NewMemory()

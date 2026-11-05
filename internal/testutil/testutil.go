@@ -69,7 +69,7 @@ func Env(overrides map[string]string) func(string) string {
 }
 
 // DeadRedis crea un cliente real de Redis apuntando a un puerto sin servidor.
-func DeadRedis(t *testing.T) *goredis.Client {
+func DeadRedis(t testing.TB) *goredis.Client {
 	t.Helper()
 	client, err := platformredis.New(DeadAddr)
 	if err != nil {
