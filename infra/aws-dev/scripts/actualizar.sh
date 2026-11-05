@@ -61,6 +61,8 @@ fi
 echo "actualizar: instalando $digest"
 site="$(grep -m1 '^SITE_ADDRESS=' "$app/.env" | cut -d= -f2-)"
 "$app/deploy-env.sh" /wherever/dev/ "$site"
+# Corre como root; sin esto, `docker compose` manual como ec2-user ya no puede leer .env.
+chown ec2-user:ec2-user "$app/.env"
 
 set +e
 docker run --rm --env-file "$app/.env" --entrypoint /indexes "$digest"
