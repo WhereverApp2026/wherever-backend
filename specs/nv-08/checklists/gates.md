@@ -14,7 +14,7 @@
 - [ ] Regreso manual por SHA con re-etiquetado: con imagen, sin imagen y no ancestro (R10)
 - [ ] `sha` inválido rechazado antes de tocar GHCR; nunca interpolado en un comando (R11)
 - [ ] Repetir el mismo SHA termina en verde sin construir (R12)
-- [ ] `wherever-dev-boundary` en los dos roles; `plan` revisado, estado respaldado, ciclo de apagado comprobado (R13) — aplicado el 2026-11-04: 2 cambios, nada reemplazado, `plan` posterior sin cambios, SSM `Online`, `/ready` 200, `verificar.sh` OK; falta ver el ciclo real de apagado y encendido
+- [ ] `wherever-dev-boundary` en los dos roles; `plan` revisado, estado respaldado, ciclo de apagado comprobado (R13) — aplicado el 2026-11-04: 2 cambios, nada reemplazado, `plan` posterior sin cambios, SSM `Online`, `/ready` 200, `verificar.sh` OK; ciclo real visto: encendió sola el 2026-11-05 a las 08:00:47 de México con el boundary puesto, SSM `Online` y `/ready` 200
 - [ ] GHCR con 5 versiones como máximo y la imagen activa intacta tras limpiar (R14)
 - [ ] Tabla de `/health` comprobada: SHA nuevo, sin conexión y SHA antiguo (R15)
 - [ ] `actionlint`, `yaml.safe_load`, acciones fijadas por SHA, `critic`, `check_sdd`, `check_endpoints`, `terraform fmt`/`validate`

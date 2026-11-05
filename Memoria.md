@@ -178,7 +178,9 @@
 - Límite: ZAP no ve respuestas autenticadas. Las reglas `p/` de Semgrep no tienen versión fija.
 
 ## Ejecución nv-10 (2026-11-05)
-- Estado: rama `nv-10-fuzzing`. 11 objetivos de fuzz y 7 pruebas de bordes. Falta la corrida en Actions y la firma.
+- Estado: rama `nv-10-fuzzing`, PR #16. 11 objetivos de fuzz y 7 pruebas de bordes. Actions en verde: cobertura 83,4 %, job `fuzz` en 15 min 6 s sin fallos. Falta la firma.
+- Límite: en Actions, con 2 CPU, `FuzzHandlers` da unas 6 000 ejecuciones por noche; cubre poco comparado con los demás.
+- Encendido con el boundary comprobado el 2026-11-05 a las 08:00:47 (nv-08).
 - Hallazgo corregido: `verify` leía `m`, `t` y `p` del hash sin topes. `t=0` y `p=0` causaban pánico y una `m` enorme mataba el proceso (exit 137, probado con 512 MB). Solo se dispara con un hash alterado en la base. `parseHash` lo valida; los hashes actuales siguen verificando.
 - Hallazgo corregido por el fuzz: `NormalizePhone` solo recortaba espacios en los extremos antes de quitar separadores; `"0\n("` dejaba el salto. Sin riesgo: E.164 lo rechazaba después.
 - Decisión: sin repositorios simulados, que la spec pedía: no hay interfaces y `AGENTS.md` limita los mocks. `FuzzHandlers` usa la app real con las bases caídas.

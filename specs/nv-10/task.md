@@ -26,10 +26,10 @@
 
 ## Fase 5 — Nocturno (Req. 4)
 - [x] T15 Job `fuzz` en `nightly.yml` con `-fuzztime` acotado y artefacto de fallos.
-- [ ] T16 Corrida manual dentro del tiempo previsto.
+- [x] T16 Corrida manual dentro del tiempo previsto.
 
 ## Fase 6 — Cierre
 - [x] T17 Corregir hallazgos; documentar en `docs/endpoints.md` si cambia algún error (critic B4).
-- [ ] T18 Verificar que la cobertura no baja del 45 %.
+- [x] T18 Verificar que la cobertura no baja del 45 %.
 - [x] T19 `AGENTS.md`, `Memoria.md`.
-- [ ] T20 `go build`, `go vet`, cinco suites, `check_sdd`, `critic`; PR; evidencia en `gates.md`.
+- [x] T20 `go build`, `go vet`, cinco suites, `check_sdd`, `critic`; PR; evidencia en `gates.md`.
