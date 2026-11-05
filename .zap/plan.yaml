@@ -1,0 +1,28 @@
+# Análisis pasivo de ZAP (spec nv-09). Sembrado con el OpenAPI porque la API no tiene páginas que
+# rastrear: `zap-baseline.py` solo vería la raíz, que da 404. No corre reglas activas.
+env:
+  contexts:
+    - name: wherever-api
+      urls:
+        - http://localhost:8080
+  parameters:
+    failOnError: true
+    progressToStdout: true
+jobs:
+  - type: openapi
+    parameters:
+      apiFile: /zap/wrk/internal/http/openapi.json
+      targetUrl: http://localhost:8080
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/zap-reporte
+      reportFile: zap.json
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/zap-reporte
+      reportFile: zap.html

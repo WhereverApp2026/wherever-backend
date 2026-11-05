@@ -165,6 +165,17 @@
 - Pruebas intermitentes sin causa confirmada: en una corrida del usuario fallaron `TestMailer_RegisterSendsVerification`, `TestExport_NoticeWindowNeverPasses72h` y `TestMailerSecurity_TemplatesEscapeHTML`, sin guardar el mensaje; no se reprodujo en otras 3 corridas completas ni repitiendo las dos primeras 15 veces. Con carga, `TestMailer_SlowOrDownServerDoesNotChangeResponses` excede su límite de 500 ms (547–806 ms). Si CI las hace fallar, el CD no publica.
 - PR #11 de nv-07 ya fusionado; su firma sigue pendiente (falta `destroy` y retirar `wherever-sin-limites`).
 
+## Ejecución nv-09 (2026-11-05)
+- Estado: rama `nv-09-ci-seguridad`, sale de `nv-08-cd`. CI de seguridad en jobs paralelos con gate, y ZAP nocturno. Falta: PR de referencia, hallazgo plantado, corrida de ZAP en Actions y, tras fusionar nv-08 y nv-09, PR solo de `docs/`.
+- Línea base sin hallazgos: `specs/nv-09/checklists/gates.md`.
+- Decisión: se movieron a jobs propios lint, govulncheck, semgrep y `docker build`, en lugar de repetirlos. `critic`, `endpoints` y `sdd` van en `guardrails` porque aplican también a documentos.
+- Decisión: ZAP con `.zap/plan.yaml` y el OpenAPI, no `zap-baseline.py`: la API no tiene páginas y el baseline solo vería la raíz. Vio 33 rutas.
+- Lección: `critic B3` revisa el orden de los middlewares HTTP, no CI; no detecta cambios del workflow.
+- Lección: `ci-pr` solo corre en PR hacia `main`; un PR apilado sobre otra rama no corre CI.
+- Lección: el proxy de ZAP usa el 8080 por defecto; con `--network host` choca con la API.
+- Lección: un `.semgrepignore` reemplaza las exclusiones por defecto de Semgrep.
+- Límite: ZAP no ve respuestas autenticadas. Las reglas `p/` de Semgrep no tienen versión fija.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

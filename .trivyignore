@@ -1,0 +1,3 @@
+# Excepciones de Trivy (spec nv-09). Vacío a propósito: la línea base no tiene hallazgos que exceptuar.
+# Cada excepción lleva su CVE, el motivo y la fecha de revisión, por ejemplo:
+#   CVE-0000-00000 # motivo; revisar antes del AAAA-MM-DD

@@ -27,3 +27,6 @@ Thumbs.db
 *.tfstate.*
 terraform.tfvars
 *.tfplan
+
+# Reportes locales de ZAP (nv-09)
+zap-reporte/
