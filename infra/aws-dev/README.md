@@ -106,9 +106,28 @@ La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su p
 ## Memoria de la instancia
 `t3.micro` (1 GB): API 192 MB, Caddy 64 MB y 2 GB de swap. Cada contenedor tiene tope propio: si Neo4j se pasa, el OOM mata solo ese contenedor y `unless-stopped` lo levanta. Medido en reposo (2026-11-03): Neo4j 360 MB, API 22 MB, Caddy 21 MB, Redis 3 MB; ~210 MB disponibles y ~200 MB de swap en uso. Si falta, `instance_type = "t3.small"` (elegible en esta cuenta, plan gratuito nuevo).
 
-## Destruir
+## Crear y destruir (spec nv-14)
+Son el paso configurado de la infraestructura. Corren en tu máquina, con `terraform.tfvars` y el perfil; GitHub no tiene claves de AWS. Muestran el plan y piden confirmar por escrito. El estado de Terraform es local y cada script lo respalda en `~/wherever-dev-terraform-respaldo`.
+
 ```bash
-terraform -chdir=infra/aws-dev destroy
+infra/aws-dev/scripts/crear.sh
 ```
+
+```bash
+infra/aws-dev/scripts/destruir.sh
+```
+
+Con `--solo-plan`, no cambian nada.
+
+**`crear.sh`** aplica Terraform, espera a Systems Manager, sube los archivos, arma `.env` desde Parameter Store, levanta Caddy y activa los timers. El actualizador instala la imagen de `dev` por su cuenta.
+
+Pasos manuales tras recrear; `crear.sh` también los imprime:
+1. **Atlas → Network Access:** permite la IP elástica nueva. Sin esto la API no se instala, porque `/indexes` falla y el actualizador reintenta cada minuto.
+2. **SNS:** confirma el correo *Subscription Confirmation*; se pierde al destruir.
+3. **URL:** cambia al recrear, porque la IP es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
+
+**`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch.
+
+Antes de las 21:50 o después de las 08:00: fuera de horario, la instancia nueva se apaga o el actualizador no instala.
 Un `destroy` + `apply` **cambia la IP elástica**: cambia la URL de sslip.io, hay que actualizar *Network Access* de Atlas (y quitar la IP vieja) y cualquier cliente que apunte a la URL anterior. Hazlo cuando nada dependa de esa URL.
 La IP elástica se libera con el destroy; una suelta cobra. Los parámetros de `/wherever/dev/` no los crea Terraform: bórralos con `aws ssm delete-parameter` si ya no sirven.
