@@ -58,7 +58,7 @@ func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage
 		stage("errors", middleware.Errors(errorHandler, deps.Logger)),
 		stage("request_id", middleware.RequestID()),
 		stage("request_timeout", middleware.RequestTimeout(cfg.RequestTimeout)),
-		stage("proxy_headers", middleware.ProxyHeaders()),
+		stage("proxy_headers", middleware.ProxyHeaders(cfg.TrustedProxyHops)),
 		stage("cors", middleware.CORS(cfg.CORSAllowedOrigin)),
 		stage("rate_limit_global", exceptPath(healthPath, limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow))),
 		stage("rate_limit_writes", limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites)),
