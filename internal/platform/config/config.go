@@ -23,13 +23,16 @@ const (
 const (
 	MaxBodyLimit      = 10 * 1024 * 1024
 	MaxRequestTimeout = 60 * time.Second
-	DefaultRateGlobal = 1000
-	DefaultRateWrites = 10
-	MinJWTKeyBytes    = 32
-	MaxAccessTTL      = 15 * time.Minute
-	MaxRefreshTTL     = 30 * 24 * time.Hour
-	MinPhoneKeyBytes  = 32
-	MaxArcoGraceDays  = 30
+	// Saltos de confianza en X-Forwarded-For: 1 con Caddy, 2 con CloudFront y balanceador (nv-12).
+	DefaultTrustedProxyHops = 1
+	MaxTrustedProxyHops     = 3
+	DefaultRateGlobal       = 1000
+	DefaultRateWrites       = 10
+	MinJWTKeyBytes          = 32
+	MaxAccessTTL            = 15 * time.Minute
+	MaxRefreshTTL           = 30 * 24 * time.Hour
+	MinPhoneKeyBytes        = 32
+	MaxArcoGraceDays        = 30
 	// DefaultJobHour es la madrugada de America/Mexico_City; un servidor que se apaga de noche la cambia.
 	DefaultJobHour     = 3
 	maxJobHour         = 23
@@ -46,36 +49,37 @@ const (
 
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
 const (
-	KeyAppEnv          = "APP_ENV"
-	KeyPort            = "PORT"
-	KeyMongoURI        = "MONGO_URI"
-	KeyRedisAddr       = "REDIS_ADDR"
-	KeyNeo4jURI        = "NEO4J_URI"
-	KeyJWTKey          = "JWT_KEY"
-	KeyJWTIssuer       = "JWT_ISSUER"
-	KeyJWTAudience     = "JWT_AUDIENCE"
-	KeyCORSOrigin      = "CORS_ALLOWED_ORIGIN"
-	KeyTrustedProxies  = "TRUSTED_PROXIES"
-	KeyBodyLimit       = "BODY_LIMIT"
-	KeyRequestTimeout  = "REQUEST_TIMEOUT"
-	KeyRateLimitGlobal = "RATE_LIMIT_GLOBAL"
-	KeyRateLimitWrites = "RATE_LIMIT_WRITES"
-	KeyJWTAccessTTL    = "JWT_ACCESS_TTL"
-	KeyJWTRefreshTTL   = "JWT_REFRESH_TTL"
-	KeyPhoneHMACKey    = "PHONE_HMAC_KEY"
-	KeyArcoGraceDays   = "ARCO_DIAS_GRACIA"
-	KeySMTPHost        = "SMTP_HOST"
-	KeySMTPPort        = "SMTP_PORT"
-	KeySMTPUser        = "SMTP_USER"
-	KeySMTPPassword    = "SMTP_PASSWORD"
-	KeySMTPTLS         = "SMTP_TLS"
-	KeyMailFrom        = "MAIL_FROM"
-	KeyMailTimeout     = "MAIL_TIMEOUT"
-	KeyMailWorkers     = "MAIL_WORKERS"
-	KeyMailQueueSize   = "MAIL_QUEUE_SIZE"
-	KeyAppLinkBase     = "APP_LINK_BASE"
-	KeyJobHour         = "JOB_HOUR"
-	KeyHideInternals   = "HIDE_INTERNALS"
+	KeyAppEnv           = "APP_ENV"
+	KeyPort             = "PORT"
+	KeyMongoURI         = "MONGO_URI"
+	KeyRedisAddr        = "REDIS_ADDR"
+	KeyNeo4jURI         = "NEO4J_URI"
+	KeyJWTKey           = "JWT_KEY"
+	KeyJWTIssuer        = "JWT_ISSUER"
+	KeyJWTAudience      = "JWT_AUDIENCE"
+	KeyCORSOrigin       = "CORS_ALLOWED_ORIGIN"
+	KeyTrustedProxies   = "TRUSTED_PROXIES"
+	KeyTrustedProxyHops = "TRUSTED_PROXY_HOPS"
+	KeyBodyLimit        = "BODY_LIMIT"
+	KeyRequestTimeout   = "REQUEST_TIMEOUT"
+	KeyRateLimitGlobal  = "RATE_LIMIT_GLOBAL"
+	KeyRateLimitWrites  = "RATE_LIMIT_WRITES"
+	KeyJWTAccessTTL     = "JWT_ACCESS_TTL"
+	KeyJWTRefreshTTL    = "JWT_REFRESH_TTL"
+	KeyPhoneHMACKey     = "PHONE_HMAC_KEY"
+	KeyArcoGraceDays    = "ARCO_DIAS_GRACIA"
+	KeySMTPHost         = "SMTP_HOST"
+	KeySMTPPort         = "SMTP_PORT"
+	KeySMTPUser         = "SMTP_USER"
+	KeySMTPPassword     = "SMTP_PASSWORD"
+	KeySMTPTLS          = "SMTP_TLS"
+	KeyMailFrom         = "MAIL_FROM"
+	KeyMailTimeout      = "MAIL_TIMEOUT"
+	KeyMailWorkers      = "MAIL_WORKERS"
+	KeyMailQueueSize    = "MAIL_QUEUE_SIZE"
+	KeyAppLinkBase      = "APP_LINK_BASE"
+	KeyJobHour          = "JOB_HOUR"
+	KeyHideInternals    = "HIDE_INTERNALS"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -90,7 +94,7 @@ var requiredKeys = []string{
 }
 
 var optionalKeys = []string{
-	KeyPort, KeyCORSOrigin, KeyTrustedProxies, KeyBodyLimit, KeyRequestTimeout, KeyRateLimitGlobal, KeyRateLimitWrites,
+	KeyPort, KeyCORSOrigin, KeyTrustedProxies, KeyTrustedProxyHops, KeyBodyLimit, KeyRequestTimeout, KeyRateLimitGlobal, KeyRateLimitWrites,
 	KeyJWTAccessTTL, KeyJWTRefreshTTL, KeyArcoGraceDays,
 	KeySMTPHost, KeySMTPPort, KeySMTPUser, KeySMTPPassword, KeySMTPTLS, KeyMailFrom,
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
@@ -119,6 +123,7 @@ type Config struct {
 	Mail              Mail
 	CORSAllowedOrigin string
 	TrustedProxies    []string
+	TrustedProxyHops  int
 	BodyLimit         int
 	RequestTimeout    time.Duration
 	RateLimitGlobal   int
@@ -212,6 +217,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyMailWorkers, &c.Mail.Workers, defaultMailWorkers},
 		{KeyMailQueueSize, &c.Mail.QueueSize, defaultMailQueue},
 		{KeyJobHour, &c.JobHour, DefaultJobHour},
+		{KeyTrustedProxyHops, &c.TrustedProxyHops, DefaultTrustedProxyHops},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -273,6 +279,9 @@ func (c Config) validateLimits() []error {
 	}
 	if c.RequestTimeout <= 0 || c.RequestTimeout > MaxRequestTimeout {
 		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyRequestTimeout, MaxRequestTimeout))
+	}
+	if c.TrustedProxyHops < 1 || c.TrustedProxyHops > MaxTrustedProxyHops {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 1 y %d", KeyTrustedProxyHops, MaxTrustedProxyHops))
 	}
 	errs = append(errs, c.validateTTLs()...)
 	return append(errs, c.validateRates()...)

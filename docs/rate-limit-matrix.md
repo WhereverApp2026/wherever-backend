@@ -1,6 +1,6 @@
 # Rate Limit Matrix — vivo
 
-> Constitución §3, §6. El limitador va antes de Auth.
+> Constitución §3, §6. El limitador va antes de Auth. La IP sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final y solo de un proxy de confianza; las entradas más a la izquierda se ignoran (nv-12).
 
 | Política | Límite | Ventana | Ámbito | Spec |
 |---|---|---|---|---|

@@ -43,10 +43,11 @@ func Config(env string) config.Config {
 			SMTPTLS: config.SMTPTLSStartTLS, SMTPPort: 587, Timeout: 5 * time.Second, Workers: 4, QueueSize: 100,
 			LinkBase: "http://localhost:8080",
 		},
-		BodyLimit:       config.MaxBodyLimit,
-		RequestTimeout:  config.MaxRequestTimeout,
-		RateLimitGlobal: config.DefaultRateGlobal,
-		RateLimitWrites: config.DefaultRateWrites,
+		TrustedProxyHops: config.DefaultTrustedProxyHops,
+		BodyLimit:        config.MaxBodyLimit,
+		RequestTimeout:   config.MaxRequestTimeout,
+		RateLimitGlobal:  config.DefaultRateGlobal,
+		RateLimitWrites:  config.DefaultRateWrites,
 	}
 }
 

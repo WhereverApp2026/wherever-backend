@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -57,13 +59,40 @@ func RequestTimeout(timeout time.Duration) fiber.Handler {
 	}
 }
 
-// ProxyHeaders resuelve la IP del cliente. Fiber solo lee X-Forwarded-For de los
-// proxies de confianza (TRUSTED_PROXIES); con la lista vacía usa la IP del socket.
-func ProxyHeaders() fiber.Handler {
+// ProxyHeaders resuelve la IP del cliente. X-Forwarded-For solo se lee si la conexión viene de un
+// proxy de confianza (TRUSTED_PROXIES), y de ella se toma la entrada a `hops` del final: lo que está
+// más a la izquierda lo pudo escribir el cliente, y creerlo evadiría los límites por IP (nv-12).
+func ProxyHeaders(hops int) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		c.Locals(localClientIP, c.IP())
+		c.Locals(localClientIP, resolveClientIP(c, hops))
 		return c.Next()
 	}
+}
+
+// resolveClientIP cae a la dirección de la conexión si la cabecera no alcanza o no es una IP.
+func resolveClientIP(c *fiber.Ctx, hops int) string {
+	remote := c.Context().RemoteIP().String()
+	if !c.IsProxyTrusted() {
+		return remote
+	}
+	entries := forwardedEntries(c)
+	if len(entries) < hops {
+		return remote
+	}
+	ip := net.ParseIP(strings.TrimSpace(entries[len(entries)-hops]))
+	if ip == nil {
+		return remote
+	}
+	return ip.String()
+}
+
+// forwardedEntries une todas las cabeceras X-Forwarded-For en orden, como pide el estándar HTTP.
+func forwardedEntries(c *fiber.Ctx) []string {
+	var entries []string
+	for _, header := range c.Request().Header.PeekAll(fiber.HeaderXForwardedFor) {
+		entries = append(entries, strings.Split(string(header), ",")...)
+	}
+	return entries
 }
 
 // ClientIP devuelve la IP resuelta por ProxyHeaders.
