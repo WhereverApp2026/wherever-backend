@@ -237,6 +237,12 @@
 - Lección: al adjuntar una política, IAM tarda unos minutos en propagar y la misma llamada pasa y falla alternadamente. Antes de un `apply`, repite una lectura hasta verla pasar varias veces seguidas.
 - Lección: una política administrada no pasa de 6144 caracteres; la del deployer ya no admite más, y lo nuevo va en políticas aparte.
 
+## NV-14 — Crear y eliminar la infraestructura (en curso)
+- Estado (2026-11-06): el docente aceptó scripts versionados. `crear.sh` y `destruir.sh` probados solo con `--solo-plan`. Falta el ciclo real, después de NV-12 y antes de congelar la app móvil.
+- Decisión: scripts y no workflow. Porqué: el docente lo acepta y evita claves de AWS de larga duración en GitHub, lo que respeta la decisión de NV-08.
+- Decisión: el estado de Terraform sigue local, con respaldo automático. Porqué: el bucket de S3 solo hacía falta para que corriera en GitHub; un solo operador no lo necesita. Si se pierde esa máquina, se pierde el estado: copia el respaldo a otro lado.
+- Lección: una instancia recreada no se instalaba sola: no tenía archivos, y `actualizar.sh` exigía `/ready` 200 de una versión que aún no existe.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

@@ -67,8 +67,9 @@ wait_ready() {
 	return 1
 }
 
-# Sin esto, una caída de Atlas o una pausa de Aura parecerían un fallo de la imagen nueva.
-if ! ready_now; then
+# Sin esto, una caída de Atlas o una pausa de Aura parecerían un fallo de la imagen nueva. Una
+# instancia recién creada no tiene versión actual: ahí no hay nada que comprobar (nv-14).
+if [[ -n "$current" ]] && ! ready_now; then
 	echo "actualizar: la versión actual no da /ready 200; se reintenta en la siguiente revisión"
 	exit 0
 fi
