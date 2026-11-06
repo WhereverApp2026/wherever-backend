@@ -117,6 +117,19 @@
         }
       }
     },
+    "/api/v1/probe/lenta": {
+      "get": {
+        "summary": "Sonda de 45 s para peticiones largas (no-prod)",
+        "responses": {
+          "200": {
+            "description": "Terminó"
+          },
+          "408": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "summary": "Inicia sesión con correo y contraseña (5 fallos del mismo correo → 423 por 15 min)",

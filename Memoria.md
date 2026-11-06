@@ -225,6 +225,10 @@
 - Decisión: CloudFront da el HTTPS, sin dominio. Porqué: ACM no valida `sslip.io` y no hay dominio propio.
 - Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer.
 - Decisión: la IP del cliente sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final, y no de la primera entrada. Porqué: Fiber sin `EnableIPValidation` devuelve la cabecera tal cual; hoy no se explota porque Caddy la limpia, pero el balanceador la conservaría y un cliente evadiría el límite de login.
+- Prueba (T03, 2026-11-05): la cuenta permite crear balanceador y CloudFront; se borraron y quedan 0. La política necesitó además `ec2:GetSecurityGroupsForVpc`.
+- Decisión: la compresión tampoco toca `POST /usuarios`. Porqué: el registro también devuelve tokens, no solo `/auth`.
+- Pendiente de nv-15: el trabajo de las 21:00 del 2026-11-05 quedó sin revisar: la sesión se reinició antes y la instancia se apagó a las 22:00. Sus logs viven en el contenedor: se leen después de las 08:00 y **antes de fusionar otro PR**, porque instalar una imagen recrea el contenedor y los borra.
+- Lección: `critic-guardrails.sh` guarda su propia lista del pipeline y `check_endpoints` exige fila hasta para las sondas: al cambiar el pipeline o una ruta hay que tocarlos.
 - Decisión: varias cabeceras `X-Forwarded-For` cuentan como una lista. Porqué: la primera la puede escribir el cliente.
 
 ## NV-13 — Observabilidad en CloudWatch (en curso)

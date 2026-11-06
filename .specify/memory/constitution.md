@@ -56,7 +56,7 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 - Capas `handler → service → repository`; el handler no toca la base y el repository no conoce HTTP. Módulos por funcionalidad en `internal/<modulo>/`.
 - Rutas `/api/v1/<recurso>`, v1 estricta; sin versión → 404.
 - JSON `snake_case`. Errores `{ codigo, mensaje, campos[], detalle?, traza_id }`; `traza_id` = `request_id` (cabecera `X-Request-ID`).
-- Pipeline fijo: `SecurityHeaders outermost → Recover/ErrorHandler → RequestID → ProxyHeaders → CORS 1 origen → RateLimiter antes de Auth → JWT → Roles → Handlers`.
+- Pipeline fijo: `SecurityHeaders outermost → Recover/ErrorHandler → RequestID → ProxyHeaders → CORS 1 origen → Compresión → RateLimiter antes de Auth → JWT → Roles → Handlers`.
 - Health: `/health` (liveness, siempre 200 `{estado:"ok", version}`, sin consultar bases y fuera del límite global, para que el balanceador no gaste Redis) y `/ready` (check real de MongoDB, Redis y Neo4j con 1 s máximo cada una; responde `{estado, dependencias}`; 503 si cae MongoDB o Neo4j; Redis caído = `degraded` con 200). Ambos fuera de `/api/v1`; `/ready` es para la red interna y el balanceador.
 - OpenAPI solo en desarrollo.
 - DTOs validados; códigos `200/201/202/204/400/401/403/404/408/409/410/422/423/429/500/503`. `400` = petición mal formada, `422` = falla de validación o regla de negocio, `410` = vencido, `423` = bloqueado. Paginación por cursor `?cursor=&limite=` → `PageResult{items, siguiente_cursor, limite}` (por defecto 20, máx. 50; `siguiente_cursor` vacío = no hay más).
@@ -124,4 +124,5 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 | 1.2.0 | 2026-11-05 | Redis y Neo4j gestionados externos en el servidor de desarrollo; `/health` fuera del límite global (nv-11) |
 | 1.3.0 | 2026-11-05 | Observabilidad en CloudWatch para el servidor de desarrollo (nv-13) |
 | 1.4.0 | 2026-11-06 | La infraestructura de desarrollo se crea y elimina con scripts versionados, sin claves de AWS en GitHub (nv-14) |
+| 1.5.0 | 2026-11-06 | Compresión en el pipeline, sin comprimir lo que lleva tokens (nv-12) |
 | 1.6.0 | 2026-11-06 | Dos instancias detrás de balanceador y CloudFront en desarrollo, con HTTPS del certificado de CloudFront (nv-12) |

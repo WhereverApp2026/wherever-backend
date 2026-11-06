@@ -60,6 +60,7 @@
 ## 6. Seguridad DevSecOps
 - JWT HS256 real siempre (sin flag legacy), access 15 min; `jwt_revocado:{jti}` revisado en el middleware.
 - IP del cliente: entrada de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final (1 con Caddy, 2 con CloudFront y balanceador); si no alcanza o no es IP, la conexión. Si cambia la cadena de proxies, cambia este valor.
+- Compresión (nv-12): según `Accept-Encoding`; `/auth` y `POST /usuarios` nunca, porque llevan tokens. Una ruta nueva que devuelva tokens se agrega a `carriesTokens`.
 - Headers outermost + HSTS 365d no-dev + CORS 1 origen.
 - Rate 4 políticas + 429 uniforme + limitador antes de Auth.
 - Timeout 60s + body 10MB + `slog` con filtro de secretos.

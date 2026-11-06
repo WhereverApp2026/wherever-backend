@@ -13,6 +13,7 @@
 | GET | `/api/v1/probe/forbidden` (no-prod) | no | global | 403/404 | nv-01 |
 | GET | `/api/v1/probe/conflict` (no-prod) | no | global | 409/404 | nv-01 |
 | GET | `/api/v1/probe/invalid` (no-prod) | no | global | 422/404 | nv-01 |
+| GET | `/api/v1/probe/lenta` (no-prod): tarda 45 s | no | global | 200/408/404 | nv-12 |
 | GET | `/docs` y `/openapi.json` (solo dev) | no | — | 200/404 | nv-01 |
 | POST | `/api/v1/auth/login` → `{correo, password, dispositivo{modelo, sistema, app_version}}` → tokens. Argon2id; 5 fallos del mismo correo (exista o no) → 423 con minutos restantes | no | login 5/5 min por IP | 200/400/401/422/423/429/503 | nv-04 (J1) |
 | POST | `/api/v1/auth/refresh` → `{refresh_token}` → tokens nuevos; rota el refresh y uno ya rotado revoca la familia | refresh_token | 10/min por IP | 200/400/401/422/429/503 | nv-04 (J1) |

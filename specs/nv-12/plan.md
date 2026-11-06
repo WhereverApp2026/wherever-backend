@@ -8,7 +8,7 @@
   - Servidor: `actualizar.sh` (salida y reingreso del balanceador, instalación de B condicionada a A), unit del temporizador, `instalar-actualizador.sh` por Systems Manager.
   - Pipeline: `.github/workflows/cd-dev.yml` (URL de CloudFront, espera de unos 10 min, lecturas seguidas, 5xx sostenidos como apagado, etiqueta `org.opencontainers.image.revision`), variable `API_URL`.
   - Otros: `iam/wherever-dev-boundary.json`, `iam/wherever-dev-deployer-policy.json`, `verificar.sh`, `README.md`, `.specify/memory/constitution.md` (§3, §4, §8), `AGENTS.md`, `CHECKLIST_PR.md`, `Memoria.md`.
-- Sin cambios: contratos. `docs/endpoints.md` solo suma la sonda, si `check_endpoints` la exige.
+- Sin cambios: contratos. `docs/endpoints.md` y `openapi.json` solo suman la sonda; `critic-guardrails.sh` suma `compress` al pipeline esperado.
 
 2. Guardarraíles
 - La corrección de la IP del cliente va en su propio PR, probada y fusionada antes de crear el balanceador. La compresión también va en su propio PR, en producción antes de quitar Caddy.
@@ -41,6 +41,6 @@
 - `curl -i https://<id>.cloudfront.net/health → 200`, certificado válido
 - `curl -i http://<id>.cloudfront.net/ → redirige a HTTPS`
 - `curl -i http://<dns-del-balanceador>/health` desde internet sin pasar por CloudFront → sin respuesta
-- `curl -sI -H 'Accept-Encoding: gzip' https://<id>.cloudfront.net/ready → Content-Encoding: gzip`
+- Perfil autenticado con `Accept-Encoding: gzip` por CloudFront → `Content-Encoding: gzip`
 - Dos destinos sanos en el grupo de destino
 - `infra/aws-dev/scripts/verificar.sh → exit 0`

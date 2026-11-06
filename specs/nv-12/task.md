@@ -13,8 +13,8 @@
 - [x] T08 PR propio, fusionar y desplegar.
 
 ## Fase 2 — Compresión, sonda y auditoría (Req. 3, 7)
-- [ ] T09 Middleware de compresión con sus pruebas: `Accept-Encoding` y `/auth` sin comprimir.
-- [ ] T10 Sonda `/api/v1/probe/lenta`, oculta por `HIDE_INTERNALS`.
+- [x] T09 Middleware de compresión con sus pruebas: `Accept-Encoding`; `/auth` y `POST /usuarios` sin comprimir.
+- [x] T10 Sonda `/api/v1/probe/lenta`, oculta por `HIDE_INTERNALS`.
 - [ ] T11 PR propio, fusionar y desplegar; confirmar la compresión en el servidor.
 - [ ] T12 Auditoría de estado local y `docs/auditoria-estado.md`.
 
