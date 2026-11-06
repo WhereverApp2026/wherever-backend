@@ -232,6 +232,7 @@
 - Decisión: el logger también oculta correos y credenciales de URI dentro de cualquier texto. Porqué: solo miraba el nombre del campo, y el texto de un error de MongoDB puede traer un correo; ahora esos logs salen de la instancia.
 - Decisión: timer `wherever-sonda` que consulta `/ready` cada 5 minutos. Porqué: nadie más lo consulta con frecuencia, y la alarma nunca sonaría. Cuesta el 2 % de la cuota de Redis por instancia.
 - Decisión: controlador `awslogs` en modo `non-blocking`. Porqué: una caída de CloudWatch no debe impedir que la API arranque.
+- Lección: `log_event` tragaba su error con `|| true` y los eventos no se registraban, así que la alarma de regreso no podía sonar. Lo que no debe detener un flujo igual debe avisar: ahora escribe el fallo en el journal.
 - Lección: cambiar el controlador o instalar una imagen recrea el contenedor y borra sus logs locales.
 - Lección: al adjuntar una política, IAM tarda unos minutos en propagar y la misma llamada pasa y falla alternadamente. Antes de un `apply`, repite una lectura hasta verla pasar varias veces seguidas.
 - Lección: una política administrada no pasa de 6144 caracteres; la del deployer ya no admite más, y lo nuevo va en políticas aparte.

@@ -22,7 +22,7 @@
 - [x] T11 Error provocado con un contenedor aparte: métrica, alarma y correo. Base caída: alarma de `/ready`.
 - [x] T12 Consultas guardadas de Insights.
 - [x] T13 Estimar el volumen diario frente a la cuota gratuita; falta contrastarlo con el consumo real.
-- [ ] T14 Eventos de despliegue en el flujo `despliegues-<instancia>`.
+- [x] T14 Eventos de despliegue en el flujo `despliegues-<instancia>`.
 
 ## Fase 5 — Cierre
 - [x] T15 `verificar.sh`, `docs/observabilidad.md`, `README.md`.
