@@ -80,7 +80,8 @@
 - JSON `snake_case` medido; sin mezclas.
 
 ## 8. Observabilidad mínima
-- `slog` JSON + consola, sin secretos. `request_id` por petición.
+- `slog` JSON + consola, sin secretos. `request_id` por petición. El logger oculta llaves sensibles, correos y credenciales de URI en cualquier texto.
+- Logs en CloudWatch (nv-13): los filtros de métricas de `infra/aws-dev/observabilidad.tf` dependen de `level`, `estado`, `duracion_ms`, `dependencia` y `evento`. Renombrar un campo apaga su alarma en silencio. Detalle en `docs/observabilidad.md`.
 - Sin OTel/Prometheus/Grafana completos por ahora.
 
 ## 9. Operación manual — sin hosting aún

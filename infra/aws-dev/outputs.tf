@@ -23,6 +23,11 @@ output "ssm_session" {
   value       = "aws ssm start-session --target ${aws_instance.api.id} --region ${var.region} --profile ${var.profile}"
 }
 
+output "log_group" {
+  description = "Grupo de CloudWatch Logs de la API."
+  value       = aws_cloudwatch_log_group.api.name
+}
+
 output "param_path" {
   description = "Ruta de Parameter Store con los secretos del entorno."
   value       = local.param_path

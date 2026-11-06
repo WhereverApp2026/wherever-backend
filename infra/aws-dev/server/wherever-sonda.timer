@@ -1,0 +1,11 @@
+# Cada 5 minutos: gasta unos 11 000 comandos de Redis al mes por instancia, el 2 % de la cuota.
+[Unit]
+Description=Sonda de /ready cada 5 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
