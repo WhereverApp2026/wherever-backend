@@ -220,7 +220,8 @@
 - Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
 
 ## NV-12 — Dos APIs, balanceador y CloudFront (en curso)
-- Estado (2026-11-05): decisiones (a)–(e) aprobadas. Hecha la corrección de la IP del cliente en su PR. Faltan permisos, prueba de ELB y CloudFront, compresión, infraestructura y despliegue.
+- Estado (2026-11-06): infraestructura aplicada, dos instancias sanas y CloudFront con HTTPS. La app móvil sigue en `sslip.io`. Faltan compresión en producción, despliegue escalonado, regreso, petición larga, calendario y cambio de URL.
+- Lección: en Git Bash, `export MSYS_NO_PATHCONV=1` también rompe el `curl -o` a `/tmp`: da cuerpos vacíos y parece un fallo de la API. Úsalo solo por comando.
 - Decisión: CloudFront da el HTTPS, sin dominio. Porqué: ACM no valida `sslip.io` y no hay dominio propio.
 - Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer.
 - Decisión: la IP del cliente sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final, y no de la primera entrada. Porqué: Fiber sin `EnableIPValidation` devuelve la cabecera tal cual; hoy no se explota porque Caddy la limpia, pero el balanceador la conservaría y un cliente evadiría el límite de login.

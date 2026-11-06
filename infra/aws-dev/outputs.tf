@@ -1,11 +1,26 @@
-output "instance_id" {
-  description = "Instancia EC2 de desarrollo."
-  value       = aws_instance.api.id
+output "instance_ids" {
+  description = "Instancias de la API por nodo."
+  value       = { for node, instance in aws_instance.api : node => instance.id }
 }
 
-output "public_ip" {
-  description = "IP elástica (agrégala al Network Access de MongoDB Atlas)."
-  value       = aws_eip.api.public_ip
+output "target_group_arn" {
+  description = "Grupo de destino del balanceador."
+  value       = aws_lb_target_group.api.arn
+}
+
+output "cloudfront_url" {
+  description = "URL pública de la API."
+  value       = "https://${aws_cloudfront_distribution.api.domain_name}"
+}
+
+output "alb_dns" {
+  description = "Balanceador; no responde directo desde internet."
+  value       = aws_lb.api.dns_name
+}
+
+output "public_ips" {
+  description = "IP elásticas por nodo (agrégalas al Network Access de MongoDB Atlas)."
+  value       = { for node, eip in aws_eip.api : node => eip.public_ip }
 }
 
 output "site_address" {
@@ -20,7 +35,7 @@ output "url_https" {
 
 output "ssm_session" {
   description = "Entrar a la instancia sin SSH."
-  value       = "aws ssm start-session --target ${aws_instance.api.id} --region ${var.region} --profile ${var.profile}"
+  value       = "aws ssm start-session --target ${aws_instance.api["a"].id} --region ${var.region} --profile ${var.profile}"
 }
 
 output "log_group" {
@@ -35,5 +50,5 @@ output "param_path" {
 
 output "verificar" {
   description = "Comprobación de solo lectura del Free Tier y la exposición."
-  value       = "./scripts/verificar.sh --profile ${var.profile} --region ${var.region} --instance ${aws_instance.api.id} --url https://${local.site_address}"
+  value       = "./scripts/verificar.sh --profile ${var.profile} --region ${var.region} --instance ${aws_instance.api["a"].id} --url https://${local.site_address}"
 }

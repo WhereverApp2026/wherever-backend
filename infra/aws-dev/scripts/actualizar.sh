@@ -11,6 +11,13 @@ param=/wherever/dev/GHCR_TOKEN
 ready_url=http://127.0.0.1:8080/ready
 log_group=/wherever/dev/api
 ready_wait=120
+# Nodo y balanceador de esta instancia (nv-12); los escribe instalar-actualizador.sh.
+node_file="$app/nodo.env"
+seen_file="$app/digest-visto"
+b_delay=300
+NODE="" TARGET_GROUP_ARN="" PUBLIC_URL=""
+# shellcheck source=/dev/null
+[[ -f "$node_file" ]] && . "$node_file"
 
 mkdir -p /var/log/wherever
 touch "$failed"
@@ -43,10 +50,16 @@ current=""
 grep -qxF "$digest" "$failed" && exit 0
 
 # Evento de despliegue en CloudWatch (nv-13). Nunca detiene una actualización: es solo el aviso.
-log_event() {
-	local token instance stream
+instance_id() {
+	local token
 	token="$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" || return 0
-	instance="$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)" || return 0
+	curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id
+}
+
+log_event() {
+	local instance stream
+	instance="$(instance_id)"
+	[[ -n "$instance" ]] || return 0
 	stream="despliegues-$instance"
 	aws logs create-log-stream --region "$region" --log-group-name "$log_group" --log-stream-name "$stream" 2>/dev/null || true
 	# En JSON: la forma abreviada de la CLI no admite llaves en el mensaje.
@@ -74,8 +87,71 @@ if [[ -n "$current" ]] && ! ready_now; then
 	exit 0
 fi
 
+# --- Balanceador (nv-12): una instancia a la vez y nunca la única sana. ---
+self_id="$(instance_id)"
+
+other_healthy() {
+	local count
+	count="$(aws elbv2 describe-target-health --region "$region" --target-group-arn "$TARGET_GROUP_ARN" \
+		--query "length(TargetHealthDescriptions[?Target.Id!='$self_id' && TargetHealth.State=='healthy'])" --output text)"
+	[[ "$count" -ge 1 ]]
+}
+
+public_serves() {
+	local want="$1" try
+	# El balanceador reparte: basta con que una lectura traiga el SHA, porque solo A puede servirlo.
+	for try in 1 2 3 4 5 6; do
+		curl -s --max-time 10 "$PUBLIC_URL/health" | grep -q "\"version\":\"$want\"" && return 0
+		sleep 2
+	done
+	return 1
+}
+
+left_balancer=false
+leave_balancer() {
+	[[ -n "$TARGET_GROUP_ARN" && -n "$current" ]] || return 0
+	aws elbv2 deregister-targets --region "$region" --target-group-arn "$TARGET_GROUP_ARN" --targets "Id=$self_id"
+	left_balancer=true
+	aws elbv2 wait target-deregistered --region "$region" --target-group-arn "$TARGET_GROUP_ARN" --targets "Id=$self_id" ||
+		echo "actualizar: el vaciado no terminó a tiempo; se sigue" >&2
+}
+
+join_balancer() {
+	[[ "$left_balancer" == "true" ]] || return 0
+	aws elbv2 register-targets --region "$region" --target-group-arn "$TARGET_GROUP_ARN" --targets "Id=$self_id" ||
+		echo "actualizar: no se pudo volver a registrar $self_id" >&2
+	left_balancer=false
+}
+# Pase lo que pase, la instancia vuelve al balanceador.
+trap 'join_balancer; rm -rf "$docker_config"' EXIT
+
+if [[ -n "$TARGET_GROUP_ARN" && -n "$current" ]]; then
+	if ! other_healthy; then
+		echo "actualizar: la otra instancia no está sana; no se saca esta; se reintenta en la siguiente revisión"
+		exit 0
+	fi
+	if [[ "$NODE" == "b" ]]; then
+		seen=""
+		[[ -f "$seen_file" ]] && seen="$(cat "$seen_file")"
+		if [[ "${seen%% *}" != "$digest" ]]; then
+			seen="$digest $(date +%s)"
+			echo "$seen" >"$seen_file"
+		fi
+		(($(date +%s) - ${seen##* } >= b_delay)) || exit 0
+		revision="$(docker image inspect "$digest" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"
+		if [[ -z "$revision" ]]; then
+			echo "actualizar: $digest no trae la etiqueta de revisión; B no la instala"
+			exit 0
+		fi
+		if ! public_serves "$revision"; then
+			echo "actualizar: A aún no sirve $revision; B espera"
+			exit 0
+		fi
+	fi
+fi
+
 echo "actualizar: instalando $digest"
-site="$(grep -m1 '^SITE_ADDRESS=' "$app/.env" | cut -d= -f2-)"
+site="$(grep -m1 '^SITE_ADDRESS=' "$app/.env" | cut -d= -f2- || true)"
 "$app/deploy-env.sh" /wherever/dev/ "$site"
 # Corre como root; sin esto, `docker compose` manual como ec2-user ya no puede leer .env.
 chown ec2-user:ec2-user "$app/.env"
@@ -109,8 +185,10 @@ switch_api() {
 	fi
 }
 
+leave_balancer
 switch_api "$digest"
 if wait_ready; then
+	join_balancer
 	echo "actualizar: $digest instalada"
 	log_event instalada "$digest"
 	docker image prune -af >/dev/null

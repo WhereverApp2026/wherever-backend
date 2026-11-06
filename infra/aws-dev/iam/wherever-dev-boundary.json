@@ -90,6 +90,21 @@
         "logs:PutLogEvents"
       ],
       "Resource": "arn:aws:logs:us-east-2:816101201001:log-group:/wherever/dev/api:*"
+    },
+    {
+      "Sid": "RegistrarYQuitarDestinos",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:RegisterTargets",
+        "elasticloadbalancing:DeregisterTargets"
+      ],
+      "Resource": "arn:aws:elasticloadbalancing:us-east-2:816101201001:targetgroup/wherever-dev-*/*"
+    },
+    {
+      "Sid": "LeerSaludDeDestinos",
+      "Effect": "Allow",
+      "Action": "elasticloadbalancing:DescribeTargetHealth",
+      "Resource": "*"
     }
   ]
 }

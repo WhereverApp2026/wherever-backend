@@ -1,6 +1,6 @@
 # infra/aws-dev — Entorno de desarrollo en AWS (spec nv-07)
 
-Una EC2 del Free Tier en `us-east-2` con la API y Caddy (HTTPS con Let's Encrypt). MongoDB vive en Atlas, Redis en Upstash y Neo4j en Aura (nv-11).
+Dos EC2 en zonas distintas de `us-east-2`, detrás de un balanceador y de CloudFront, que da el HTTPS (nv-12). MongoDB vive en Atlas, Redis en Upstash y Neo4j en Aura (nv-11).
 **MongoDB vive en MongoDB Atlas**, no en la instancia. Apagado diario a las 22:00 y encendido de
 lunes a viernes a las 08:00 (`America/Mexico_City`). Sin datos reales, sin CD, desechable.
 
@@ -106,6 +106,12 @@ La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su p
 ## Memoria de la instancia
 `t3.micro` (1 GB): API 192 MB, Caddy 64 MB y 2 GB de swap. Cada contenedor tiene tope propio: si Neo4j se pasa, el OOM mata solo ese contenedor y `unless-stopped` lo levanta. Medido en reposo (2026-11-03): Neo4j 360 MB, API 22 MB, Caddy 21 MB, Redis 3 MB; ~210 MB disponibles y ~200 MB de swap en uso. Si falta, `instance_type = "t3.small"` (elegible en esta cuenta, plan gratuito nuevo).
 
+## Dos instancias (spec nv-12)
+- **Costo:** unos US$41 al mes; el balanceador cobra aunque las instancias estén apagadas. Se destruye después de la evaluación con `destruir.sh`: sin créditos se pierde el acceso a la cuenta.
+- **Acceso:** el 8080 solo admite al balanceador, y el balanceador solo a CloudFront. El 22 está cerrado; se entra por Systems Manager.
+- **Actualización:** cada instancia sale del balanceador, instala y vuelve a entrar; nunca sale si es la única sana. B espera al menos 5 minutos y a que A sirva el SHA nuevo. Si A regresó, B no instala.
+- **Caída abrupta:** hasta unos 25 s de errores 502 intermitentes, hasta que el balanceador marca la instancia como no sana.
+
 ## Crear y destruir (spec nv-14)
 Son el paso configurado de la infraestructura. Corren en tu máquina, con `terraform.tfvars` y el perfil; GitHub no tiene claves de AWS. Muestran el plan y piden confirmar por escrito. El estado de Terraform es local y cada script lo respalda en `~/wherever-dev-terraform-respaldo`.
 
@@ -119,10 +125,10 @@ infra/aws-dev/scripts/destruir.sh
 
 Con `--solo-plan`, no cambian nada.
 
-**`crear.sh`** aplica Terraform, espera a Systems Manager, sube los archivos, arma `.env` desde Parameter Store, levanta Caddy y activa los timers. El actualizador instala la imagen de `dev` por su cuenta.
+**`crear.sh`** aplica Terraform y, en cada instancia, espera a Systems Manager, sube los archivos, arma `.env` desde Parameter Store y activa los timers. El actualizador instala la imagen de `dev` por su cuenta.
 
 Pasos manuales tras recrear; `crear.sh` también los imprime:
-1. **Atlas → Network Access:** permite la IP elástica nueva. Sin esto la API no se instala, porque `/indexes` falla y el actualizador reintenta cada minuto.
+1. **Atlas → Network Access:** permite las IP elásticas nuevas. Sin esto la API no se instala, porque `/indexes` falla y el actualizador reintenta cada minuto.
 2. **SNS:** confirma el correo *Subscription Confirmation*; se pierde al destruir.
 3. **URL:** cambia al recrear, porque la IP es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
 

@@ -51,9 +51,9 @@ variable "swap_gb" {
 }
 
 variable "ssh_enabled" {
-  description = "Abre el 22 solo desde ssh_cidr. Sin él, el acceso es por Systems Manager."
+  description = "Abre el 22 solo desde ssh_cidr. Cerrado por defecto: el acceso es por Systems Manager (nv-12)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "ssh_cidr" {
@@ -77,10 +77,10 @@ variable "app_port" {
   default     = 8080
 }
 
-variable "app_port_cidr" {
-  description = "Desde dónde se puede llegar directo al puerto de la API (sin Caddy). Vacío = mismo que ssh_cidr."
-  type        = string
-  default     = ""
+variable "caddy_enabled" {
+  description = "Abre 80 y 443 para Caddy y sslip.io. Se apaga al cambiar a la URL de CloudFront (nv-12)."
+  type        = bool
+  default     = true
 }
 
 variable "domain_name" {

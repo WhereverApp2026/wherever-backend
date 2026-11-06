@@ -12,15 +12,16 @@ data "aws_vpc" "default" {
 }
 
 locals {
-  name          = "${var.project}-${var.environment}"
-  param_path    = "/${var.project}/${var.environment}/"
-  app_port_cidr = var.app_port_cidr != "" ? var.app_port_cidr : var.ssh_cidr
-  site_address  = var.domain_name != "" ? var.domain_name : "${replace(aws_eip.api.public_ip, ".", "-")}.sslip.io"
+  name         = "${var.project}-${var.environment}"
+  param_path   = "/${var.project}/${var.environment}/"
+  site_address = var.domain_name != "" ? var.domain_name : "${replace(aws_eip.api["a"].public_ip, ".", "-")}.sslip.io"
+  # Dos zonas distintas (nv-12). "a" es la instancia original: su zona no se puede cambiar sin reemplazarla.
+  api_nodes = { a = "${var.region}c", b = "${var.region}a" }
   # Tope de permisos de todo rol del proyecto (nv-08). Lo crea el administrador en la consola.
   boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.name}-boundary"
 }
 
-# --- Red: solo 80/443 públicos; 22 y el puerto de la API solo desde tu IP; ninguna base. ---
+# --- Red: el puerto de la API solo desde el balanceador (alb.tf); 22 cerrado; ninguna base. ---
 
 resource "aws_security_group" "api" {
   name        = "${local.name}-api"
@@ -28,7 +29,19 @@ resource "aws_security_group" "api" {
   vpc_id      = data.aws_vpc.default.id
 }
 
+# Caddy y sslip.io siguen hasta que la URL de CloudFront pase las pruebas (nv-12).
+moved {
+  from = aws_vpc_security_group_ingress_rule.http
+  to   = aws_vpc_security_group_ingress_rule.http[0]
+}
+
+moved {
+  from = aws_vpc_security_group_ingress_rule.https
+  to   = aws_vpc_security_group_ingress_rule.https[0]
+}
+
 resource "aws_vpc_security_group_ingress_rule" "http" {
+  count             = var.caddy_enabled ? 1 : 0
   security_group_id = aws_security_group.api.id
   description       = "HTTP para el reto de Lets Encrypt y la redireccion a HTTPS"
   cidr_ipv4         = "0.0.0.0/0"
@@ -38,6 +51,7 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "https" {
+  count             = var.caddy_enabled ? 1 : 0
   security_group_id = aws_security_group.api.id
   description       = "HTTPS publico (Caddy)"
   cidr_ipv4         = "0.0.0.0/0"
@@ -54,15 +68,6 @@ resource "aws_vpc_security_group_ingress_rule" "ssh" {
   ip_protocol       = "tcp"
   from_port         = 22
   to_port           = 22
-}
-
-resource "aws_vpc_security_group_ingress_rule" "app" {
-  security_group_id = aws_security_group.api.id
-  description       = "API directa (sin Caddy) solo desde la IP de quien desarrolla"
-  cidr_ipv4         = local.app_port_cidr
-  ip_protocol       = "tcp"
-  from_port         = var.app_port
-  to_port           = var.app_port
 }
 
 # Salida solo por los puertos que hacen falta. El destino es cualquier IP porque las de Atlas,
@@ -148,7 +153,31 @@ resource "aws_key_pair" "dev" {
   public_key = var.ssh_public_key
 }
 
+data "aws_subnet" "api" {
+  for_each          = local.api_nodes
+  vpc_id            = data.aws_vpc.default.id
+  availability_zone = each.value
+  default_for_az    = true
+}
+
+moved {
+  from = aws_instance.api
+  to   = aws_instance.api["a"]
+}
+
+moved {
+  from = aws_eip.api
+  to   = aws_eip.api["a"]
+}
+
+moved {
+  from = aws_eip_association.api
+  to   = aws_eip_association.api["a"]
+}
+
 resource "aws_instance" "api" {
+  for_each               = local.api_nodes
+  subnet_id              = data.aws_subnet.api[each.key].id
   ami                    = data.aws_ssm_parameter.al2023.value
   instance_type          = var.instance_type
   key_name               = aws_key_pair.dev.key_name
@@ -181,7 +210,7 @@ resource "aws_instance" "api" {
   user_data_replace_on_change = false
 
   tags = {
-    Name = "${local.name}-api"
+    Name = "${local.name}-api-${each.key}"
   }
 
   lifecycle {
@@ -191,15 +220,17 @@ resource "aws_instance" "api" {
 
 # IP fija: sin ella cada apagado cambiaría la IP, la URL de la app y el certificado.
 resource "aws_eip" "api" {
-  domain = "vpc"
+  for_each = local.api_nodes
+  domain   = "vpc"
   tags = {
-    Name = "${local.name}-api"
+    Name = "${local.name}-api-${each.key}"
   }
 }
 
 resource "aws_eip_association" "api" {
-  instance_id   = aws_instance.api.id
-  allocation_id = aws_eip.api.id
+  for_each      = local.api_nodes
+  instance_id   = aws_instance.api[each.key].id
+  allocation_id = aws_eip.api[each.key].id
 }
 
 # --- Apagado diario y encendido entre semana (EventBridge Scheduler). ---
@@ -229,7 +260,7 @@ data "aws_iam_policy_document" "start_stop" {
   statement {
     sid       = "SoloEncenderYApagarEstaInstancia"
     actions   = ["ec2:StartInstances", "ec2:StopInstances"]
-    resources = [aws_instance.api.arn]
+    resources = [for instance in aws_instance.api : instance.arn]
   }
 }
 
@@ -241,7 +272,7 @@ resource "aws_iam_role_policy" "start_stop" {
 
 resource "aws_scheduler_schedule" "stop" {
   name                         = "${local.name}-apagar"
-  description                  = "Apaga la instancia de desarrollo todos los días"
+  description                  = "Apaga las instancias de desarrollo todos los días"
   schedule_expression          = var.stop_expression
   schedule_expression_timezone = var.timezone
 
@@ -252,13 +283,13 @@ resource "aws_scheduler_schedule" "stop" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
     role_arn = aws_iam_role.scheduler.arn
-    input    = jsonencode({ InstanceIds = [aws_instance.api.id] })
+    input    = jsonencode({ InstanceIds = [for instance in aws_instance.api : instance.id] })
   }
 }
 
 resource "aws_scheduler_schedule" "start" {
   name                         = "${local.name}-encender"
-  description                  = "Enciende la instancia de desarrollo de lunes a viernes"
+  description                  = "Enciende las instancias de desarrollo de lunes a viernes"
   schedule_expression          = var.start_expression
   schedule_expression_timezone = var.timezone
   state                        = var.start_enabled ? "ENABLED" : "DISABLED"
@@ -270,7 +301,7 @@ resource "aws_scheduler_schedule" "start" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
     role_arn = aws_iam_role.scheduler.arn
-    input    = jsonencode({ InstanceIds = [aws_instance.api.id] })
+    input    = jsonencode({ InstanceIds = [for instance in aws_instance.api : instance.id] })
   }
 }
 
@@ -293,6 +324,14 @@ resource "aws_budgets_budget" "monthly" {
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = 50
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.budget_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = [var.budget_email]

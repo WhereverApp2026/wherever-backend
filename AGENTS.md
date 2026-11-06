@@ -88,7 +88,7 @@
 - Bases de desarrollo con `make infra-up`; índices con `scripts/indexes`; esquema y demostración de Neo4j con `make siembra`.
 - Servidor de AWS: Redis en Upstash y Neo4j en Aura (nv-11). Antes de una demostración, comprueba que Aura no esté en pausa.
 - Imagen lista con `docker build`, no desplegada. Cuando haya hosting se añade runbook con variables y verificación post-subida.
-- Una sola instancia local para desarrollo; la multi-instancia se valida en la spec de infraestructura.
+- Una sola instancia local para desarrollo. En AWS hay dos (nv-12): archivos del servidor con `instalar-actualizador.sh` en cada una; el chequeo del balanceador es `/health`.
 - Crear y eliminar la infraestructura: `infra/aws-dev/scripts/crear.sh` y `destruir.sh` (nv-14), en la máquina del operador. GitHub no tiene claves de AWS, por decisión de nv-08.
 
 ## 10. Lecciones
