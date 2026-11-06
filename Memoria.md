@@ -227,7 +227,7 @@
 - Decisión: varias cabeceras `X-Forwarded-For` cuentan como una lista. Porqué: la primera la puede escribir el cliente.
 
 ## NV-13 — Observabilidad en CloudWatch (en curso)
-- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Faltan confirmar el correo de SNS, comprobar el evento de despliegue con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
+- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Correo de alarma recibido el 2026-11-06. Faltan ver el evento dentro de una instalación real con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
 - NV-15: el trabajo de las 21:00 corrió el 2026-11-05 sin fallos y sin pendientes.
 - Decisión: el logger también oculta correos y credenciales de URI dentro de cualquier texto. Porqué: solo miraba el nombre del campo, y el texto de un error de MongoDB puede traer un correo; ahora esos logs salen de la instancia.
 - Decisión: timer `wherever-sonda` que consulta `/ready` cada 5 minutos. Porqué: nadie más lo consulta con frecuencia, y la alarma nunca sonaría. Cuesta el 2 % de la cuota de Redis por instancia.
