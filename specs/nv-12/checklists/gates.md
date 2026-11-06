@@ -6,9 +6,9 @@
 | critic B2 | Sin tokens en logs | salida de `critic` | pendiente |
 | critic B3 | Cambios en `cd-dev.yml` aprobados por el revisor | salida de `critic` + aprobación | pendiente |
 | critic B4 | Endpoints sin cambios | salida de `critic` | pendiente |
-| Organización | ELB y CloudFront no bloqueados por política | salida del recurso de prueba | pendiente |
+| Organización | ELB y CloudFront no bloqueados por política | Balanceador, grupo de destino y distribución creados y borrados el 2026-11-05; quedan 0 | listo |
 | IP del cliente | Cabecera falsificada no evade el límite; pruebas con 1, 2 y 3 entradas | `TestClientIP_*`, `TestIPCliente_FalsificarLaCabeceraNoEvadeElLimiteDeLogin` | listo en local |
-| Compresión | Con `Accept-Encoding` llega comprimida por CloudFront; `/auth` sin comprimir | salida de pruebas y `curl` | pendiente |
+| Compresión | Con `Accept-Encoding` llega comprimida por CloudFront; `/auth` y `POST /usuarios` sin comprimir | `TestCompress_*`, `TestCompresion_*`; falta por CloudFront | listo en local |
 | Auditoría | Sin estado local que rompa con dos instancias | `docs/auditoria-estado.md` | pendiente |
 | Plan | Sin reemplazos inesperados | `terraform plan` | pendiente |
 | Salud | Dos destinos sanos; HTTPS válido por CloudFront; HTTP redirige | salida de `curl` | pendiente |

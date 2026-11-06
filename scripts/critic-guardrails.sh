@@ -52,7 +52,7 @@ check_b2() {
 
 # Orden constitucional §4 tal como lo declara internal/http/app.go (Pipeline).
 PIPELINE_FILE="internal/http/app.go"
-PIPELINE_EXPECTED="security_headers errors request_id request_timeout proxy_headers cors rate_limit_global rate_limit_writes jwt"
+PIPELINE_EXPECTED="security_headers errors request_id request_timeout proxy_headers cors compress rate_limit_global rate_limit_writes jwt"
 
 check_b3() {
 	if [[ ! -f "$PIPELINE_FILE" ]]; then
