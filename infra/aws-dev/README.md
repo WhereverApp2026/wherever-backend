@@ -94,6 +94,11 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw url_https)/ready"
 - **Diagnóstico.** Con una clave de Redis mala, la API registra `i/o timeout`, no `WRONGPASS`. Compruébala con `redis-cli --tls -u` desde un contenedor. Copia la cadena de Upstash en Connect → TCP; no la armes a mano.
 - **Esquema y datos de demostración.** `make siembra`, con `NEO4J_URI` en el entorno. Es idempotente e imprime el tamaño del grafo.
 
+## Observabilidad (spec nv-13)
+- **Logs:** CloudWatch, grupo `/wherever/dev/api`, 14 días. Un flujo `api-<instancia>` y otro `despliegues-<instancia>`. También siguen en `docker logs`. Detalle en `docs/observabilidad.md`.
+- **Alarmas:** llegan al correo de `budget_email`; AWS manda un correo que hay que confirmar una vez.
+- **Instalar o actualizar archivos del servidor:** `infra/aws-dev/scripts/instalar-actualizador.sh --instance <id>`, por Systems Manager.
+
 ## Pendiente: correo
 La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
 

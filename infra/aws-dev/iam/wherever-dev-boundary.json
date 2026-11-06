@@ -81,6 +81,15 @@
           "kms:ViaService": "ec2.us-east-2.amazonaws.com"
         }
       }
+    },
+    {
+      "Sid": "EnviarLogsDeLaApi",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-2:816101201001:log-group:/wherever/dev/api:*"
     }
   ]
 }

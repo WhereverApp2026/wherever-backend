@@ -12,6 +12,12 @@ const Redacted = "[REDACTADO]"
 
 var sensitiveKey = regexp.MustCompile(`(?i)(password|contrasena|secret|token|authorization|cookie|jwt|key|uri|dsn)`)
 
+// Un texto libre, como el error de una base, puede traer un correo o una URI con contraseña.
+var (
+	emailInText = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
+	uriUserinfo = regexp.MustCompile(`://[^/\s:@]+:[^/\s@]+@`)
+)
+
 // New crea un logger JSON; en dev usa texto legible en consola.
 func New(w io.Writer, env string) *slog.Logger {
 	opts := &slog.HandlerOptions{Level: slog.LevelInfo, ReplaceAttr: redact}
@@ -21,10 +27,19 @@ func New(w io.Writer, env string) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(w, opts))
 }
 
+// redactText oculta correos y credenciales de URI; un correo ya enmascarado (a***@x.com) no coincide.
+func redactText(text string) string {
+	text = uriUserinfo.ReplaceAllString(text, "://"+Redacted+"@")
+	return emailInText.ReplaceAllString(text, Redacted)
+}
+
 // redact oculta el valor de los atributos con nombre sensible.
 func redact(_ []string, attr slog.Attr) slog.Attr {
 	if sensitiveKey.MatchString(attr.Key) {
 		return slog.String(attr.Key, Redacted)
+	}
+	if attr.Value.Kind() == slog.KindString {
+		return slog.String(attr.Key, redactText(attr.Value.String()))
 	}
 	return attr
 }

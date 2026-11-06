@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
 # Verificación de SOLO LECTURA del entorno de desarrollo (spec nv-07). Falla (exit 1) si algo
 # sale del Free Tier o queda expuesto. No crea, cambia ni borra nada.
-#   uso: verificar.sh --profile wherever-dev --region us-east-2 --instance i-… [--url https://…] [--ssh ec2-user@ip --key ~/.ssh/llave]
+#   uso: verificar.sh --profile wherever-dev --region us-east-2 --instance i-… [--url https://…]
 set -uo pipefail
 
-profile="" region="" instance="" url="" remote="" key=""
+profile="" region="" instance="" url=""
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--profile) profile="$2"; shift 2 ;;
 		--region) region="$2"; shift 2 ;;
 		--instance) instance="$2"; shift 2 ;;
 		--url) url="$2"; shift 2 ;;
-		--ssh) remote="$2"; shift 2 ;;
-		--key) key="$2"; shift 2 ;;
 		*) echo "opción desconocida: $1" >&2; exit 2 ;;
 	esac
 done
-[[ -n "$profile" && -n "$region" && -n "$instance" ]] || { echo "uso: $0 --profile <perfil> --region <región> --instance <id> [--url <https://…>] [--ssh <usuario@ip> --key <llave>]" >&2; exit 2; }
+[[ -n "$profile" && -n "$region" && -n "$instance" ]] || { echo "uso: $0 --profile <perfil> --region <región> --instance <id> [--url <https://…>]" >&2; exit 2; }
 
 # tr: en Windows la CLI termina las líneas en CRLF y el último campo quedaría con \r.
 aws_q() { aws --profile "$profile" --region "$region" --output text "$@" | tr -d '\r'; }
@@ -81,20 +79,30 @@ if [[ -n "$url" && "$state" == "running" ]]; then
 	check "$url/ready con todas las bases" "$estado" "ok"
 fi
 
-# Redis y Neo4j viven fuera de la instancia (nv-11).
-if [[ -n "$remote" && "$state" == "running" ]]; then
-	ssh_opts=(-o BatchMode=yes -o ConnectTimeout=15 -o LogLevel=ERROR)
-	[[ -n "$key" ]] && ssh_opts+=(-i "$key")
-	if inside="$(ssh "${ssh_opts[@]}" "$remote" "sudo ss -ltnH; docker ps --format '{{.Names}}'" | tr -d '\r')"; then
-		if grep -qE ':(6379|7687|7474)\b|redis|neo4j' <<<"$inside"; then
-			bad "Redis o Neo4j siguen en la instancia"
-		else
-			ok "sin Redis ni Neo4j en la instancia"
-		fi
+# Redis y Neo4j viven fuera de la instancia (nv-11). Se entra por Systems Manager, no por SSH.
+if [[ "$state" == "running" ]]; then
+	id="$(MSYS_NO_PATHCONV=1 aws_q ssm send-command --instance-ids "$instance" --document-name AWS-RunShellScript \
+		--parameters '{"commands":["ss -ltnH; docker ps --format {{.Names}}"]}' --query Command.CommandId)"
+	status=""
+	for _ in $(seq 1 15); do
+		status="$(aws_q ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query Status 2>/dev/null || true)"
+		[[ "$status" == "Success" || "$status" == "Failed" ]] && break
+		sleep 2
+	done
+	inside="$(aws_q ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query StandardOutputContent 2>/dev/null || true)"
+	if [[ "$status" != "Success" ]]; then
+		bad "no se pudo revisar la instancia por Systems Manager ($status)"
+	elif grep -qE ':(6379|7687|7474)\b|redis|neo4j' <<<"$inside"; then
+		bad "Redis o Neo4j siguen en la instancia"
 	else
-		bad "no se pudo entrar por SSH a $remote"
+		ok "sin Redis ni Neo4j en la instancia"
 	fi
 fi
+
+# Observabilidad (nv-13).
+check "retención del grupo de logs" "$(aws_q logs describe-log-groups --log-group-name-prefix /wherever/dev/api --query 'logGroups[0].retentionInDays')" "14"
+alarms="$(aws_q cloudwatch describe-alarms --alarm-name-prefix wherever-dev- --query 'length(MetricAlarms)')"
+if (( alarms >= 1 && alarms <= 10 )); then ok "$alarms alarmas (máximo 10)"; else bad "$alarms alarmas (deben ser de 1 a 10)"; fi
 
 if (( fails > 0 )); then
 	echo "verificar: FALLA ($fails)"

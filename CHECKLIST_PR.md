@@ -16,5 +16,6 @@
 - [ ] Headers + `/ready` + `401` verificados manualmente
 - [ ] `make infra-up` y `docker build .` sin errores
 - [ ] `Memoria.md` actualizada, sin secretos
+- [ ] Si cambió un campo de log, filtros de `infra/aws-dev/observabilidad.tf` revisados
 - [ ] YAML válido (`yaml.safe_load`), `go build ./...` después de la mutación si se usó
 - [ ] Revisor: ______  Fecha: ______
