@@ -1,5 +1,5 @@
 ---
-version: 1.4.0
+version: 1.6.0
 ratified: 2026-10-28
 last_amended: 2026-11-05
 status: borrador (pendiente de firma del revisor)
@@ -46,7 +46,7 @@ methodology: SDD
 | Logs | `slog` JSON + `request_id` |
 | SAST | Semgrep + `gosec` + `golangci-lint` + `govulncheck` |
 | CI | GitHub Actions: `ci-pr.yml` sin deploy; `cd-dev.yml` publica la imagen y el entorno de desarrollo se actualiza solo (nv-08); `ci-pr.yml` incluye análisis estático, de imagen y gate, y `nightly.yml` incluye DAST (nv-09); producción sin CD |
-| Infra de desarrollo | Docker Compose (`deployments/docker-compose.yml`: MongoDB, Redis, Neo4j) con `make infra-up`/`infra-down`; el servidor de desarrollo usa servicios gestionados: Atlas, Upstash y Aura (nv-11), envía sus logs a CloudWatch (nv-13) y se crea y elimina con scripts versionados (nv-14); `Dockerfile` multi-etapa en la raíz |
+| Infra de desarrollo | Docker Compose (`deployments/docker-compose.yml`: MongoDB, Redis, Neo4j) con `make infra-up`/`infra-down`; el servidor de desarrollo usa servicios gestionados: Atlas, Upstash y Aura (nv-11), envía sus logs a CloudWatch (nv-13), se crea y elimina con scripts versionados (nv-14) y corre dos instancias detrás de balanceador y CloudFront, con el certificado de CloudFront (nv-12); `Dockerfile` multi-etapa en la raíz |
 | Infra (posterior) | Docker, Terraform, AWS (ALB con SSL, ≥2 instancias en zonas distintas, S3 + CDN, Secrets Manager) |
 
 No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla de excepción en `nv-00`.
@@ -124,3 +124,4 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 | 1.2.0 | 2026-11-05 | Redis y Neo4j gestionados externos en el servidor de desarrollo; `/health` fuera del límite global (nv-11) |
 | 1.3.0 | 2026-11-05 | Observabilidad en CloudWatch para el servidor de desarrollo (nv-13) |
 | 1.4.0 | 2026-11-06 | La infraestructura de desarrollo se crea y elimina con scripts versionados, sin claves de AWS en GitHub (nv-14) |
+| 1.6.0 | 2026-11-06 | Dos instancias detrás de balanceador y CloudFront en desarrollo, con HTTPS del certificado de CloudFront (nv-12) |

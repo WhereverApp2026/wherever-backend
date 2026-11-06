@@ -16,8 +16,8 @@ La especificación del curso pide que la creación de la infraestructura y el de
 
 ## Diseño
 - `crear.sh` y `destruir.sh` usan `terraform plan -out` y `apply` de ese archivo.
-- `instalar-actualizador.sh --site <sitio>` hace el primer arranque solo si no existe `.env`, así que es seguro correrlo en un servidor vivo. Espera a `cloud-init` antes de subir nada, porque `user_data` crea `/opt/wherever` al final.
-- Las salidas de Terraform (`instance_id`, `public_ip`, `site_address`) alimentan los scripts. NV-12 los adapta a dos instancias y a la URL de CloudFront.
+- `instalar-actualizador.sh` hace el primer arranque solo si no existe `.env`, así que es seguro correrlo en un servidor vivo. Espera a `cloud-init` antes de subir nada, porque `user_data` crea `/opt/wherever` al final.
+- Las salidas de Terraform (`instance_ids`, `public_ips`, `target_group_arn`, `cloudfront_url`) alimentan los scripts.
 
 ## Contratos
 Sin endpoints nuevos ni recursos nuevos de Terraform. Enmienda de la constitución §3: la infraestructura de desarrollo se crea y elimina con scripts versionados.
@@ -27,7 +27,8 @@ Sin endpoints nuevos ni recursos nuevos de Terraform. Enmienda de la constituci�
 - `bash -n` de los scripts; `terraform fmt`, `validate`, `trivy config infra/`.
 - `crear.sh --solo-plan`: sin cambios sobre la infraestructura actual. `destruir.sh --solo-plan`: lista todo sin borrar nada.
 - Sin escribir la confirmación, ninguno de los dos cambia nada.
-- `instalar-actualizador.sh --site` en el servidor vivo: no repite el primer arranque ni reinicia la API.
+- `instalar-actualizador.sh` en el servidor vivo: no repite el primer arranque ni reinicia la API.
+- `crear.sh` sobre una instancia nueva (la B de NV-12): primer arranque e instalación sola en cuanto Atlas permite su IP.
 - **Ciclo completo:** `destruir.sh` y `crear.sh` recrean todo; `/ready` 200 por HTTPS; `/health` con el SHA de `main`; los pasos manuales bastan.
 
 ## Criterios

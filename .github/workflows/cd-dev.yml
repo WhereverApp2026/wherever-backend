@@ -78,6 +78,7 @@ jobs:
           docker buildx build --provenance=false --sbom=false --push \
             --build-arg VERSION="$SHA" \
             --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$SHA" \
             -t "$IMAGE:$SHA" .
 
       - name: mover la etiqueta dev
@@ -94,7 +95,8 @@ jobs:
           package-type: container
           min-versions-to-keep: 10
 
-      # Tabla de spec nv-08 §Contratos: el servidor revisa cada minuto y tarda hasta unos 3 minutos.
+      # Tabla de spec nv-08 §Contratos. Con dos instancias (nv-12), A instala en unos 3 minutos y B al
+      # menos 5 después. Varias lecturas seguidas con el SHA: el balanceador reparte entre las dos.
       - name: comprobar el servidor
         env:
           SHA: ${{ steps.entrada.outputs.sha }}
@@ -109,30 +111,37 @@ jobs:
             echo "::notice::ventana de apagado: el servidor se actualizará al encender a las 08:00"
             exit 0
           fi
-          vio_respuesta=false
+          vio_instancia=false
           codigo=000
           version=""
-          limite=$((SECONDS + 300))
+          seguidas=0
+          limite=$((SECONDS + 720))
           while ((SECONDS < limite)); do
             codigo="$(curl -s -o health.json -w '%{http_code}' --max-time 10 "$API_URL/health" || true)"
-            if [[ "$codigo" != "000" ]]; then
-              vio_respuesta=true
-            fi
+            version=""
             if [[ "$codigo" == "200" ]]; then
+              vio_instancia=true
               version="$(jq -r '.version // ""' health.json || true)"
-              if [[ "$version" == "$SHA" ]]; then
-                echo "el servidor ya sirve $SHA"
+            fi
+            if [[ "$version" == "$SHA" ]]; then
+              seguidas=$((seguidas + 1))
+              if ((seguidas >= 5)); then
+                echo "el servidor ya sirve $SHA en 5 lecturas seguidas"
                 exit 0
               fi
+              sleep 3
+            else
+              seguidas=0
+              sleep 15
             fi
-            sleep 15
           done
-          if [[ "$vio_respuesta" == "false" ]]; then
-            echo "::notice::sin conexión con el servidor: si está apagado, se actualizará al encender"
+          # CloudFront y el balanceador siempre responden: con todo apagado solo hay 5xx.
+          if [[ "$vio_instancia" == "false" && ( "$codigo" == 000 || "$codigo" == 5* ) ]]; then
+            echo "::notice::ninguna instancia respondió: si están apagadas, se actualizarán al encender"
             exit 0
           fi
           if [[ "$codigo" != "200" ]]; then
-            echo "::error::/health respondió $codigo tras 5 minutos"
+            echo "::error::/health respondió $codigo tras 12 minutos"
             exit 1
           fi
           echo "::error::el servidor sigue en $version y no en $SHA: revisa si regresó (failed_digest) o si venció GHCR_TOKEN"

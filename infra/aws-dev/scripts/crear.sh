@@ -48,33 +48,34 @@ if tf show -no-color "$(basename "$plan")" | grep -q '^Plan:'; then
 	backup despues-de-crear
 fi
 
-instance="$(tf output -raw instance_id)"
-ip="$(tf output -raw public_ip)"
-site="$(tf output -raw site_address)"
-url="https://$site"
+url="$(tf output -raw cloudfront_url)"
+target_group="$(tf output -raw target_group_arn)"
+ips="$(tf output -json public_ips | python -I -c 'import json,sys; print(" y ".join(sorted(v + "/32" for v in json.load(sys.stdin).values())))')"
+nodes="$(tf output -json instance_ids | python -I -c 'import json,sys; [print(k, v) for k, v in sorted(json.load(sys.stdin).items())]' | tr -d '\r')"
 
-state="$(aws_ ec2 describe-instances --instance-ids "$instance" --query 'Reservations[0].Instances[0].State.Name')"
-if [[ "$state" == "stopped" || "$state" == "stopping" ]]; then
-	echo "crear: la instancia $instance está apagada por el horario; se termina aquí. Enciéndela y vuelve a correr este script."
-	exit 1
-fi
-
-echo "crear: esperando a Systems Manager en $instance"
-ping=""
-for _ in $(seq 1 60); do
-	ping="$(aws_ ssm describe-instance-information --filters "Key=InstanceIds,Values=$instance" \
-		--query 'InstanceInformationList[0].PingStatus' 2>/dev/null || true)"
-	[[ "$ping" == "Online" ]] && break
-	sleep 10
-done
-[[ "$ping" == "Online" ]] || { echo "crear: la instancia no aparece en Systems Manager" >&2; exit 1; }
-
-"$scripts/instalar-actualizador.sh" --instance "$instance" --site "$site" --profile "$profile" --region "$region"
+while read -r node instance; do
+	state="$(aws_ ec2 describe-instances --instance-ids "$instance" --query 'Reservations[0].Instances[0].State.Name')"
+	if [[ "$state" == "stopped" || "$state" == "stopping" ]]; then
+		echo "crear: la instancia $node ($instance) está apagada por el horario; enciéndela y vuelve a correr este script."
+		exit 1
+	fi
+	echo "crear: esperando a Systems Manager en $node ($instance)"
+	ping=""
+	for _ in $(seq 1 60); do
+		ping="$(aws_ ssm describe-instance-information --filters "Key=InstanceIds,Values=$instance" \
+			--query 'InstanceInformationList[0].PingStatus' 2>/dev/null || true)"
+		[[ "$ping" == "Online" ]] && break
+		sleep 10
+	done
+	[[ "$ping" == "Online" ]] || { echo "crear: $instance no aparece en Systems Manager" >&2; exit 1; }
+	"$scripts/instalar-actualizador.sh" --instance "$instance" --node "$node" --target-group "$target_group" \
+		--public-url "$url" --profile "$profile" --region "$region" </dev/null
+done <<<"$nodes"
 
 cat <<EOF
 
 crear: la infraestructura está lista. Falta lo que no se puede automatizar:
-  1. Atlas → Network Access: permite $ip/32. La API no se instala hasta que lo hagas.
+  1. Atlas → Network Access: permite $ips. La API no se instala hasta que lo hagas.
   2. Confirma el correo de AWS "Subscription Confirmation", si llegó uno nuevo.
   3. Si la URL cambió, actualiza el repositorio y avisa al equipo móvil:
        gh variable set API_URL --body "$url"

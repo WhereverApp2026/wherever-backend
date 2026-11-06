@@ -2,16 +2,20 @@
 # Sube al servidor el actualizador de nv-08 y la sonda de nv-13, y activa sus timers. Corre en tu
 # máquina y entra por Systems Manager, sin SSH; repítelo cada vez que cambien estos archivos, porque
 # el CD solo actualiza la imagen de la API. No reinicia la API: eso lo hace la siguiente imagen.
-# Con --site, si la instancia es nueva y no tiene .env, también hace el primer arranque (nv-14).
-#   uso: instalar-actualizador.sh --instance <id> [--site <sitio>] [--profile wherever-dev] [--region us-east-2]
+# Si la instancia es nueva y no tiene .env, también hace el primer arranque (nv-14). Con --node, anota
+# su lugar en el balanceador (nv-12).
+#   uso: instalar-actualizador.sh --instance <id> [--node a|b --target-group <arn> --public-url <url>]
+#        [--profile wherever-dev] [--region us-east-2]
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
-instance="" site="" profile="wherever-dev" region="us-east-2"
+instance="" node="" target_group="" public_url="" profile="wherever-dev" region="us-east-2"
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--instance) instance="$2"; shift 2 ;;
-		--site) site="$2"; shift 2 ;;
+		--node) node="$2"; shift 2 ;;
+		--target-group) target_group="$2"; shift 2 ;;
+		--public-url) public_url="$2"; shift 2 ;;
 		--profile) profile="$2"; shift 2 ;;
 		--region) region="$2"; shift 2 ;;
 		*) echo "opción desconocida: $1" >&2; exit 2 ;;
@@ -59,16 +63,13 @@ for file in wherever-actualizar.service wherever-actualizar.timer wherever-sonda
 	upload "$here/server/$file" "/etc/systemd/system/$file"
 done
 
-# Antes de los timers: el actualizador necesita .env, y Caddy no lo levanta nadie más.
-first_boot() {
-	remote "set -e
+# Antes de los timers: el actualizador necesita .env.
+first_boot='set -e
 cd /opt/wherever
-if [ -f .env ]; then echo 'instalar-actualizador: ya tiene .env; sin primer arranque'; exit 0; fi
-chmod +x deploy-env.sh
-./deploy-env.sh /wherever/dev/ '$site'
-chown ec2-user:ec2-user .env
-docker compose --env-file .env up -d --no-deps caddy"
-}
+chmod +x deploy-env.sh actualizar.sh
+if [ -f .env ]; then echo "instalar-actualizador: ya tiene .env; sin primer arranque"; exit 0; fi
+./deploy-env.sh /wherever/dev/
+chown ec2-user:ec2-user .env'
 
 timers='set -e
 cd /opt/wherever
@@ -81,8 +82,8 @@ systemctl daemon-reload
 systemctl enable --now wherever-actualizar.timer wherever-sonda.timer
 systemctl list-timers "wherever-*" --no-pager'
 
-remote 'cd /opt/wherever; chmod +x deploy-env.sh actualizar.sh'
-if [[ -n "$site" ]]; then
-	first_boot
+if [[ -n "$node" ]]; then
+	remote "printf 'NODE=%s\\nTARGET_GROUP_ARN=%s\\nPUBLIC_URL=%s\\n' '$node' '$target_group' '$public_url' > /opt/wherever/nodo.env"
 fi
+remote "$first_boot"
 remote "$timers"

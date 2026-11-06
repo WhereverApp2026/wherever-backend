@@ -21,11 +21,13 @@ services:
         mode: non-blocking
         max-buffer-size: 4m
 
+  # Solo en la instancia A y solo hasta cambiar a la URL de CloudFront (nv-12).
   caddy:
+    profiles: [caddy]
     image: caddy:2.10.2-alpine
     network_mode: host # 80 y 443 de la instancia; reenvía a 127.0.0.1:8080
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:?falta SITE_ADDRESS}
+      SITE_ADDRESS: ${SITE_ADDRESS:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data # conserva el certificado entre apagados

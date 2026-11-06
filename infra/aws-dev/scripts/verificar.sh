@@ -43,7 +43,7 @@ while read -r from to cidr; do
 	[[ -z "$from" ]] && continue
 	case "$from" in
 		80 | 443) ok "puerto $from abierto (público, esperado)" ;;
-		22) if [[ "$cidr" == "0.0.0.0/0" ]]; then bad "SSH abierto a todo internet"; else ok "SSH solo desde $cidr"; fi ;;
+		22) bad "SSH abierto ($cidr): se entra por Systems Manager (nv-12)" ;;
 		# MongoDB vive en Atlas, pero si alguien abre 27017 aquí también es un error.
 		27017 | 6379 | 7687 | 7474) bad "puerto de base de datos $from expuesto ($cidr)" ;;
 		*) if [[ "$cidr" == "0.0.0.0/0" ]]; then bad "puerto $from-$to abierto a todo internet"; else ok "puerto $from solo desde $cidr"; fi ;;
@@ -55,7 +55,7 @@ loose="$(aws_q ec2 describe-addresses --query 'length(Addresses[?AssociationId==
 check "IP elástica asociada a la instancia" "$associated" "1"
 check "IPs elásticas sueltas (cobran)" "$loose" "0"
 check "NAT gateways" "$(aws_q ec2 describe-nat-gateways --filter Name=state,Values=available,pending --query 'length(NatGateways)')" "0"
-check "balanceadores" "$(aws_q elbv2 describe-load-balancers --query 'length(LoadBalancers)' 2>/dev/null || echo 0)" "0"
+check "balanceadores" "$(aws_q elbv2 describe-load-balancers --query 'length(LoadBalancers)' 2>/dev/null || echo 0)" "1"
 
 for sched in wherever-dev-apagar wherever-dev-encender; do
 	state="$(aws_q scheduler get-schedule --name "$sched" --query 'State' 2>/dev/null || echo FALTA)"
