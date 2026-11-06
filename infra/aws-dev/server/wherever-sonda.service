@@ -1,0 +1,8 @@
+# Consulta /ready para que un fallo de las bases quede en el log y dispare la alarma (spec nv-13).
+[Unit]
+Description=Sonda de /ready de la API de Wherever
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -s -o /dev/null --max-time 10 http://127.0.0.1:8080/ready

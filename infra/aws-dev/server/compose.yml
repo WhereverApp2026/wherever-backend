@@ -11,6 +11,15 @@ services:
       - "8080:8080" # el Security Group solo deja llegar desde tu IP; el público entra por Caddy
     restart: unless-stopped
     mem_limit: 192m
+    # nv-13. non-blocking: si CloudWatch no responde, la API arranca y atiende; pierde líneas, no peticiones.
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${LOG_REGION:?falta LOG_REGION}
+        awslogs-group: /wherever/dev/api
+        awslogs-stream: ${LOG_STREAM:?falta LOG_STREAM}
+        mode: non-blocking
+        max-buffer-size: 4m
 
   caddy:
     image: caddy:2.10.2-alpine

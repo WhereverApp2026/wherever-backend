@@ -113,6 +113,12 @@ variable "start_enabled" {
   default     = true
 }
 
+variable "log_retention_days" {
+  description = "Días que CloudWatch conserva los logs de la API."
+  type        = number
+  default     = 14
+}
+
 variable "budget_usd" {
   description = "Tope mensual de gasto para la alerta."
   type        = number

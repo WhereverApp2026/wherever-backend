@@ -9,6 +9,7 @@ failed=/var/log/wherever/failed_digest
 active="$app/imagen.env"
 param=/wherever/dev/GHCR_TOKEN
 ready_url=http://127.0.0.1:8080/ready
+log_group=/wherever/dev/api
 ready_wait=120
 
 mkdir -p /var/log/wherever
@@ -40,6 +41,17 @@ current=""
 [[ -f "$active" ]] && current="$(cut -d= -f2- "$active")"
 [[ "$digest" == "$current" ]] && exit 0
 grep -qxF "$digest" "$failed" && exit 0
+
+# Evento de despliegue en CloudWatch (nv-13). Nunca detiene una actualización: es solo el aviso.
+log_event() {
+	local token instance stream
+	token="$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" || return 0
+	instance="$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)" || return 0
+	stream="despliegues-$instance"
+	aws logs create-log-stream --region "$region" --log-group-name "$log_group" --log-stream-name "$stream" 2>/dev/null || true
+	aws logs put-log-events --region "$region" --log-group-name "$log_group" --log-stream-name "$stream" \
+		--log-events "timestamp=$(($(date +%s) * 1000)),message={\"evento\":\"$1\",\"digest\":\"$2\"}" >/dev/null 2>&1 || true
+}
 
 ready_now() { [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$ready_url" || true)" == "200" ]]; }
 
@@ -96,6 +108,7 @@ switch_api() {
 switch_api "$digest"
 if wait_ready; then
 	echo "actualizar: $digest instalada"
+	log_event instalada "$digest"
 	docker image prune -af >/dev/null
 	exit 0
 fi
@@ -106,7 +119,9 @@ if wait_ready; then
 	# La anterior quedó sana, así que el problema es de la imagen nueva.
 	echo "$digest" >>"$failed"
 	echo "actualizar: regreso completo; $digest registrada como fallida" >&2
+	log_event regreso "$digest"
 else
 	echo "actualizar: la versión anterior tampoco da /ready 200; no se registra fallo" >&2
+	log_event regreso "$digest"
 fi
 exit 1

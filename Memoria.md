@@ -222,9 +222,19 @@
 ## NV-12 — Dos APIs, balanceador y CloudFront (en curso)
 - Estado (2026-11-05): decisiones (a)–(e) aprobadas. Hecha la corrección de la IP del cliente en su PR. Faltan permisos, prueba de ELB y CloudFront, compresión, infraestructura y despliegue.
 - Decisión: CloudFront da el HTTPS, sin dominio. Porqué: ACM no valida `sslip.io` y no hay dominio propio.
-- Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer; hoy no lo tiene y da `AccessDenied`.
+- Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer.
 - Decisión: la IP del cliente sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final, y no de la primera entrada. Porqué: Fiber sin `EnableIPValidation` devuelve la cabecera tal cual; hoy no se explota porque Caddy la limpia, pero el balanceador la conservaría y un cliente evadiría el límite de login.
 - Decisión: varias cabeceras `X-Forwarded-For` cuentan como una lista. Porqué: la primera la puede escribir el cliente.
+
+## NV-13 — Observabilidad en CloudWatch (en curso)
+- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Faltan confirmar el correo de SNS, comprobar el evento de despliegue con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
+- NV-15: el trabajo de las 21:00 corrió el 2026-11-05 sin fallos y sin pendientes.
+- Decisión: el logger también oculta correos y credenciales de URI dentro de cualquier texto. Porqué: solo miraba el nombre del campo, y el texto de un error de MongoDB puede traer un correo; ahora esos logs salen de la instancia.
+- Decisión: timer `wherever-sonda` que consulta `/ready` cada 5 minutos. Porqué: nadie más lo consulta con frecuencia, y la alarma nunca sonaría. Cuesta el 2 % de la cuota de Redis por instancia.
+- Decisión: controlador `awslogs` en modo `non-blocking`. Porqué: una caída de CloudWatch no debe impedir que la API arranque.
+- Lección: cambiar el controlador o instalar una imagen recrea el contenedor y borra sus logs locales.
+- Lección: al adjuntar una política, IAM tarda unos minutos en propagar y la misma llamada pasa y falla alternadamente. Antes de un `apply`, repite una lectura hasta verla pasar varias veces seguidas.
+- Lección: una política administrada no pasa de 6144 caracteres; la del deployer ya no admite más, y lo nuevo va en políticas aparte.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

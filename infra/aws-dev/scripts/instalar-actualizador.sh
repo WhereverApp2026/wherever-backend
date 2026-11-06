@@ -1,31 +1,64 @@
 #!/usr/bin/env bash
-# Sube al servidor el actualizador de nv-08 y activa su timer. Corre en tu máquina; repítelo cada
-# vez que cambien estos archivos, porque el CD solo actualiza la imagen de la API.
-#   uso: infra/aws-dev/scripts/instalar-actualizador.sh --ip <ip> --key ~/.ssh/wherever-dev
+# Sube al servidor el actualizador de nv-08 y la sonda de nv-13, y activa sus timers. Corre en tu
+# máquina y entra por Systems Manager, sin SSH; repítelo cada vez que cambien estos archivos, porque
+# el CD solo actualiza la imagen de la API. No reinicia la API: eso lo hace la siguiente imagen.
+#   uso: instalar-actualizador.sh --instance <id> [--profile wherever-dev] [--region us-east-2]
 set -euo pipefail
+export MSYS_NO_PATHCONV=1
 
-ip="" key=""
+instance="" profile="wherever-dev" region="us-east-2"
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-		--ip) ip="$2"; shift 2 ;;
-		--key) key="$2"; shift 2 ;;
+		--instance) instance="$2"; shift 2 ;;
+		--profile) profile="$2"; shift 2 ;;
+		--region) region="$2"; shift 2 ;;
 		*) echo "opción desconocida: $1" >&2; exit 2 ;;
 	esac
 done
-[[ -n "$ip" && -n "$key" ]] || { echo "uso: $0 --ip <ip> --key <llave privada>" >&2; exit 2; }
+[[ -n "$instance" ]] || { echo "uso: $0 --instance <id> [--profile <perfil>] [--region <región>]" >&2; exit 2; }
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
-ssh_opts=(-i "$key" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
-remote="ec2-user@$ip"
+aws_() { aws --profile "$profile" --region "$region" --output text "$@" | tr -d '\r'; }
 
-scp "${ssh_opts[@]}" "$here/server/compose.yml" "$here/scripts/deploy-env.sh" "$here/scripts/actualizar.sh" \
-	"$here/server/wherever-actualizar.service" "$here/server/wherever-actualizar.timer" "$remote:/opt/wherever/"
+# Corre un comando en la instancia y espera su resultado; falla si el comando falla.
+remote() {
+	local params id status=""
+	params="$(printf '%s' "$1" | python -I -c 'import json,sys; print(json.dumps({"commands":[sys.stdin.read()]}))')"
+	id="$(aws_ ssm send-command --instance-ids "$instance" --document-name AWS-RunShellScript \
+		--parameters "$params" --query Command.CommandId)"
+	for _ in $(seq 1 60); do
+		status="$(aws_ ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query Status 2>/dev/null || true)"
+		case "$status" in Success | Failed | Cancelled | TimedOut) break ;; esac
+		sleep 2
+	done
+	aws_ ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query StandardOutputContent
+	if [[ "$status" != "Success" ]]; then
+		aws_ ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query StandardErrorContent >&2
+		echo "instalar-actualizador: el comando terminó en $status" >&2
+		exit 1
+	fi
+}
 
-ssh "${ssh_opts[@]}" "$remote" 'set -e
+# Un comando por archivo: cada uno cabe holgado en el límite de tamaño de Systems Manager.
+upload() {
+	echo "instalar-actualizador: subiendo $(basename "$2")"
+	remote "printf '%s' '$(base64 -w0 "$1")' | base64 -d > '$2'"
+}
+
+for file in server/compose.yml scripts/deploy-env.sh scripts/actualizar.sh; do
+	upload "$here/$file" "/opt/wherever/$(basename "$file")"
+done
+for file in wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer; do
+	upload "$here/server/$file" "/etc/systemd/system/$file"
+done
+
+remote 'set -e
 cd /opt/wherever
+chown ec2-user:ec2-user compose.yml deploy-env.sh actualizar.sh
 chmod +x deploy-env.sh actualizar.sh
-sudo mv wherever-actualizar.service wherever-actualizar.timer /etc/systemd/system/
-sudo chown root:root /etc/systemd/system/wherever-actualizar.service /etc/systemd/system/wherever-actualizar.timer
-sudo systemctl daemon-reload
-sudo systemctl enable --now wherever-actualizar.timer
-systemctl list-timers wherever-actualizar.timer --no-pager'
+cd /etc/systemd/system
+chown root:root wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer
+chmod 644 wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer
+systemctl daemon-reload
+systemctl enable --now wherever-actualizar.timer wherever-sonda.timer
+systemctl list-timers "wherever-*" --no-pager'
