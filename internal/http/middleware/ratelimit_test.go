@@ -19,7 +19,7 @@ import (
 func TestRateLimit_Uniform429WithRetryAfter(t *testing.T) {
 	log, _ := testutil.Logger()
 	limiter := middleware.NewLimiter(testutil.DeadRedis(t), log)
-	app := newTestApp(true, log, middleware.ProxyHeaders(), limiter.Window(middleware.PolicyGlobal, 2, time.Minute))
+	app := newTestApp(true, log, middleware.ProxyHeaders(1), limiter.Window(middleware.PolicyGlobal, 2, time.Minute))
 	app.Get("/x", okHandler)
 
 	for i := 0; i < 2; i++ {
@@ -38,7 +38,7 @@ func TestRateLimit_Uniform429WithRetryAfter(t *testing.T) {
 func TestRateLimit_RedisDownFallsBackToMemoryAndWarns(t *testing.T) {
 	log, logs := testutil.Logger()
 	limiter := middleware.NewLimiter(testutil.DeadRedis(t), log)
-	app := newTestApp(true, log, middleware.ProxyHeaders(),
+	app := newTestApp(true, log, middleware.ProxyHeaders(1),
 		limiter.Window(middleware.PolicyGlobal, 100, time.Minute),
 		limiter.Concurrent(middleware.PolicyWrites, 10))
 	app.Get("/x", okHandler)
@@ -57,7 +57,7 @@ func TestRateLimit_ConcurrentWritesOverLimitIs429(t *testing.T) {
 	limiter := middleware.NewLimiter(testutil.DeadRedis(t), discardLogger())
 	release := make(chan struct{})
 	entered := make(chan struct{}, 1)
-	app := newTestApp(true, discardLogger(), middleware.ProxyHeaders(), limiter.Concurrent(middleware.PolicyWrites, 1))
+	app := newTestApp(true, discardLogger(), middleware.ProxyHeaders(1), limiter.Concurrent(middleware.PolicyWrites, 1))
 	app.Get("/x", okHandler)
 	app.Post("/x", func(c *fiber.Ctx) error {
 		entered <- struct{}{}

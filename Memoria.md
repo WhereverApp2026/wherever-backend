@@ -203,7 +203,7 @@
 - Lección: la IP pública de casa alterna y cierra el SSH; lo que se pueda configurar por Parameter Store no depende de ella.
 
 ## NV-11 — Datos gestionados externos
-- Estado (2026-11-05): el servidor ya usa Upstash y Aura; Redis y Neo4j salieron de la instancia, con sus volúmenes. `verificar.sh` OK y `terraform plan` sin cambios. La reducción de comandos llega al fusionar y publicarse la imagen. Falta firmar y contrastar el 40 % con la consola de Upstash.
+- Estado (2026-11-05): el servidor ya usa Upstash y Aura; Redis y Neo4j salieron de la instancia, con sus volúmenes. `verificar.sh` OK y `terraform plan` sin cambios. El servidor corre `f1a28f8` con la reducción de comandos: 5 `/health` no mueven `rate:global`, y un `/ready` lo sube en 1. Falta firmar y contrastar el 40 % con la consola de Upstash.
 - Latencia desde el servidor: `/ready` con las tres bases 88 ms en caliente y 352 ms en frío, bajo el límite de 1 s; el 503 del arranque que se vio desde la máquina local no se repitió ahí.
 - Medición con `scripts/medir-redis.sh` (comandos que Upstash cobra), antes → después: `/health` 5 → 0; `/ready` 5 → 3; lectura autenticada 6 → 4; escritura autenticada 11 → 7; registro 15 → 9; login correcto 17 → 11; login fallido 18 → 12; refresh 16 → 10; logout 12 → 8.
 - Estimación: 2000 peticiones por día laborable (22 días, supuesto, sin tráfico real medido) y 4.6 comandos de promedio dan 202 000 al mes, el 40 % de la cuota. El tope del 60 % equivale a unas 65 000 peticiones al mes. Dos APIs no suben el costo por petición.
@@ -218,6 +218,13 @@
 - `main` falló en `govulncheck` tras fusionar el PR 21, con el del PR en verde minutos antes: GO-2026-6888 (`brotli`) y GO-2026-6865 (`klauspost/compress`), ambas indirectas. Se subieron a v1.2.7 y v1.20.2. Sin CI verde en `main` no se publica imagen.
 - Lección: el grupo de seguridad limita la salida; los puertos de un servicio externo nuevo se abren en `egress_ports` o la API no llega.
 - Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
+
+## NV-12 — Dos APIs, balanceador y CloudFront (en curso)
+- Estado (2026-11-05): decisiones (a)–(e) aprobadas. Hecha la corrección de la IP del cliente en su PR. Faltan permisos, prueba de ELB y CloudFront, compresión, infraestructura y despliegue.
+- Decisión: CloudFront da el HTTPS, sin dominio. Porqué: ACM no valida `sslip.io` y no hay dominio propio.
+- Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer.
+- Decisión: la IP del cliente sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final, y no de la primera entrada. Porqué: Fiber sin `EnableIPValidation` devuelve la cabecera tal cual; hoy no se explota porque Caddy la limpia, pero el balanceador la conservaría y un cliente evadiría el límite de login.
+- Decisión: varias cabeceras `X-Forwarded-For` cuentan como una lista. Porqué: la primera la puede escribir el cliente.
 
 ## NV-13 — Observabilidad en CloudWatch (en curso)
 - Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Faltan confirmar el correo de SNS, comprobar el evento de despliegue con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
