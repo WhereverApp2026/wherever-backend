@@ -2,8 +2,8 @@
 
 ## Fase 0 — Preparación
 - [x] T01 Revisor aprueba decisiones (a)–(e); NV-11 terminada.
-- [ ] T02 Ampliar boundary y política del deployer en la consola, en ese orden.
-- [ ] T03 Recurso de prueba de ELB y de CloudFront creado y borrado; confirmar que la organización no los bloquea.
+- [x] T02 Ampliar boundary y política del deployer en la consola, en ese orden.
+- [x] T03 Recurso de prueba de ELB y de CloudFront creado y borrado; confirmar que la organización no los bloquea.
 - [ ] T04 Rama `nv-12-alta-disponibilidad`; respaldo del estado de Terraform.
 - [ ] T05 El operador confirma el saldo de créditos en Billing; subir el presupuesto a unos US$50 con avisos al 50, 80 y 100 %.
 
@@ -13,8 +13,8 @@
 - [ ] T08 PR propio, fusionar y desplegar.
 
 ## Fase 2 — Compresión, sonda y auditoría (Req. 3, 7)
-- [ ] T09 Middleware de compresión con sus pruebas: `Accept-Encoding` y `/auth` sin comprimir.
-- [ ] T10 Sonda `/api/v1/probe/lenta`, oculta por `HIDE_INTERNALS`.
+- [x] T09 Middleware de compresión con sus pruebas: `Accept-Encoding`; `/auth` y `POST /usuarios` sin comprimir.
+- [x] T10 Sonda `/api/v1/probe/lenta`, oculta por `HIDE_INTERNALS`.
 - [ ] T11 PR propio, fusionar y desplegar; confirmar la compresión en el servidor.
 - [ ] T12 Auditoría de estado local y `docs/auditoria-estado.md`.
 
