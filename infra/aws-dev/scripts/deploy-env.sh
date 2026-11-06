@@ -2,12 +2,11 @@
 # Corre EN la instancia: arma /opt/wherever/.env desde Parameter Store (spec nv-07).
 # Lee todos los parámetros de la ruta (SecureString descifrados) sin mostrar sus valores.
 # GHCR_TOKEN no va al .env: es del actualizador (nv-08) y la API no debe verlo.
-#   uso: deploy-env.sh /wherever/dev/ [sitio]
+#   uso: deploy-env.sh /wherever/dev/
 set -euo pipefail
 umask 077
 
-path="${1:?uso: deploy-env.sh /<proyecto>/<entorno>/ [sitio]}"
-site="${2:-}"
+path="${1:?uso: deploy-env.sh /<proyecto>/<entorno>/}"
 region="$(cut -d= -f2 /opt/wherever/region)"
 out=/opt/wherever/.env
 tmp="$(mktemp /opt/wherever/.env.XXXXXX)"
@@ -20,9 +19,6 @@ aws ssm get-parameters-by-path --region "$region" --path "$path" --recursive --w
     printf '%s=%s\n' "${name##*/}" "$value"
   done > "$tmp"
 
-if [ -n "$site" ]; then
-  printf 'SITE_ADDRESS=%s\n' "$site" >> "$tmp"
-fi
 # Región y flujo del log de esta instancia (nv-13): compose.yml los pide para el controlador awslogs.
 imds_token="$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)"
 instance_id="$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/instance-id)"

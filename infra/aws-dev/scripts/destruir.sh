@@ -36,7 +36,7 @@ fi
 
 cat <<'EOF'
 
-Se pierden los logs de CloudWatch y la IP elástica: al recrear, la URL cambia.
+Se pierden los logs de CloudWatch y las IP elásticas: al recrear, la URL de CloudFront cambia.
 No se tocan: Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas del deployer.
 EOF
 read -r -p "Escribe DESTRUIR para continuar: " answer

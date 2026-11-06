@@ -32,8 +32,9 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 | `NEO4J_URI` | SecureString: `neo4j+s://` de Aura con usuario y contraseña antes de la arroba |
 | `JWT_KEY`, `PHONE_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local (los nombres exactos: la API no lee `JWT_SECRET` ni `HMAC_SECRET`) |
 | `JWT_ISSUER`, `JWT_AUDIENCE` | `wherever-api`, `wherever-app` |
-| `TRUSTED_PROXIES` | `172.16.0.0/12` (Caddy llega por la red de Docker; solo de ahí se cree `X-Forwarded-For`) |
-| `TRUSTED_PROXY_HOPS` | Opcional; `1` con Caddy (por defecto). Con CloudFront y balanceador será `2` (nv-12) |
+| `TRUSTED_PROXIES` | `172.16.0.0/12` (el balanceador llega desde la VPC; solo de ahí se cree `X-Forwarded-For`) |
+| `TRUSTED_PROXY_HOPS` | `2`: CloudFront y el balanceador; sin este valor, un cliente comparte el límite con los demás (nv-12) |
+| `REQUEST_TIMEOUT` | `55s`: menos que los 60 s de CloudFront, para que el cliente reciba el error de la API y no un 504 (nv-12) |
 | `JOB_HOUR` | `21`: la instancia se apaga a las 22:00; a las 03:00 el trabajo de privacidad nunca correría (nv-15) |
 | `HIDE_INTERNALS` | `true`: servidor público, sin `detalle` ni sondas (nv-15) |
 | `CORS_ALLOWED_ORIGIN`, `SMTP_*`, `MAIL_FROM`, `APP_LINK_BASE` | opcionales |
@@ -44,18 +45,7 @@ En Git Bash (Windows) antepón `MSYS_NO_PATHCONV=1`; si no, la ruta `/wherever/d
 MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east-2 --name /wherever/dev/MONGO_URI --type SecureString --value '<cadena>'
 ```
 
-La app (la imagen se construye aquí porque el repo es privado y se copia por SSH):
-```bash
-infra/aws-dev/scripts/desplegar.sh --ip "$(terraform -chdir=infra/aws-dev output -raw public_ip)" \
-  --site "$(terraform -chdir=infra/aws-dev output -raw site_address)" --key ~/.ssh/wherever-dev
-```
-
-Si `docker build` se cuelga en `go mod download` (red inestable hacia `proxy.golang.org`), excepción de desarrollo: compila en local y empaqueta sobre la misma base, luego corre el resto de `desplegar.sh` a mano (copiar imagen, `deploy-env.sh`, `compose up`). No es reproducible: anota el commit en `Memoria.md`.
-```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$(git rev-parse --short HEAD)" -o <dir>/api ./cmd/api
-# <dir>/Dockerfile: FROM gcr.io/distroless/static-debian12:nonroot / COPY api /api / USER nonroot:nonroot / ENTRYPOINT ["/api"]
-docker build -t wherever-api:dev <dir>
-```
+La app la instalan `crear.sh` y el actualizador; ver [Crear y destruir](#crear-y-destruir-spec-nv-14).
 
 ## Actualización automática (spec nv-08)
 Cada `push` a `main` con CI en verde publica la imagen en GHCR (`cd-dev.yml`); el servidor la detecta y se instala sola, con regreso automático.
@@ -66,21 +56,17 @@ Una sola vez:
 MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east-2 --name /wherever/dev/GHCR_TOKEN --type SecureString --value '<token>'
 ```
 2. Define la variable del repositorio `API_URL` con la URL del servidor.
-3. Activa el timer (repítelo si cambian estos archivos; requiere que `ssh_cidr` tenga tu IP vigente):
-```bash
-infra/aws-dev/scripts/instalar-actualizador.sh --ip "$(terraform -chdir=infra/aws-dev output -raw public_ip)" --key ~/.ssh/wherever-dev
-```
+3. Activa el timer con `crear.sh`, que corre `instalar-actualizador.sh` en cada instancia. Repítelo si cambian esos archivos.
 
 - **Ver qué pasó:** `journalctl -u wherever-actualizar -n 50`.
 - **Regresar:** en Actions, `cd-dev` → Run workflow con el SHA completo; el servidor la instala solo.
 - **Reintentar una versión fallida:** borra su línea de `/var/log/wherever/failed_digest`.
 - **Si el workflow termina en rojo con un SHA antiguo:** el servidor regresó, o venció `GHCR_TOKEN`.
-- **Emergencia:** `desplegar.sh` apaga el timer; se reactiva con `instalar-actualizador.sh`.
 
 ## Verificar
 ```bash
 $(terraform -chdir=infra/aws-dev output -raw verificar)   # solo lectura; falla si algo sale del Free Tier o queda expuesto
-curl -i "$(terraform -chdir=infra/aws-dev output -raw url_https)/ready"
+curl -i "$(terraform -chdir=infra/aws-dev output -raw cloudfront_url)/ready"
 ```
 `/ready` da 503 si Atlas no acepta la IP elástica o falta un índice (`make indexes` contra Atlas).
 
@@ -91,7 +77,7 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw url_https)/ready"
 - **Neo4j en pausa.** Aura Free se pausa tras 72 horas sin uso y **borra la instancia tras 30 días en pausa**. En pausa, `/ready` da 503 y el actualizador no instala imágenes. Para reanudar: consola de Aura → instancia → Resume. Compruébalo antes de la entrega y de la evaluación.
 - **Cuota de Redis.** Upstash Free da 500 000 comandos al mes. Mira el consumo en su consola. Costos por operación: `scripts/medir-redis.sh`. Sin cuota, `/ready` da 200 `degraded` y lo autenticado da 503.
 - **Plan B de Redis.** Regresa el servicio `redis` a `server/compose.yml` (historial de Git), apunta `REDIS_ADDR` a `redis:6379` y corre `instalar-actualizador.sh`.
-- **Rotar credenciales.** Cambia la clave en la consola del servicio y carga el parámetro con `--overwrite`. La API la toma al instalar la siguiente imagen; para aplicarla antes, entra por SSH y corre en `/opt/wherever` `sudo ./deploy-env.sh /wherever/dev/ "$(grep -m1 '^SITE_ADDRESS=' .env | cut -d= -f2-)"`, y luego `docker compose --env-file .env --env-file imagen.env up -d --no-deps api`.
+- **Rotar credenciales.** Cambia la clave en la consola del servicio y carga el parámetro con `--overwrite`. La API la toma al instalar la siguiente imagen; para aplicarla antes, entra por Systems Manager y corre en `/opt/wherever`, en cada instancia, `./deploy-env.sh /wherever/dev/` y `docker compose --env-file .env --env-file imagen.env up -d --no-deps api`.
 - **Diagnóstico.** Con una clave de Redis mala, la API registra `i/o timeout`, no `WRONGPASS`. Compruébala con `redis-cli --tls -u` desde un contenedor. Copia la cadena de Upstash en Connect → TCP; no la armes a mano.
 - **Esquema y datos de demostración.** `make siembra`, con `NEO4J_URI` en el entorno. Es idempotente e imprime el tamaño del grafo.
 
@@ -104,7 +90,7 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw url_https)/ready"
 La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
 
 ## Memoria de la instancia
-`t3.micro` (1 GB): API 192 MB, Caddy 64 MB y 2 GB de swap. Cada contenedor tiene tope propio: si Neo4j se pasa, el OOM mata solo ese contenedor y `unless-stopped` lo levanta. Medido en reposo (2026-11-03): Neo4j 360 MB, API 22 MB, Caddy 21 MB, Redis 3 MB; ~210 MB disponibles y ~200 MB de swap en uso. Si falta, `instance_type = "t3.small"` (elegible en esta cuenta, plan gratuito nuevo).
+`t3.micro` (1 GB): API 192 MB y 2 GB de swap.
 
 ## Dos instancias (spec nv-12)
 - **Costo:** unos US$41 al mes; el balanceador cobra aunque las instancias estén apagadas. Se destruye después de la evaluación con `destruir.sh`: sin créditos se pierde el acceso a la cuenta.
@@ -130,10 +116,9 @@ Con `--solo-plan`, no cambian nada.
 Pasos manuales tras recrear; `crear.sh` también los imprime:
 1. **Atlas → Network Access:** permite las IP elásticas nuevas. Sin esto la API no se instala, porque `/indexes` falla y el actualizador reintenta cada minuto.
 2. **SNS:** confirma el correo *Subscription Confirmation*; se pierde al destruir.
-3. **URL:** cambia al recrear, porque la IP es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
+3. **URL:** cambia al recrear, porque la distribución de CloudFront es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
 
 **`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch.
 
 Antes de las 21:50 o después de las 08:00: fuera de horario, la instancia nueva se apaga o el actualizador no instala.
-Un `destroy` + `apply` **cambia la IP elástica**: cambia la URL de sslip.io, hay que actualizar *Network Access* de Atlas (y quitar la IP vieja) y cualquier cliente que apunte a la URL anterior. Hazlo cuando nada dependa de esa URL.
 La IP elástica se libera con el destroy; una suelta cobra. Los parámetros de `/wherever/dev/` no los crea Terraform: bórralos con `aws ssm delete-parameter` si ya no sirven.

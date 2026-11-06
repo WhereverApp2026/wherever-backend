@@ -1,6 +1,6 @@
 #!/bin/bash
 # Arranque de la instancia de desarrollo (spec nv-07). Solo prepara el sistema: Docker,
-# Compose, swap y rotación de logs. La app la sube scripts/desplegar.sh y los secretos los
+# Compose, swap y rotación de logs. La app la sube scripts/instalar-actualizador.sh y los secretos los
 # arma scripts/deploy-env.sh desde Parameter Store (${param_path}). Sin secretos aquí.
 set -euo pipefail
 exec > >(tee -a /var/log/wherever-bootstrap.log) 2>&1

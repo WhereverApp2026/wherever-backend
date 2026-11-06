@@ -42,7 +42,7 @@ rules="$(aws_q ec2 describe-security-group-rules --filters "Name=group-id,Values
 while read -r from to cidr; do
 	[[ -z "$from" ]] && continue
 	case "$from" in
-		80 | 443) ok "puerto $from abierto (público, esperado)" ;;
+		80 | 443) bad "puerto $from abierto: el HTTPS lo da CloudFront" ;;
 		22) bad "SSH abierto ($cidr): se entra por Systems Manager (nv-12)" ;;
 		# MongoDB vive en Atlas, pero si alguien abre 27017 aquí también es un error.
 		27017 | 6379 | 7687 | 7474) bad "puerto de base de datos $from expuesto ($cidr)" ;;

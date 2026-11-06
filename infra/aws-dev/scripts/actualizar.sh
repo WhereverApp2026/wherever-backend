@@ -151,8 +151,7 @@ if [[ -n "$TARGET_GROUP_ARN" && -n "$current" ]]; then
 fi
 
 echo "actualizar: instalando $digest"
-site="$(grep -m1 '^SITE_ADDRESS=' "$app/.env" | cut -d= -f2- || true)"
-"$app/deploy-env.sh" /wherever/dev/ "$site"
+"$app/deploy-env.sh" /wherever/dev/
 # Corre como root; sin esto, `docker compose` manual como ec2-user ya no puede leer .env.
 chown ec2-user:ec2-user "$app/.env"
 

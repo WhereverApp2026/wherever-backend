@@ -77,18 +77,6 @@ variable "app_port" {
   default     = 8080
 }
 
-variable "caddy_enabled" {
-  description = "Abre 80 y 443 para Caddy y sslip.io. Se apaga al cambiar a la URL de CloudFront (nv-12)."
-  type        = bool
-  default     = true
-}
-
-variable "domain_name" {
-  description = "Dominio propio para el certificado. Vacío = <ip-con-guiones>.sslip.io."
-  type        = string
-  default     = ""
-}
-
 variable "timezone" {
   description = "Zona horaria de las reglas de apagado y encendido."
   type        = string
