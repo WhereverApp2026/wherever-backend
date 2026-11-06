@@ -220,10 +220,11 @@
 - Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
 
 ## NV-12 — Dos APIs, balanceador y CloudFront (en curso)
-- Estado (2026-11-06): despliegue escalonado, regreso automático, compresión y petición larga probados en real, sin errores por CloudFront. Caddy, `sslip.io` y `desplegar.sh` salen del repo. Faltan el ciclo real de NV-14, que da la URL final, el límite con `TRUSTED_PROXY_HOPS=2`, el cambio de la app, `cd-dev` con todo apagado y el encendido de las 08:00.
+- Estado (2026-11-06): todo recreado con los scripts de NV-14 y probado: despliegue escalonado, regreso, compresión, petición larga y límite por cliente con `TRUSTED_PROXY_HOPS=2`. URL final en `cloudfront_url` y en la variable `API_URL`. Faltan que la app compile con ella, `cd-dev` con todo apagado y el encendido de las 08:00.
 - Lección: en Git Bash, `export MSYS_NO_PATHCONV=1` también rompe el `curl -o` a `/tmp`: da cuerpos vacíos y parece un fallo de la API. Úsalo solo por comando.
 - Decisión: recrear todo y cambiar la URL en una sola ventana. Porqué: la URL de CloudFront cambia al recrear, y la app tendría que cambiarla dos veces.
 - Lección: una prueba de regreso debe durar más que el retraso de B; en la primera corrida se restauró `dev` antes de que B llegara a su comprobación.
+- Lección: `tls: internal error` al conectar con Atlas suele ser una IP no permitida. Una instancia sin Mongo sigue sana para el balanceador, porque `/health` no consulta bases: revisa `/ready` en cada instancia tras tocar Atlas.
 - Decisión: CloudFront da el HTTPS, sin dominio. Porqué: ACM no valida `sslip.io` y no hay dominio propio.
 - Decisión: puerto 22 cerrado e instalación por Systems Manager. Porqué: la IP del operador cambia con frecuencia. Exige `ssm:SendCommand` en la política del deployer.
 - Decisión: la IP del cliente sale de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final, y no de la primera entrada. Porqué: Fiber sin `EnableIPValidation` devuelve la cabecera tal cual; hoy no se explota porque Caddy la limpia, pero el balanceador la conservaría y un cliente evadiría el límite de login.
@@ -245,7 +246,7 @@
 - Lección: una política administrada no pasa de 6144 caracteres; la del deployer ya no admite más, y lo nuevo va en políticas aparte.
 
 ## NV-14 — Crear y eliminar la infraestructura (en curso)
-- Estado (2026-11-06): el docente aceptó scripts versionados. `crear.sh` y `destruir.sh` probados solo con `--solo-plan`. Falta el ciclo real, después de NV-12 y antes de congelar la app móvil.
+- Estado (2026-11-06): el docente aceptó scripts versionados, según Osmar Reséndiz. Ciclo real hecho: 55 recursos borrados y 53 creados, y la API instalada sola en las dos instancias. Falta firmar.
 - Decisión: scripts y no workflow. Porqué: el docente lo acepta y evita claves de AWS de larga duración en GitHub, lo que respeta la decisión de NV-08.
 - Decisión: el estado de Terraform sigue local, con respaldo automático. Porqué: el bucket de S3 solo hacía falta para que corriera en GitHub; un solo operador no lo necesita. Si se pierde esa máquina, se pierde el estado: copia el respaldo a otro lado.
 - Lección: una instancia recreada no se instalaba sola: no tenía archivos, y `actualizar.sh` exigía `/ready` 200 de una versión que aún no existe.

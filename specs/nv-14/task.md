@@ -16,9 +16,9 @@
 
 ## Fase 3 — Cierre parcial (Req. 8, 9)
 - [x] T09 `README.md`, enmienda de la constitución, `AGENTS.md`, `Memoria.md`.
-- [ ] T10 `check_sdd`, `critic`; PR. Sin cambios de Go: las suites las corre el CI.
+- [x] T10 `check_sdd`, `critic`; PR. Sin cambios de Go: las suites las corre el CI.
 
 ## Fase 4 — Ciclo real
-- [ ] T11 Adaptar los scripts a lo que entregue NV-12.
-- [ ] T12 `destruir.sh` y `crear.sh` en la ventana acordada, antes de congelar la app móvil.
-- [ ] T13 Pasos manuales de Atlas, SNS y URL comprobados; evidencia en `gates.md`.
+- [x] T11 Adaptar los scripts a lo que entregue NV-12.
+- [x] T12 `destruir.sh` y `crear.sh` en la ventana acordada, antes de congelar la app móvil.
+- [x] T13 Pasos manuales de Atlas, SNS y URL comprobados; evidencia en `gates.md`.

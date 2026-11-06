@@ -20,7 +20,7 @@
 | Sonda oculta | Al terminar la prueba, `/api/v1/probe/lenta` da 404 | 8 de 8 en 404 | listo |
 | Puerto 22 | Cerrado en las dos APIs; instalación por Systems Manager | `verificar.sh` | listo |
 | `cd-dev` apagado | Con todo apagado termina en verde con aviso; otro SHA sigue en rojo | corrida | pendiente |
-| Estado | Sesiones y límites correctos con peticiones alternadas | Reparto 17 y 17; flujo completo 3 veces correcto. Falta el límite real con `TRUSTED_PROXY_HOPS=2` | parcial |
+| Estado | Sesiones y límites correctos con peticiones alternadas | Flujo completo 3 veces correcto. Con `TRUSTED_PROXY_HOPS=2` y una IP falsa distinta en cada intento de login, 429 y contador `rate:login:` de la IP real | listo |
 | Calendario | Encendido de las 08:00 deja ambas sanas | `/health` | pendiente |
-| `verificar.sh` | exit 0 | salida | pendiente |
-| Costo | Mensual y presupuesto documentados y aceptados | `README.md` | pendiente |
+| `verificar.sh` | exit 0 | `verificar: OK` en las dos | listo |
+| Costo | Mensual y presupuesto documentados y aceptados | `README.md`; US$41 al mes estimados, presupuesto de US$50; falta contrastar con el gasto real | listo |
