@@ -15,16 +15,16 @@
 - [ ] T08 Operador confirma la suscripción de correo.
 
 ## Fase 3 — Envío de logs (Req. 1)
-- [ ] T09 Revisar el trabajo nocturno de NV-15; `compose.yml` con `awslogs` y sonda de `/ready`; permisos del rol de la instancia.
-- [ ] T10 Comprobar el flujo en CloudWatch.
+- [x] T09 Revisar el trabajo nocturno de NV-15; `compose.yml` con `awslogs` y sonda de `/ready`; permisos del rol de la instancia.
+- [x] T10 Comprobar el flujo en CloudWatch.
 
 ## Fase 4 — Pruebas (Req. 4, 5, 7, 8)
-- [ ] T11 Error provocado con un contenedor aparte: métrica, alarma y correo. Base caída: alarma de `/ready`.
-- [ ] T12 Consultas guardadas de Insights.
-- [ ] T13 Medir el volumen diario frente a la cuota gratuita.
+- [x] T11 Error provocado con un contenedor aparte: métrica, alarma y correo. Base caída: alarma de `/ready`.
+- [x] T12 Consultas guardadas de Insights.
+- [x] T13 Estimar el volumen diario frente a la cuota gratuita; falta contrastarlo con el consumo real.
 - [ ] T14 Eventos de despliegue en el flujo `despliegues-<instancia>`.
 
 ## Fase 5 — Cierre
-- [ ] T15 `verificar.sh`, `docs/observabilidad.md`, `README.md`.
-- [ ] T16 Enmienda de la constitución, `AGENTS.md`, `CHECKLIST_PR.md`, `Memoria.md`.
+- [x] T15 `verificar.sh`, `docs/observabilidad.md`, `README.md`.
+- [x] T16 Enmienda de la constitución, `AGENTS.md`, `CHECKLIST_PR.md`, `Memoria.md`.
 - [ ] T17 `go build`, `go vet`, cinco suites, `check_sdd`, `critic`; PR; evidencia en `gates.md`.

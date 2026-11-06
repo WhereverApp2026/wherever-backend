@@ -220,7 +220,8 @@
 - Riesgo aceptado hasta decidir otra cosa: una sola IP dentro del límite global agota la cuota en menos de 3 horas.
 
 ## NV-13 — Observabilidad en CloudWatch (en curso)
-- Estado (2026-11-06): `apply` hecho (18 recursos), alarmas en OK. Faltan confirmar el correo de SNS, revisar el trabajo de las 21:00 de NV-15, subir `compose.yml` y probar.
+- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Faltan confirmar el correo de SNS, comprobar el evento de despliegue con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
+- NV-15: el trabajo de las 21:00 corrió el 2026-11-05 sin fallos y sin pendientes.
 - Decisión: el logger también oculta correos y credenciales de URI dentro de cualquier texto. Porqué: solo miraba el nombre del campo, y el texto de un error de MongoDB puede traer un correo; ahora esos logs salen de la instancia.
 - Decisión: timer `wherever-sonda` que consulta `/ready` cada 5 minutos. Porqué: nadie más lo consulta con frecuencia, y la alarma nunca sonaría. Cuesta el 2 % de la cuota de Redis por instancia.
 - Decisión: controlador `awslogs` en modo `non-blocking`. Porqué: una caída de CloudWatch no debe impedir que la API arranque.
