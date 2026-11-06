@@ -60,9 +60,10 @@ Sin endpoints nuevos. `GET /health` sigue devolviendo el SHA de la instancia que
 - Sin dominio, el correo sigue sin resolverse (SPF y DKIM); queda para cuando haya dominio.
 - Sin autoescalado ni varias regiones. Los servicios de datos gratuitos no tienen alta disponibilidad. Solo desarrollo.
 - El balanceador cobra aunque las instancias estén apagadas.
+- El chequeo en `/health` no consulta bases: si una sola instancia pierde MongoDB, sigue recibiendo tráfico y cerca de la mitad de las peticiones falla. Pasó al recrear, con una IP mal cargada en Atlas. Lo detecta la alarma `dependencia`, gracias a la sonda de NV-13; se acepta en desarrollo a cambio de que una pausa de Aura no saque a las dos instancias.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Infraestructura aplicada; faltan el despliegue escalonado, el regreso, el cambio de URL y la firma
+- **Estado:** 🚧 Implementada y probada; falta `cd-dev` con todo apagado, el encendido de las 08:00, que la app compile con la URL final y la firma
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** 2026-11-05 (inicio de la ejecución)
 - **Decisiones del revisor (2026-11-05):** aprobadas (a) CloudFront delante del balanceador, sin dominio; (b) costo de US$41 al mes, destrucción tras la evaluación y presupuesto de US$50; (c) puerto 22 cerrado e instalación por Systems Manager (cambió frente a la propuesta de abrirlo a la IP del operador); (d) ampliar boundary y política del deployer, con los JSON preparados por el revisor; (e) enmienda de la constitución. Si la prueba de ELB o CloudFront falla por verificación de cuenta o por la organización, no se insiste y se decide con el revisor.

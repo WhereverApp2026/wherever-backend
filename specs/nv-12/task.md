@@ -36,10 +36,10 @@
 - [x] T23 Despliegue escalonado y regreso automático.
 - [x] T24 Compresión por CloudFront.
 - [x] T25 `REQUEST_TIMEOUT` en 55 s; petición larga con `/api/v1/probe/lenta` por CloudFront, y volver a ocultarla; comprobar que da 404.
-- [ ] T26 Estado compartido entre instancias.
+- [x] T26 Estado compartido entre instancias.
 - [ ] T27 Calendario de apagado y encendido; `cd-dev` en verde con todo apagado.
 
 ## Fase 6 — Cambio de URL y cierre (Req. 12, 13)
-- [ ] T28 Cambiar la URL de la app; quitar Caddy; `TRUSTED_PROXY_HOPS=2`.
+- [x] T28 Quitar Caddy; `TRUSTED_PROXY_HOPS=2`; URL final entregada. Falta que la app compile con ella.
 - [ ] T29 `verificar.sh`, `README.md`, costo y presupuesto, enmienda de la constitución, `AGENTS.md`, `CHECKLIST_PR.md`, `Memoria.md`.
 - [ ] T30 `go build`, `go vet`, cinco suites, `actionlint`, `check_sdd`, `critic`; PR; evidencia en `gates.md`.

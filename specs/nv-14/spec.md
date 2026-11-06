@@ -41,11 +41,10 @@ Sin endpoints nuevos ni recursos nuevos de Terraform. Enmienda de la constituci�
 - Corre en la máquina del operador. El estado local depende de esa máquina y de sus respaldos: si se pierden, hay que borrar a mano en la consola.
 - Si una imagen falla en el primer arranque, no hay versión anterior a la que regresar: el actualizador reintenta cada minuto.
 - Atlas, SNS y la URL tienen pasos manuales al recrear.
-- Permisos de borrado del deployer sin probar hasta el ciclo real.
 - Solo desarrollo.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada en la rama `nv-14-infra-scripts`, sin el ciclo real; sin firmar
+- **Estado:** 🚧 Implementada y con el ciclo real hecho; sin firmar
 - **Revisores:** Osmar Reséndiz (pendiente de firmar)
 - **Fecha:** 2026-11-06 (ejecución)
 - **Decisiones:** (a) respuesta del docente: bastan scripts versionados, según Osmar Reséndiz, 2026-11-06. Con eso salen el workflow `infra-dev.yml`, el usuario `wherever-dev-pipeline` y sus claves en GitHub. (b) El estado sigue local: el bucket de S3 solo hacía falta para correr en GitHub. Si se quiere remoto, es un cambio aparte.
