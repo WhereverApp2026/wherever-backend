@@ -23,7 +23,7 @@ const (
 const (
 	MaxBodyLimit      = 10 * 1024 * 1024
 	MaxRequestTimeout = 60 * time.Second
-	// Saltos de confianza en X-Forwarded-For: 1 con Caddy, 2 con CloudFront y balanceador (nv-12).
+	// Saltos de confianza en X-Forwarded-For: 2 con CloudFront y balanceador (nv-12).
 	DefaultTrustedProxyHops = 1
 	MaxTrustedProxyHops     = 3
 	DefaultRateGlobal       = 1000

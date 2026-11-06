@@ -12,9 +12,8 @@ data "aws_vpc" "default" {
 }
 
 locals {
-  name         = "${var.project}-${var.environment}"
-  param_path   = "/${var.project}/${var.environment}/"
-  site_address = var.domain_name != "" ? var.domain_name : "${replace(aws_eip.api["a"].public_ip, ".", "-")}.sslip.io"
+  name       = "${var.project}-${var.environment}"
+  param_path = "/${var.project}/${var.environment}/"
   # Dos zonas distintas (nv-12). "a" es la instancia original: su zona no se puede cambiar sin reemplazarla.
   api_nodes = { a = "${var.region}c", b = "${var.region}a" }
   # Tope de permisos de todo rol del proyecto (nv-08). Lo crea el administrador en la consola.
@@ -27,37 +26,6 @@ resource "aws_security_group" "api" {
   name        = "${local.name}-api"
   description = "Wherever dev: HTTPS publico; SSH y API solo desde la IP de quien desarrolla"
   vpc_id      = data.aws_vpc.default.id
-}
-
-# Caddy y sslip.io siguen hasta que la URL de CloudFront pase las pruebas (nv-12).
-moved {
-  from = aws_vpc_security_group_ingress_rule.http
-  to   = aws_vpc_security_group_ingress_rule.http[0]
-}
-
-moved {
-  from = aws_vpc_security_group_ingress_rule.https
-  to   = aws_vpc_security_group_ingress_rule.https[0]
-}
-
-resource "aws_vpc_security_group_ingress_rule" "http" {
-  count             = var.caddy_enabled ? 1 : 0
-  security_group_id = aws_security_group.api.id
-  description       = "HTTP para el reto de Lets Encrypt y la redireccion a HTTPS"
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
-}
-
-resource "aws_vpc_security_group_ingress_rule" "https" {
-  count             = var.caddy_enabled ? 1 : 0
-  security_group_id = aws_security_group.api.id
-  description       = "HTTPS publico (Caddy)"
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = 443
-  to_port           = 443
 }
 
 resource "aws_vpc_security_group_ingress_rule" "ssh" {

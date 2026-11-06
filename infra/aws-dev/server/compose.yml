@@ -1,6 +1,6 @@
 # Servidor de desarrollo en AWS (spec nv-07). MongoDB vive en Atlas, Redis en Upstash y Neo4j en
-# Aura (nv-11); aquí solo la API y Caddy. Todo vuelve solo tras un apagado.
-# Lo sube scripts/desplegar.sh a /opt/wherever; .env lo arma scripts/deploy-env.sh.
+# Aura (nv-11); aquí solo la API, y el HTTPS lo da CloudFront (nv-12). Todo vuelve solo tras un apagado.
+# Lo sube scripts/instalar-actualizador.sh a /opt/wherever; .env lo arma scripts/deploy-env.sh.
 name: wherever
 
 services:
@@ -8,7 +8,7 @@ services:
     image: ${API_IMAGE:-wherever-api:dev} # imagen.env la fija por digest (nv-08)
     env_file: .env
     ports:
-      - "8080:8080" # el Security Group solo deja llegar desde tu IP; el público entra por Caddy
+      - "8080:8080" # el Security Group solo deja llegar al balanceador
     restart: unless-stopped
     mem_limit: 192m
     # nv-13. non-blocking: si CloudWatch no responde, la API arranca y atiende; pierde líneas, no peticiones.
@@ -20,21 +20,3 @@ services:
         awslogs-stream: ${LOG_STREAM:?falta LOG_STREAM}
         mode: non-blocking
         max-buffer-size: 4m
-
-  # Solo en la instancia A y solo hasta cambiar a la URL de CloudFront (nv-12).
-  caddy:
-    profiles: [caddy]
-    image: caddy:2.10.2-alpine
-    network_mode: host # 80 y 443 de la instancia; reenvía a 127.0.0.1:8080
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data # conserva el certificado entre apagados
-      - caddy-config:/config
-    restart: unless-stopped
-    mem_limit: 64m
-
-volumes:
-  caddy-data:
-  caddy-config:

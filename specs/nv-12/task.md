@@ -15,7 +15,7 @@
 ## Fase 2 — Compresión, sonda y auditoría (Req. 3, 7)
 - [x] T09 Middleware de compresión con sus pruebas: `Accept-Encoding`; `/auth` y `POST /usuarios` sin comprimir.
 - [x] T10 Sonda `/api/v1/probe/lenta`, oculta por `HIDE_INTERNALS`.
-- [ ] T11 PR propio, fusionar y desplegar; confirmar la compresión en el servidor.
+- [x] T11 PR propio, fusionar y desplegar; confirmar la compresión en el servidor.
 - [ ] T12 Auditoría de estado local y `docs/auditoria-estado.md`.
 
 ## Fase 3 — Infraestructura (Req. 4, 5, 6, 10)
@@ -28,14 +28,14 @@
 - [x] T17 `cd-dev.yml` con la etiqueta de revisión en la imagen.
 - [x] T18 Instalación de B condicionada a A: salud en el grupo de destino y SHA nuevo en `/health` por CloudFront.
 - [x] T19 Instalar temporizador y script en la segunda API por Systems Manager; cerrar el 22 en las dos.
-- [ ] T20 `cd-dev.yml` con la URL de CloudFront, espera de unos 10 min, lecturas seguidas y 5xx sostenidos como apagado; variable `API_URL`.
+- [x] T20 `cd-dev.yml` con la URL de CloudFront, espera de unos 10 min, lecturas seguidas y 5xx sostenidos como apagado; variable `API_URL`.
 
 ## Fase 5 — Pruebas (Req. 11)
 - [x] T21 Salud, certificado, redirección y aislamiento del balanceador.
 - [x] T22 Caída de una instancia.
-- [ ] T23 Despliegue escalonado y regreso automático.
-- [ ] T24 Compresión por CloudFront.
-- [ ] T25 `REQUEST_TIMEOUT` en 55 s; petición larga con `/api/v1/probe/lenta` por CloudFront, y volver a ocultarla; comprobar que da 404.
+- [x] T23 Despliegue escalonado y regreso automático.
+- [x] T24 Compresión por CloudFront.
+- [x] T25 `REQUEST_TIMEOUT` en 55 s; petición larga con `/api/v1/probe/lenta` por CloudFront, y volver a ocultarla; comprobar que da 404.
 - [ ] T26 Estado compartido entre instancias.
 - [ ] T27 Calendario de apagado y encendido; `cd-dev` en verde con todo apagado.
 

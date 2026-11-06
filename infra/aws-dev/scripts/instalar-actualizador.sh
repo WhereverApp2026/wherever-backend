@@ -56,7 +56,7 @@ upload() {
 echo "instalar-actualizador: esperando el arranque de la instancia"
 remote 'cloud-init status --wait >/dev/null || true; test -d /opt/wherever'
 
-for file in server/compose.yml server/Caddyfile scripts/deploy-env.sh scripts/actualizar.sh; do
+for file in server/compose.yml scripts/deploy-env.sh scripts/actualizar.sh; do
 	upload "$here/$file" "/opt/wherever/$(basename "$file")"
 done
 for file in wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer; do
@@ -73,7 +73,7 @@ chown ec2-user:ec2-user .env'
 
 timers='set -e
 cd /opt/wherever
-chown ec2-user:ec2-user compose.yml Caddyfile deploy-env.sh actualizar.sh
+chown ec2-user:ec2-user compose.yml deploy-env.sh actualizar.sh
 chmod +x deploy-env.sh actualizar.sh
 cd /etc/systemd/system
 chown root:root wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer
