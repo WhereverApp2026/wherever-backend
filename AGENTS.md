@@ -89,6 +89,7 @@
 - Servidor de AWS: Redis en Upstash y Neo4j en Aura (nv-11). Antes de una demostración, comprueba que Aura no esté en pausa.
 - Imagen lista con `docker build`, no desplegada. Cuando haya hosting se añade runbook con variables y verificación post-subida.
 - Una sola instancia local para desarrollo; la multi-instancia se valida en la spec de infraestructura.
+- Crear y eliminar la infraestructura: `infra/aws-dev/scripts/crear.sh` y `destruir.sh` (nv-14), en la máquina del operador. GitHub no tiene claves de AWS, por decisión de nv-08.
 
 ## 10. Lecciones
 - Fuente: `Memoria.md`. Si se vuelve regla, mover a `AGENTS.md`.

@@ -231,14 +231,21 @@
 - Decisión: varias cabeceras `X-Forwarded-For` cuentan como una lista. Porqué: la primera la puede escribir el cliente.
 
 ## NV-13 — Observabilidad en CloudWatch (en curso)
-- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Faltan confirmar el correo de SNS, comprobar el evento de despliegue con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
+- Estado (2026-11-06): logs en CloudWatch funcionando en el servidor. Las alarmas `errores`, `respuestas` y `dependencia` sonaron a los 50 s con un contenedor aparte; Insights devuelve resultados; 0 datos sensibles en 31 líneas reales. Correo de alarma recibido el 2026-11-06. Faltan ver el evento dentro de una instalación real con la siguiente imagen y contrastar el volumen estimado (unos 14 MB al mes).
 - NV-15: el trabajo de las 21:00 corrió el 2026-11-05 sin fallos y sin pendientes.
 - Decisión: el logger también oculta correos y credenciales de URI dentro de cualquier texto. Porqué: solo miraba el nombre del campo, y el texto de un error de MongoDB puede traer un correo; ahora esos logs salen de la instancia.
 - Decisión: timer `wherever-sonda` que consulta `/ready` cada 5 minutos. Porqué: nadie más lo consulta con frecuencia, y la alarma nunca sonaría. Cuesta el 2 % de la cuota de Redis por instancia.
 - Decisión: controlador `awslogs` en modo `non-blocking`. Porqué: una caída de CloudWatch no debe impedir que la API arranque.
+- Lección: `log_event` tragaba su error con `|| true` y los eventos no se registraban, así que la alarma de regreso no podía sonar. Lo que no debe detener un flujo igual debe avisar: ahora escribe el fallo en el journal.
 - Lección: cambiar el controlador o instalar una imagen recrea el contenedor y borra sus logs locales.
 - Lección: al adjuntar una política, IAM tarda unos minutos en propagar y la misma llamada pasa y falla alternadamente. Antes de un `apply`, repite una lectura hasta verla pasar varias veces seguidas.
 - Lección: una política administrada no pasa de 6144 caracteres; la del deployer ya no admite más, y lo nuevo va en políticas aparte.
+
+## NV-14 — Crear y eliminar la infraestructura (en curso)
+- Estado (2026-11-06): el docente aceptó scripts versionados. `crear.sh` y `destruir.sh` probados solo con `--solo-plan`. Falta el ciclo real, después de NV-12 y antes de congelar la app móvil.
+- Decisión: scripts y no workflow. Porqué: el docente lo acepta y evita claves de AWS de larga duración en GitHub, lo que respeta la decisión de NV-08.
+- Decisión: el estado de Terraform sigue local, con respaldo automático. Porqué: el bucket de S3 solo hacía falta para que corriera en GitHub; un solo operador no lo necesita. Si se pierde esa máquina, se pierde el estado: copia el respaldo a otro lado.
+- Lección: una instancia recreada no se instalaba sola: no tenía archivos, y `actualizar.sh` exigía `/ready` 200 de una versión que aún no existe.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

@@ -49,8 +49,11 @@ log_event() {
 	instance="$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)" || return 0
 	stream="despliegues-$instance"
 	aws logs create-log-stream --region "$region" --log-group-name "$log_group" --log-stream-name "$stream" 2>/dev/null || true
+	# En JSON: la forma abreviada de la CLI no admite llaves en el mensaje.
+	local events="[{\"timestamp\":$(($(date +%s) * 1000)),\"message\":\"{\\\"evento\\\":\\\"$1\\\",\\\"digest\\\":\\\"$2\\\"}\"}]"
 	aws logs put-log-events --region "$region" --log-group-name "$log_group" --log-stream-name "$stream" \
-		--log-events "timestamp=$(($(date +%s) * 1000)),message={\"evento\":\"$1\",\"digest\":\"$2\"}" >/dev/null 2>&1 || true
+		--log-events "$events" >/dev/null ||
+		echo "actualizar: no se pudo registrar el evento $1 en CloudWatch" >&2
 }
 
 ready_now() { [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$ready_url" || true)" == "200" ]]; }
@@ -64,8 +67,9 @@ wait_ready() {
 	return 1
 }
 
-# Sin esto, una caída de Atlas o una pausa de Aura parecerían un fallo de la imagen nueva.
-if ! ready_now; then
+# Sin esto, una caída de Atlas o una pausa de Aura parecerían un fallo de la imagen nueva. Una
+# instancia recién creada no tiene versión actual: ahí no hay nada que comprobar (nv-14).
+if [[ -n "$current" ]] && ! ready_now; then
 	echo "actualizar: la versión actual no da /ready 200; se reintenta en la siguiente revisión"
 	exit 0
 fi
