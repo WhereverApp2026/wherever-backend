@@ -44,7 +44,7 @@ Sin endpoints nuevos. Enmienda de la constitución §3: observabilidad en CloudW
 - Al ser gratuito, retención corta y umbrales sencillos.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 En ejecución en la rama `nv-13-observabilidad`
+- **Estado:** 🚧 Implementada en `main` (PR 24 y 25) y desplegada; sin firmar
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** 2026-11-05 (inicio de la ejecución)
 - **Decisiones para el revisor antes de ejecutar:** (a) CloudWatch Logs con el controlador `awslogs`; (b) retención de 14 días; (c) correo del proyecto para las alarmas; (d) ampliar el boundary y la política del deployer; (e) enmienda de la constitución.

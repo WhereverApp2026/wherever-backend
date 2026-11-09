@@ -41,7 +41,7 @@ La auditoría del 5 de noviembre de 2026 contra los requerimientos, el documento
 - No corrige el resto de la auditoría.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada en la rama `nv-15-correcciones-auditoria`; sin firmar
+- **Estado:** 🚧 Implementada en `main` (PR 20) y comprobada en el servidor; sin firmar
 - **Revisores:** Osmar Reséndiz (pendiente de firmar)
 - **Fecha:** 2026-11-05 (ejecución)
 - **Detalle:** se numera nv-15 porque nv-11 a nv-14 ya tienen otro alcance. La evidencia va en `specs/nv-15/checklists/gates.md` + `Memoria.md`.
