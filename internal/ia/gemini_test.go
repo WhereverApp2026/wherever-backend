@@ -80,7 +80,8 @@ func TestGemini_ExitoConPeticionSeparadaYSinDatosPersonales(t *testing.T) {
 	assert.Contains(t, string(usuario), "tranquilo")
 	assert.NotContains(t, string(usuario), "ana@example.com")
 	assert.NotContains(t, string(usuario), "123 4567")
-	config := cuerpo["generationConfig"].(map[string]any)
+	config, ok := cuerpo["generationConfig"].(map[string]any)
+	require.True(t, ok)
 	assert.Equal(t, "application/json", config["responseMimeType"])
 	assert.NotNil(t, config["responseJsonSchema"])
 }

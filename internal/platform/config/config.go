@@ -83,7 +83,7 @@ const (
 	KeyAppLinkBase      = "APP_LINK_BASE"
 	KeyJobHour          = "JOB_HOUR"
 	KeyHideInternals    = "HIDE_INTERNALS"
-	KeyGeminiAPIKey     = "GEMINI_API_KEY"
+	KeyGeminiAPIKey     = "GEMINI_API_KEY" // #nosec G101 -- nombre de la variable, no su valor
 	KeyIAModeloID       = "IA_MODELO_ID"
 	KeyIATimeout        = "IA_TIMEOUT"
 )

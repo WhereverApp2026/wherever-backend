@@ -84,8 +84,7 @@ func TestVivo_Gemini20Frases(t *testing.T) {
 	require.NoError(t, err)
 
 	frases := leerFrases(t)
-	var latencias []time.Duration
-	var limites, invalidas, otros, entrada, salida int
+	var m medicion
 	for n, frase := range frases {
 		if n > 0 {
 			time.Sleep(pausa)
@@ -95,31 +94,46 @@ func TestVivo_Gemini20Frases(t *testing.T) {
 		r, err := ia.GenerarValidado(context.Background(), g, ia.Peticion{
 			Instrucciones: instruccionesInterpretar, TextoUsuario: frase, Esquema: esquemaInterpretar, MaxTokens: 512,
 		}, &out)
-		dur := time.Since(inicio)
-		entrada += r.TokensEntrada
-		salida += r.TokensSalida
-		switch {
-		case err == nil:
-			latencias = append(latencias, dur)
-			t.Logf("%2d ok %5dms  %-8s %-9s %v", n+1, dur.Milliseconds(), out.Compania, out.Animo, out.PalabrasClave)
-		case errors.Is(err, ia.ErrLimiteProveedor):
-			limites++
-			t.Logf("%2d 429 %v", n+1, err)
-		case errors.Is(err, ia.ErrRespuestaInvalida):
-			invalidas++
-			t.Logf("%2d inválida %v", n+1, err)
-		default:
-			otros++
-			t.Logf("%2d error %v", n+1, err)
-		}
+		m.registrar(t, n+1, time.Since(inicio), r, err, out)
 	}
-	slices.Sort(latencias)
-	t.Logf("modelo=%s frases=%d ok=%d 429=%d (%.0f %%) inválidas=%d otros=%d", g.Nombre(), len(frases),
-		len(latencias), limites, 100*float64(limites)/float64(len(frases)), invalidas, otros)
-	if len(latencias) > 0 {
+	m.resumir(t, g.Nombre(), len(frases))
+}
+
+// medicion acumula lo que la prueba en vivo reporta.
+type medicion struct {
+	latencias                                  []time.Duration
+	limites, invalidas, otros, entrada, salida int
+}
+
+func (m *medicion) registrar(t *testing.T, n int, dur time.Duration, r ia.Respuesta, err error, out interpretacion) {
+	t.Helper()
+	m.entrada += r.TokensEntrada
+	m.salida += r.TokensSalida
+	switch {
+	case err == nil:
+		m.latencias = append(m.latencias, dur)
+		t.Logf("%2d ok %5dms  %-8s %-9s %v", n, dur.Milliseconds(), out.Compania, out.Animo, out.PalabrasClave)
+	case errors.Is(err, ia.ErrLimiteProveedor):
+		m.limites++
+		t.Logf("%2d 429 %v", n, err)
+	case errors.Is(err, ia.ErrRespuestaInvalida):
+		m.invalidas++
+		t.Logf("%2d inválida %v", n, err)
+	default:
+		m.otros++
+		t.Logf("%2d error %v", n, err)
+	}
+}
+
+func (m *medicion) resumir(t *testing.T, modelo string, total int) {
+	t.Helper()
+	slices.Sort(m.latencias)
+	t.Logf("modelo=%s frases=%d ok=%d 429=%d (%.0f %%) inválidas=%d otros=%d", modelo, total,
+		len(m.latencias), m.limites, 100*float64(m.limites)/float64(total), m.invalidas, m.otros)
+	if len(m.latencias) > 0 {
 		t.Logf("latencia p50=%dms p95=%dms máx=%dms; tokens entrada=%d salida=%d",
-			percentil(latencias, 50).Milliseconds(), percentil(latencias, 95).Milliseconds(),
-			latencias[len(latencias)-1].Milliseconds(), entrada, salida)
+			percentil(m.latencias, 50).Milliseconds(), percentil(m.latencias, 95).Milliseconds(),
+			m.latencias[len(m.latencias)-1].Milliseconds(), m.entrada, m.salida)
 	}
 }
 

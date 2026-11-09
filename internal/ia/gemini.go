@@ -218,10 +218,10 @@ func leerRespuesta(datos []byte) (Respuesta, error) {
 func errorDeEstado(resp *http.Response, datos []byte) error {
 	var ge geminiError
 	_ = json.Unmarshal(datos, &ge)
-	switch {
-	case resp.StatusCode == http.StatusTooManyRequests:
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests:
 		return &LimiteError{Espera: espera(resp.Header.Get("Retry-After"), ge)}
-	case resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusGatewayTimeout:
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
 		return ErrTiempo
 	default:
 		return fmt.Errorf("%w: HTTP %d %s", ErrProveedor, resp.StatusCode, ge.Error.Status)
