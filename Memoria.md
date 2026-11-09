@@ -251,6 +251,26 @@
 - Decisión: el estado de Terraform sigue local, con respaldo automático. Porqué: el bucket de S3 solo hacía falta para que corriera en GitHub; un solo operador no lo necesita. Si se pierde esa máquina, se pierde el estado: copia el respaldo a otro lado.
 - Lección: una instancia recreada no se instalaba sola: no tenía archivos, y `actualizar.sh` exigía `/ready` 200 de una versión que aún no existe.
 
+## Ruta hacia la evaluación (nv-16 a nv-53)
+- Estado (2026-11-08): 38 specs en borrador, revisadas contra el código. 19 en la ruta prioritaria y 19 pospuestas hasta después del 2 de diciembre. Ninguna ejecutada.
+- Decisión: ejecutar solo la ruta que responde a la auditoría. Porqué: son unas 240 tareas y quedan unos 24 días; nv-11 a nv-14 tomaron cerca de dos días cada una.
+  - Ola 1, catálogo y recomendaciones: nv-20, 21, 23, 24.
+  - Ola 2, planes con IA (hallazgo C1): nv-26 a nv-33. Empieza por la prueba de Bedrock de nv-26: si la cuenta no puede usarlo, cambia el plan.
+  - Ola 3, amistades, ML y grafo: nv-34, 35, 36, 50, 51, 52, 53. nv-34 a 36 entran porque el grafo de nv-52 y 53 necesita amistades.
+  - Pospuestas: nv-16 a 19, 22, 25 y 37 a 49.
+- Falta en la ruta: el correo (C4) sigue sin proveedor y ninguna spec lo resuelve.
+- Estimación de Redis con la ruta prioritaria: la base sigue en unos 40 % de la cuota. Generar planes suma unos 11 comandos por petición (límite 3, revocación 1, límite de IA 3, caché 2, gasto 2); con 50 al día, menos del 2 %. Las demás rutas nuevas no usan Redis fuera del limitador. Total estimado: unos 42 %. Rehacer si entran las pospuestas: el cierre de votaciones de nv-39 por sí solo sumaría cerca del 7 %.
+- Hallazgos para cuando se retomen las pospuestas:
+  - nv-17: ya existe `internal/shared/pagination`; lo que falta es firmar el cursor, no un paquete nuevo. También trae paquetes de nv-16 y nv-19.
+  - nv-19: `version_terminos` y la fecha de aceptación ya viven en la privacidad del usuario (nv-05).
+  - nv-22: el índice de texto de Mongo no tolera errores de escritura; hace falta Atlas Search u otra técnica.
+  - nv-37: sus pruebas incluyen unirse por enlace, que es de nv-38.
+  - nv-38: los enlaces de la app dependen de la URL de CloudFront, que cambia al recrear.
+  - nv-39: el cierre de votaciones cada minuto con dos instancias gasta cerca del 7 % de Redis.
+  - nv-41: el JSON de Firebase tiene varias líneas y `deploy-env.sh` escribe una variable por línea; el nombre `fcm-service-account` tampoco es válido como variable.
+  - nv-44: `destruir.sh` falla con un bucket con objetos si Terraform no lo vacía (`force_destroy`).
+  - nv-45: la API tiene 192 MB y una foto de 4000x4000 decodificada ocupa unos 64 MB; la biblioteca estándar de Go no lee ni escribe WebP.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
