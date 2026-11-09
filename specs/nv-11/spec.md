@@ -53,7 +53,7 @@ Sin endpoints nuevos ni cambios de contrato. `/health` deja de contar en el lím
 - Datos de desarrollo únicamente.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada en la rama `nv-11-datos-externos`; sin firmar
+- **Estado:** 🚧 Implementada en `main` (PR 21 y 22) y desplegada; sin firmar
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** 2026-11-05 (inicio de la ejecución)
 - **Decisiones para el revisor antes de ejecutar:** (a) Upstash Redis Free y Neo4j AuraDB Free; (b) umbral del 60 % y plan B con instancia propia de Redis; (c) cuentas con el correo único del proyecto; (d) enmienda de la constitución.
