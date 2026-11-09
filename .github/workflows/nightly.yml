@@ -72,8 +72,10 @@ jobs:
           JWT_KEY=$(openssl rand -base64 48)
           PHONE_HMAC_KEY=$(openssl rand -base64 48)
           export JWT_KEY PHONE_HMAC_KEY
+          # REQUEST_TIMEOUT=10s: la sonda /probe/lenta (nv-12) espera 45 s y ZAP la toma del
+          # OpenAPI; con 10 s responde su 408 antes de que ZAP corte la lectura y falle el plan.
           docker run -d --name api --network host \
-            -e APP_ENV=staging -e PORT=8080 -e MONGO_URI -e REDIS_ADDR=localhost:6379 \
+            -e APP_ENV=staging -e PORT=8080 -e REQUEST_TIMEOUT=10s -e MONGO_URI -e REDIS_ADDR=localhost:6379 \
             -e NEO4J_URI=neo4j://localhost:7687 -e JWT_ISSUER=wherever-api -e JWT_AUDIENCE=wherever-app \
             -e JWT_KEY -e PHONE_HMAC_KEY \
             wherever-api:dast
