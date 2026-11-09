@@ -11,5 +11,5 @@
 - [x] T06 Specs nv-27, nv-28, nv-31, nv-33 y nv-50 ajustadas; aviso de privacidad del proveedor de IA.
 
 ## Fase 2 — Cierre
-- [ ] T07 Llave real en SSM y en `.env`; prueba en vivo con las 20 frases; latencia y tasa de 429 en `gates.md`.
+- [x] T07 Llave real en SSM; prueba en vivo con las 20 frases; latencia y tasa de 429 en `gates.md`.
 - [ ] T08 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR.

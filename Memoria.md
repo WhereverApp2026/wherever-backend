@@ -272,7 +272,9 @@
   - nv-45: la API tiene 192 MB y una foto de 4000x4000 decodificada ocupa unos 64 MB; la biblioteca estándar de Go no lee ni escribe WebP.
 
 ## NV-26 — Cliente de IA con Gemini (en curso)
-- Estado (2026-11-09): rama `nv-26`. Interfaz `ia.Modelo`, adaptador de Gemini (`generateContent` con `responseJsonSchema`), validación estricta con un reintento, anonimización de la frase y configuración (`GEMINI_API_KEY`, `IA_MODELO_ID`, `IA_TIMEOUT`). Unit verde. Falta la prueba en vivo con la llave real y la firma.
+- Estado (2026-11-09): rama `nv-26`. Interfaz `ia.Modelo`, adaptador de Gemini (`generateContent` con `responseJsonSchema`), validación estricta con un reintento, anonimización de la frase y configuración (`GEMINI_API_KEY`, `IA_MODELO_ID`, `IA_TIMEOUT`). Unit verde. Prueba en vivo con `gemini-3.5-flash-lite`: 20 de 20 válidas, 0 429, p50 870 ms y p95 1169 ms, unos 150 tokens de entrada por frase. Falta la firma.
+- Hallazgo de la prueba en vivo: cabe de sobra en el plazo de 8 s de nv-33 con dos llamadas. Calidad mejorable: «con la banda» salió sin compañía; se afina en las instrucciones de nv-31, no en el adaptador.
+- Operación: la llave vive en SSM (`/wherever/dev/GEMINI_API_KEY`). La prueba en vivo la toma de ahí al entorno del contenedor sin imprimirla; no hace falta copiarla a `.env`.
 - Decisión (revisor): Gemini, capa gratuita, en lugar de Bedrock. Porqué: la cuenta de AWS tiene cuota cero para los modelos de Bedrock. El adaptador de Bedrock queda como opción futura detrás de la misma interfaz; no se agregaron permisos de Bedrock a IAM.
 - Decisión: un 429 de Gemini es `ErrLimiteProveedor`, no se reintenta y responde el motor de reglas. Nuestros límites (nv-28) quedan en no más del 80 % de los que AI Studio muestra para el proyecto: la documentación pública ya no publica cifras de la capa gratuita y el día se reinicia a medianoche del Pacífico.
 - Decisión: la llave va en el encabezado `x-goog-api-key`, nunca en la URL, para que no salga en errores de `net/http`; el logger oculta además cualquier `AIza…` en texto libre.

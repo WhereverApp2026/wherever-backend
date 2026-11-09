@@ -11,4 +11,4 @@
 | Semgrep | 0 hallazgos | 0 hallazgos en `internal/ia`, `internal/platform` y `configs` (reglas del pipeline) | listo |
 | SDD | `check_sdd` OK y `Memoria.md` actualizado | `SDD-OK (54 specs)`; `Memoria.md` con la sección NV-26 | listo |
 | Red | Las instancias salen por 443 a `generativelanguage.googleapis.com` | regla `egress_ports.https` de `main.tf` | listo |
-| En vivo | 20 frases con la llave real: latencia p50 y p95, tasa de 429, inválidas | salida de `TestVivo_Gemini20Frases` | pendiente |
+| En vivo | 20 frases con la llave real: latencia p50 y p95, tasa de 429, inválidas | 2026-11-09, `gemini-3.5-flash-lite`, llave desde SSM, 6 s entre llamadas: 20 de 20 válidas, 0 429 (0 %), 0 inválidas; p50 870 ms, p95 1169 ms, máx 1336 ms; 2973 tokens de entrada y 1302 de salida (unos 149 y 65 por frase). La frase con instrucciones (17) dio una salida neutra | listo |
