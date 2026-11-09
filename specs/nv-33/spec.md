@@ -4,7 +4,7 @@
 Si la IA falla o tarda, la persona siempre recibe opciones; también puede pedir otro plan o cancelar. **Origen**: US-035, US-039, US-040, US-041, US-042, US-043 y hoja A4 del Excel. **Depende de**: NV-32.
 
 ## Requisitos
-1. **Respaldo (US-039):** si la IA tarda más de 8 s, falla, se agotó el tope o el límite del usuario, responde el motor de reglas con un plan de la misma forma que nv-31, armado con sus mejores candidatos, `fuente: reglas` y un aviso.
+1. **Respaldo (US-039):** si la IA tarda más de 8 s, falla, el proveedor responde 429, se agotó el tope, el límite global o el del usuario, responde el motor de reglas con un plan de la misma forma que nv-31, armado con sus mejores candidatos, `fuente: reglas` y un aviso.
 2. **Cancelar (US-040):** si la app corta la conexión, la API cancela la llamada al modelo.
 3. `POST /planes/generar/otra-idea` produce un plan distinto excluyendo los lugares ya propuestos.
 4. Respuesta promedio por debajo de 5 s con la IA y por debajo de 1 s con el respaldo.
@@ -19,10 +19,10 @@ Si la IA falla o tarda, la persona siempre recibe opciones; también puede pedir
 | POST | `/api/v1/planes/generar/otra-idea` | JWT | 200, 422, 429 |
 
 ## Tests
-- `Integration/Generar 10` con MongoDB y Redis reales y el servidor local de Converse: plan correcto, la IA inventa un lugar, la IA tarda 9 s (respaldo), la IA falla, tope agotado, límite del usuario, cancelación.
+- `Integration/Generar 10` con MongoDB y Redis reales y el servidor local de `generateContent` de Gemini: plan correcto, la IA inventa un lugar, la IA tarda 9 s (respaldo), la IA falla, 429 del proveedor, tope agotado, límite del usuario, cancelación.
 - `Integration/OtraIdea 3`: no repite lugares.
 - `Security/Asistente 4`: inyección de instrucciones, frase de 301 caracteres, sin sesión; un plan nunca contiene negocios no aprobados.
-- Medición con IA real: 20 frases en español, tasa de descartes, latencia p50 y p95, costo promedio por plan.
+- Medición con IA real: 20 frases en español, tasa de descartes, latencia p50 y p95, tasa de 429 y tokens por plan. La de nv-26 mide solo «interpretar»; esta mide el flujo completo.
 
 ## Criterios
 - Con la IA caída, el usuario siempre recibe 3 opciones.

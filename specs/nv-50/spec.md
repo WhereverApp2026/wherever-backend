@@ -4,16 +4,16 @@
 Cada negocio recibe un vector de significado calculado con un modelo gestionado. **Origen**: Requisito del curso (ML) y US-035. **Depende de**: NV-20, NV-26, NV-23.
 
 ## Requisitos
-1. Cada negocio tiene un **vector de significado** (embedding) calculado con un modelo gestionado (Amazon Titan Text Embeddings V2 en Bedrock) a partir de nombre, categorías, etiquetas y descripción.
+1. Cada negocio tiene un **vector de significado** (embedding) calculado con un modelo gestionado (Gemini Embedding, `gemini-embedding-2` en `IA_EMBEDDINGS_ID`, por la misma llave de nv-26; Bedrock tiene cuota cero) a partir de nombre, categorías, etiquetas y descripción.
 2. Los vectores se calculan al cargar o editar un negocio y se pueden recalcular todos con un comando.
 3. Si el servicio de embeddings falla o no hay tope disponible, todo sigue funcionando con el motor de reglas.
 
 ## Diseño
-- **Almacenamiento:** campo `embedding` (1024 dimensiones) en `negocios` con **Atlas Vector Search** (incluido en el nivel gratuito, hasta 3 índices); consulta con `$vectorSearch` y filtro `estado = aprobado`.
+- **Almacenamiento:** campo `embedding` (768 dimensiones, `output_dimensionality`; el modelo las normaliza) en `negocios` con **Atlas Vector Search** (incluido en el nivel gratuito, hasta 3 índices); consulta con `$vectorSearch` y filtro `estado = aprobado`.
 - **Si el nivel gratuito no permite el índice vectorial:** plan B, calcular la similitud en la API sobre los vectores de 30 negocios (suficiente para el piloto) detrás de la misma interfaz.
 - **Texto del negocio** versionado: `embedding_version` para recalcular si cambia la plantilla.
-- **Privacidad:** a Bedrock solo viaja texto público de negocios y la frase de búsqueda, sin identificadores.
-- **Permiso:** `bedrock:InvokeModel` sobre el modelo de embeddings.
+- **Llamadas:** `batchEmbedContents` para recalcular en bloque; la frase de búsqueda con el formato de consulta del modelo. Cuentan contra los límites globales de nv-28 con su propio límite diario (`IA_EMB_LIMITE_DIA`), por debajo del de la capa gratuita.
+- **Privacidad:** a Gemini solo viaja texto público de negocios y la frase de búsqueda anonimizada, sin identificadores.
 
 ## Contratos
 Sin endpoints nuevos.

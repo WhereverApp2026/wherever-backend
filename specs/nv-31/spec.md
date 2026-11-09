@@ -11,7 +11,7 @@ La IA convierte una frase libre en parámetros y la API elige los candidatos rea
 ## Diseño
 - **Flujo:** frase → `interpretar` (IA) → parámetros → `Recomendar` (nv-23, 15 candidatos) → `armarItinerario` (IA, solo ids candidatos) → `verificar` → `Recalcular` (nv-29) → respuesta.
 - **Instrucciones fijas** en archivos versionados (`internal/asistente/prompts/*.txt`); la frase del usuario va solo como entrada.
-- **Datos hacia el modelo:** compañía, rango de presupuesto, franja horaria, etiquetas y, de los candidatos, nombre público, categoría, precio y distancia.
+- **Datos hacia el modelo:** compañía, rango de presupuesto, franja horaria, etiquetas y, de los candidatos, nombre público, categoría, precio y distancia. La frase va anonimizada (`ia.Anonimizar`) y sin ids de usuario: el proveedor es Gemini en capa gratuita (nv-26).
 
 ## Contratos
 | Método | Ruta | Auth | Respuestas |

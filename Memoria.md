@@ -255,7 +255,7 @@
 - Estado (2026-11-08): 38 specs en borrador, revisadas contra el código. 19 en la ruta prioritaria y 19 pospuestas hasta después del 2 de diciembre. Ninguna ejecutada.
 - Decisión: ejecutar solo la ruta que responde a la auditoría. Porqué: son unas 240 tareas y quedan unos 24 días; nv-11 a nv-14 tomaron cerca de dos días cada una.
   - Ola 1, catálogo y recomendaciones: nv-20, 21, 23, 24.
-  - Ola 2, planes con IA (hallazgo C1): nv-26 a nv-33. Empieza por la prueba de Bedrock de nv-26: si la cuenta no puede usarlo, cambia el plan.
+  - Ola 2, planes con IA (hallazgo C1): nv-26 a nv-33, con Gemini (ver nv-26).
   - Ola 3, amistades, ML y grafo: nv-34, 35, 36, 50, 51, 52, 53. nv-34 a 36 entran porque el grafo de nv-52 y 53 necesita amistades.
   - Pospuestas: nv-16 a 19, 22, 25 y 37 a 49.
 - Falta en la ruta: el correo (C4) sigue sin proveedor y ninguna spec lo resuelve.
@@ -270,6 +270,15 @@
   - nv-41: el JSON de Firebase tiene varias líneas y `deploy-env.sh` escribe una variable por línea; el nombre `fcm-service-account` tampoco es válido como variable.
   - nv-44: `destruir.sh` falla con un bucket con objetos si Terraform no lo vacía (`force_destroy`).
   - nv-45: la API tiene 192 MB y una foto de 4000x4000 decodificada ocupa unos 64 MB; la biblioteca estándar de Go no lee ni escribe WebP.
+
+## NV-26 — Cliente de IA con Gemini (en curso)
+- Estado (2026-11-09): rama `nv-26`. Interfaz `ia.Modelo`, adaptador de Gemini (`generateContent` con `responseJsonSchema`), validación estricta con un reintento, anonimización de la frase y configuración (`GEMINI_API_KEY`, `IA_MODELO_ID`, `IA_TIMEOUT`). Unit verde. Falta la prueba en vivo con la llave real y la firma.
+- Decisión (revisor): Gemini, capa gratuita, en lugar de Bedrock. Porqué: la cuenta de AWS tiene cuota cero para los modelos de Bedrock. El adaptador de Bedrock queda como opción futura detrás de la misma interfaz; no se agregaron permisos de Bedrock a IAM.
+- Decisión: un 429 de Gemini es `ErrLimiteProveedor`, no se reintenta y responde el motor de reglas. Nuestros límites (nv-28) quedan en no más del 80 % de los que AI Studio muestra para el proyecto: la documentación pública ya no publica cifras de la capa gratuita y el día se reinicia a medianoche del Pacífico.
+- Decisión: la llave va en el encabezado `x-goog-api-key`, nunca en la URL, para que no salga en errores de `net/http`; el logger oculta además cualquier `AIza…` en texto libre.
+- Privacidad: la capa gratuita usa lo enviado para mejorar los productos de Google y permite revisión humana. Solo viaja texto anonimizado y datos públicos de negocios; el aviso lo dice en `docs/aviso-privacidad.md`. Sus términos exigen 18 años o más (el registro ya lo exige) y prohíben la capa gratuita para personas del EEE, Suiza y Reino Unido.
+- Red: sin cambios; las instancias ya salen por 443 a cualquier destino.
+- A evitar: en Windows, Control de aplicaciones bloquea `gofmt`, `vet` y los `*.test.exe`; correr todo en `golang:1.27.3` con Docker.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

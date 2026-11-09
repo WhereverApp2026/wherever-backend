@@ -44,7 +44,10 @@ const (
 	defaultMailQueue   = 100
 	maxMailQueue       = 10000
 	defaultPort        = 8080
-	jwtKeyPlaceholder  = "PLACEHOLDER"
+	// IA generativa (nv-26): plazo por llamada al proveedor.
+	defaultIATimeout  = 25 * time.Second
+	maxIATimeout      = 55 * time.Second
+	jwtKeyPlaceholder = "PLACEHOLDER"
 )
 
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
@@ -80,6 +83,9 @@ const (
 	KeyAppLinkBase      = "APP_LINK_BASE"
 	KeyJobHour          = "JOB_HOUR"
 	KeyHideInternals    = "HIDE_INTERNALS"
+	KeyGeminiAPIKey     = "GEMINI_API_KEY"
+	KeyIAModeloID       = "IA_MODELO_ID"
+	KeyIATimeout        = "IA_TIMEOUT"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -99,6 +105,7 @@ var optionalKeys = []string{
 	KeySMTPHost, KeySMTPPort, KeySMTPUser, KeySMTPPassword, KeySMTPTLS, KeyMailFrom,
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 	KeyJobHour, KeyHideInternals,
+	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -130,7 +137,19 @@ type Config struct {
 	RateLimitWrites   int
 	JobHour           int
 	HideInternals     bool
+	IA                IA
 }
+
+// IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
+// apagada y los llamadores usan el motor de reglas.
+type IA struct {
+	GeminiAPIKey string
+	ModeloID     string
+	Timeout      time.Duration
+}
+
+// Enabled indica si hay proveedor de IA configurado.
+func (i IA) Enabled() bool { return i.GeminiAPIKey != "" && i.ModeloID != "" }
 
 // Mail es la configuración del correo saliente (nv-06). Sin SMTPHost no hay servidor: dev y
 // staging usan el LogMailer; producción no arranca.
@@ -192,6 +211,10 @@ func Load(getenv func(string) string) (Config, error) {
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
 		HideInternals:     strings.EqualFold(strings.TrimSpace(getenv(KeyHideInternals)), "true"),
+		IA: IA{
+			GeminiAPIKey: strings.TrimSpace(getenv(KeyGeminiAPIKey)),
+			ModeloID:     strings.TrimSpace(getenv(KeyIAModeloID)),
+		},
 	}
 	errs = append(errs, cfg.parseNumbers(getenv)...)
 	errs = append(errs, cfg.validate()...)
@@ -235,6 +258,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyJWTAccessTTL, &c.AccessTTL, MaxAccessTTL},
 		{KeyJWTRefreshTTL, &c.RefreshTTL, MaxRefreshTTL},
 		{KeyMailTimeout, &c.Mail.Timeout, defaultMailTimeout},
+		{KeyIATimeout, &c.IA.Timeout, defaultIATimeout},
 	}
 	for _, item := range durations {
 		value, err := durationOr(getenv(item.key), item.fallback)
@@ -266,6 +290,7 @@ func (c Config) validate() []error {
 		errs = append(errs, fmt.Errorf("%s debe estar entre 0 y %d", KeyJobHour, maxJobHour))
 	}
 	errs = append(errs, c.validateMail()...)
+	errs = append(errs, c.IA.validate()...)
 	return append(errs, c.validateLimits()...)
 }
 
@@ -429,4 +454,19 @@ func orDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// validate aplica nv-26: el plazo cabe dentro del de la petición y la llave no es un marcador.
+func (i IA) validate() []error {
+	var errs []error
+	if i.Timeout <= 0 || i.Timeout > maxIATimeout {
+		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %s", KeyIATimeout, maxIATimeout))
+	}
+	if strings.HasPrefix(i.GeminiAPIKey, jwtKeyPlaceholder) {
+		errs = append(errs, fmt.Errorf("%s no puede ser el marcador de ejemplo; déjala vacía para apagar la IA", KeyGeminiAPIKey))
+	}
+	if strings.ContainsAny(i.ModeloID, "/?#: ") {
+		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-3.5-flash-lite)", KeyIAModeloID))
+	}
+	return errs
 }
