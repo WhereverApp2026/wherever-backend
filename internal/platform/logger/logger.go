@@ -16,6 +16,8 @@ var sensitiveKey = regexp.MustCompile(`(?i)(password|contrasena|secret|token|aut
 var (
 	emailInText = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
 	uriUserinfo = regexp.MustCompile(`://[^/\s:@]+:[^/\s@]+@`)
+	// Llave de API de Google (Gemini, nv-26), por si un error de terceros la repite.
+	googleAPIKey = regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`)
 )
 
 // New crea un logger JSON; en dev usa texto legible en consola.
@@ -30,6 +32,7 @@ func New(w io.Writer, env string) *slog.Logger {
 // redactText oculta correos y credenciales de URI; un correo ya enmascarado (a***@x.com) no coincide.
 func redactText(text string) string {
 	text = uriUserinfo.ReplaceAllString(text, "://"+Redacted+"@")
+	text = googleAPIKey.ReplaceAllString(text, Redacted)
 	return emailInText.ReplaceAllString(text, Redacted)
 }
 

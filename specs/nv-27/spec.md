@@ -4,7 +4,7 @@
 El gasto de la IA tiene un tope mensual y las respuestas repetidas se reutilizan. **Origen**: US-159, US-190. **Depende de**: NV-26.
 
 ## Requisitos
-1. **Tope de gasto mensual** (`IA_TOPE_USD_MES`, 5 por defecto): se estima el costo por llamada con los tokens reales; al llegar al tope, las llamadas devuelven `ErrTope` y el llamador usa el motor de reglas.
+1. **Tope de gasto mensual** (`IA_TOPE_USD_MES`, 5 por defecto): se estima el costo por llamada con los tokens reales; al llegar al tope, las llamadas devuelven `ErrTope` y el llamador usa el motor de reglas. En la capa gratuita de Gemini el costo es cero y el tope no se alcanza; protege si se activa la facturación, con el precio por token en configuración.
 2. **Caché** de respuestas por huella de la entrada normalizada, 1 hora de vida.
 
 ## Diseño

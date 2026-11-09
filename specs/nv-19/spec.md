@@ -5,6 +5,7 @@ La app debe registrar qué versión de términos aceptó cada persona y volver a
 
 ## Requisitos
 1. **Aceptación de términos (US-003):** `POST /api/v1/usuarios/yo/consentimientos` guarda la versión de términos y de aviso aceptadas, la fecha y la casilla opcional de promociones.
+2. El aviso incluye la sección de terceros de `docs/aviso-privacidad.md`, con el proveedor externo de IA (Gemini, nv-26); un cambio en esa sección sube la versión del aviso.
 
 ## Diseño
 - **Consentimientos:** colección `consentimientos` de solo agregar (usuario, versiones, fecha, promociones).

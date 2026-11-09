@@ -57,3 +57,11 @@ func TestLogger_ElCorreoYaEnmascaradoSeConserva(t *testing.T) {
 
 	assert.Equal(t, "a***@example.com", fields["destinatario"])
 }
+
+func TestLogger_LlaveDeGoogleDentroDeUnTextoSeOculta(t *testing.T) {
+	fake := "AIza" + "Sy0000000000000000000000000000000AB"
+	raw, _ := line(t, func(l *slog.Logger) { l.Error("error de proveedor", "error", "solicitud rechazada para "+fake) })
+
+	assert.NotContains(t, raw, fake)
+	assert.Contains(t, raw, "solicitud rechazada")
+}

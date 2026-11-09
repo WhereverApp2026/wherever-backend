@@ -128,3 +128,36 @@ func TestLoad_NoPasswordOverPlainSMTP(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "sin cifrar")
 }
+
+func TestLoad_IAApagadaSinLlave(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+
+	require.NoError(t, err)
+	assert.False(t, cfg.IA.Enabled(), "sin GEMINI_API_KEY responde el motor de reglas")
+	assert.Equal(t, 25*time.Second, cfg.IA.Timeout)
+}
+
+func TestLoad_IAEncendidaConLlaveYModelo(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(map[string]string{
+		config.KeyGeminiAPIKey: "llave-de-prueba", config.KeyIAModeloID: "gemini-3.5-flash-lite",
+	}))
+
+	require.NoError(t, err)
+	assert.True(t, cfg.IA.Enabled())
+}
+
+func TestLoad_IARechazaValoresInvalidos(t *testing.T) {
+	cases := map[string]map[string]string{
+		"plazo mayor a 55s":     {config.KeyIATimeout: "90s"},
+		"plazo no positivo":     {config.KeyIATimeout: "0s"},
+		"llave marcador":        {config.KeyGeminiAPIKey: "PLACEHOLDER_GEMINI"},
+		"modelo con models/":    {config.KeyIAModeloID: "models/gemini-3.5-flash-lite"},
+		"modelo con parámetros": {config.KeyIAModeloID: "gemini?key=x"},
+	}
+	for name, overrides := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := config.Load(testutil.Env(overrides))
+			assert.Error(t, err)
+		})
+	}
+}
