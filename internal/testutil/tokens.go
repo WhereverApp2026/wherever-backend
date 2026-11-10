@@ -39,7 +39,13 @@ func sign(t *testing.T, c middleware.Claims) string {
 
 // ValidToken firma un access token HS256 vigente (15 min).
 func ValidToken(t *testing.T, jti string, roles ...string) string {
-	return sign(t, claims("usuario-1", jti, roles, 15*time.Minute))
+	return ValidTokenFor(t, "usuario-1", jti, roles...)
+}
+
+// ValidTokenFor firma un access token con el `sub` dado. Lo usa la semilla, que necesita
+// un administrador con `sub` ObjectId para resolver el dueño provisional.
+func ValidTokenFor(t *testing.T, subject, jti string, roles ...string) string {
+	return sign(t, claims(subject, jti, roles, 15*time.Minute))
 }
 
 // ExpiredToken firma un token que venció hace un minuto.

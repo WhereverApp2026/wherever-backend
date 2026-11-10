@@ -10,7 +10,7 @@
 | Correo disponible | 20 | 1 min | `GET /api/v1/usuarios/correo-disponible` por IP; provisional | nv-05 |
 | Descarga de exportación | 10 | 1 min | `POST /api/v1/usuarios/exportaciones/descargar` por IP; provisional | nv-05 |
 | Auth enlaces | 10 | 1 min | `refresh`, `recuperar`, `restablecer`, `verificar-correo`, cada una con su llave (`rate:auth_{ruta}:{ip}`) por IP; valor provisional, se mide antes de endurecer | nv-04 |
-| Admin | 200 | 1 min | endpoints admin | módulo admin (posterior) |
+| Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar` por IP (`rate:admin:{ip}`) | nv-20 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 5 generaciones | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`); al pasarlo, 429 | nv-28 (propuesta) |
 | IA global | 12 llamadas / 400 llamadas | 1 min / 1 día (hora del Pacífico) | llamadas a Gemini de toda la app (`rate:ia_min`, `rate:ia_dia`); al llegar, responde el motor de reglas sin 429. 80 % de lo que AI Studio da al proyecto con `gemini-3.5-flash-lite` (15 por minuto, 500 por día) | nv-28 (propuesta) |

@@ -1176,6 +1176,103 @@
           }
         }
       }
+    },
+    "/api/v1/categorias": {
+      "get": {
+        "summary": "Catálogo de categorías, etiquetas, servicios y filtros (solo aprobados)",
+        "responses": {
+          "200": {
+            "description": "Catálogo; Cache-Control: no-store hasta NV-18",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Categorias"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/negocios/importar": {
+      "post": {
+        "summary": "Carga semilla idempotente de 1 a 100 negocios (CSV o JSON)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "archivo"
+                ],
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "items": {
+                  "$ref": "#/components/schemas/NegocioSemilla"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reporte; puede traer errores por fila",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionNegocios"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1762,6 +1859,331 @@
           },
           "dispositivo": {
             "$ref": "#/components/schemas/Dispositivo"
+          }
+        }
+      },
+      "ItemConteo": {
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "conteo"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "conteo": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Categorias": {
+        "type": "object",
+        "required": [
+          "categorias",
+          "etiquetas",
+          "servicios",
+          "filtros"
+        ],
+        "properties": {
+          "categorias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemConteo"
+            }
+          },
+          "etiquetas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemConteo"
+            }
+          },
+          "servicios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemConteo"
+            }
+          },
+          "filtros": {
+            "type": "object",
+            "properties": {
+              "nivel_precio": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "opciones_dieta": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "accesibilidad": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ImportacionNegocios": {
+        "type": "object",
+        "required": [
+          "creados",
+          "actualizados",
+          "errores"
+        ],
+        "properties": {
+          "creados": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "actualizados": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "errores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "fila",
+                "mensaje"
+              ],
+              "properties": {
+                "fila": {
+                  "type": "integer"
+                },
+                "campo": {
+                  "type": "string"
+                },
+                "mensaje": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NegocioSemilla": {
+        "type": "object",
+        "required": [
+          "slug",
+          "nombre",
+          "categoria",
+          "descripcion",
+          "nivel_precio",
+          "precio_promedio",
+          "ubicacion",
+          "direccion",
+          "horarios",
+          "fotos",
+          "calificacion"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "categoria": {
+            "type": "string",
+            "enum": [
+              "restaurante",
+              "cafeteria",
+              "bar",
+              "entretenimiento",
+              "servicios",
+              "comercio"
+            ]
+          },
+          "descripcion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "nivel_precio": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "precio_promedio": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "ubicacion": {
+            "type": "object",
+            "required": [
+              "type",
+              "coordinates"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Point"
+                ]
+              },
+              "coordinates": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "direccion": {
+            "type": "object",
+            "properties": {
+              "calle": {
+                "type": "string"
+              },
+              "numero": {
+                "type": "string"
+              },
+              "colonia": {
+                "type": "string"
+              },
+              "municipio": {
+                "type": "string"
+              },
+              "estado": {
+                "type": "string"
+              },
+              "cp": {
+                "type": "string"
+              }
+            }
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "horarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dia": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 6
+                },
+                "abre": {
+                  "type": "string"
+                },
+                "cierra": {
+                  "type": "string"
+                },
+                "cerrado": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "fotos": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "tipo": {
+                  "type": "string",
+                  "enum": [
+                    "fachada",
+                    "interior",
+                    "producto"
+                  ]
+                },
+                "orden": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "etiquetas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "servicios": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accesibilidad": {
+            "type": "object",
+            "properties": {
+              "silla_ruedas": {
+                "type": "boolean"
+              },
+              "apto_ninos": {
+                "type": "boolean"
+              },
+              "pet_friendly": {
+                "type": "boolean"
+              }
+            }
+          },
+          "opciones_dieta": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vegetariano",
+                "vegano",
+                "sin_gluten"
+              ]
+            }
+          },
+          "alergenos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "acepta_reservas": {
+            "type": "boolean"
+          },
+          "calificacion": {
+            "type": "object",
+            "properties": {
+              "promedio": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 5
+              },
+              "total_resenas": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "propietario_correo": {
+            "type": "string",
+            "format": "email"
           }
         }
       }

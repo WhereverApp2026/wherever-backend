@@ -20,6 +20,7 @@ import (
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
@@ -128,6 +129,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
+	businessSvc := negocios.NewService(negocios.NewRepository(db), users, log)
 	exports := privacidad.NewExports(db)
 
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
@@ -149,6 +151,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
+		negocios.NewHandler(businessSvc, validator),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }

@@ -297,6 +297,18 @@
 - Corrección de drift: la lista del pipeline en la constitución §4 omitía `request_timeout`; la enmienda de nv-16 la deja igual al código real.
 - A evitar: comparar versiones como texto (`1.10.0` quedaría antes que `1.9.0`); crear otro tipo de error con estado 503 para mantenimiento (`KindFromStatus` recorre un mapa y el resultado no sería determinista).
 
+## Spec nv-20 — Negocios aprobados, categorías y carga semilla (2026-11-10)
+- Estado (2026-11-10): implementada en la rama `nv-20`, con las cinco suites verdes, lint, gosec y Semgrep en 0. Falta la firma y cargar el CSV real de 20 a 30 negocios del piloto (T21): todavía no existe. Crea `negocios` (A2/A5), `POST /api/v1/admin/negocios/importar` y `GET /api/v1/categorias`; corre antes que nv-17 y nv-18 (ola 4).
+- Corrección de drift: el stub hablaba de 15 gustos y estados `pendiente/suspendido`; el Excel A2/A5 define 6 giros (`categoria` singular), estados `borrador/en_revision/aprobado/rechazado/pausado`, `slug` único, `nombre_normalizado`, `nivel_precio` y `calificacion` como objeto. Los gustos de A1 son texto libre (3–10) y no se tocan.
+- Decisión propuesta: no hay colección ni paquete `categorias`; el catálogo de 6 giros es una constante en `internal/negocios` y los conteos salen de `negocios` aprobados. `GET /categorias` devuelve giros, etiquetas/servicios con conteo y filtros estáticos; no ETag/304 y `no-store` hasta nv-18.
+- Decisión propuesta: semilla idempotente por `slug` (CSV o JSON, 1–100 filas), valida fila por fila, éxito parcial y deja `aprobado`. `propietario_correo` opcional; si falta, el admin que importa es el dueño provisional. `qr_checkin` se genera al crear y no cambia; reimportar no pisa calificación, cupones ni sello.
+- Decisión propuesta: extensiones al modelo A2: `version` (futuro If-Match de A5), `horario_min[]` (filtro de nv-21) y `alergenos[]` (filtro duro de nv-23). Los 9 índices salen de A2/A5 y solo los crea `scripts/indexes`.
+- A evitar: usar `categorias[]`/`precio_nivel`/`nombre_norm` del stub; contar negocios no aprobados; crear `internal/categorias` o `scripts/indices_negocios`; duplicar al reimportar; resetear campos de control; agregar ETag sin nv-18.
+- Lección: la validación por fila supera el gocyclo de 10 si va en una sola función. Se parte en ayudantes (`csvRow`, `checkHorario`, `validateIdentity`, `activeAdmin`, `owner`, `newBusiness`); correr `golangci-lint` v2.15.0 en Docker antes de abrir el PR.
+- Lección: `version` va solo en `$inc` (MongoDB rechaza el mismo campo en `$setOnInsert` e `$inc`); en un alta queda en 1.
+- Pendiente para nv-23: `alergenos[]` lista lo que el negocio contiene y una lista vacía no distingue «sin alérgenos» de «sin dato». Antes del filtro duro, definir cómo se marca un negocio sin dato para no recomendarlo a alguien con alergias.
+- Proceso: PR 36 se fusionó en `specs-nv-16` después de que esa rama entró a `main`, así que su commit llega a `main` con el PR de nv-20. Revisar la base de un PR apilado antes de fusionarlo.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

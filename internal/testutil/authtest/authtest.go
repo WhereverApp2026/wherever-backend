@@ -20,6 +20,7 @@ import (
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
@@ -35,19 +36,20 @@ const Password = "Prueba_1234"
 
 // Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
 type Env struct {
-	Cfg     config.Config
-	Mongo   *platformmongo.Client
-	Redis   *goredis.Client
-	Users   *usuarios.Repository
-	Service *auth.Service
-	Account *account.Service
-	Cities  *ciudades.Service
-	Exports *privacidad.Exports
-	Job     *privacidad.Job
-	Mail    *mailer.Memory
-	Log     *slog.Logger
-	Logs    *testutil.LogBuffer
-	modules []httpapi.Module
+	Cfg      config.Config
+	Mongo    *platformmongo.Client
+	Redis    *goredis.Client
+	Users    *usuarios.Repository
+	Service  *auth.Service
+	Account  *account.Service
+	Cities   *ciudades.Service
+	Negocios *negocios.Service
+	Exports  *privacidad.Exports
+	Job      *privacidad.Job
+	Mail     *mailer.Memory
+	Log      *slog.Logger
+	Logs     *testutil.LogBuffer
+	modules  []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -101,6 +103,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 
 	authRepo := auth.NewRepository(client.DB())
 	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
+	businesses := negocios.NewService(negocios.NewRepository(client.DB()), users, log)
 	exports := privacidad.NewExports(client.DB())
 	registry := privacidad.NewRegistry()
 	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, account.NewPrivacy(users)} {
@@ -113,12 +116,13 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Exports: exports,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Exports: exports,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
+			negocios.NewHandler(businesses, v),
 		},
 	}
 }
@@ -146,6 +150,21 @@ func (e *Env) CreateUser(t *testing.T, email string) usuarios.User {
 	u := usuarios.User{
 		Name: "Prueba", NormalizedName: "prueba", Email: email, PasswordHash: hash, BirthDate: &birth,
 		Roles: []string{middleware.RoleConsumer}, Status: usuarios.StatusActive,
+	}
+	require.NoError(t, e.Users.Create(context.Background(), &u))
+	return u
+}
+
+// CreateAdmin inserta un usuario activo con rol administrador y la contraseña de prueba.
+func (e *Env) CreateAdmin(t *testing.T, email string) usuarios.User {
+	t.Helper()
+	hasher, err := auth.NewHasher()
+	require.NoError(t, err)
+	hash, err := hasher.Hash(Password)
+	require.NoError(t, err)
+	u := usuarios.User{
+		Name: "Admin", NormalizedName: "admin", Email: email, PasswordHash: hash,
+		Roles: []string{middleware.RoleAdmin}, Status: usuarios.StatusActive,
 	}
 	require.NoError(t, e.Users.Create(context.Background(), &u))
 	return u
