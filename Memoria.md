@@ -261,7 +261,7 @@
 - Falta en la ruta: el correo (C4) sigue sin proveedor y ninguna spec lo resuelve.
 - Estimación de Redis con la ruta prioritaria: la base sigue en unos 40 % de la cuota. Generar planes suma unos 11 comandos por petición (límite 3, revocación 1, límite de IA 3, caché 2, gasto 2); con 50 al día, menos del 2 %. Las demás rutas nuevas no usan Redis fuera del limitador. Total estimado: unos 42 %. Rehacer si entran las pospuestas: el cierre de votaciones de nv-39 por sí solo sumaría cerca del 7 %.
 - Hallazgos para cuando se retomen las pospuestas:
-  - nv-17: ya existe `internal/shared/pagination`; lo que falta es firmar el cursor, no un paquete nuevo. También trae paquetes de nv-16 y nv-19.
+  - nv-17: ya existe `internal/shared/pagination`; lo que falta es firmar el cursor y reutilizar `internal/shared/etag` de nv-16.
   - nv-19: `version_terminos` y la fecha de aceptación ya viven en la privacidad del usuario (nv-05).
   - nv-22: el índice de texto de Mongo no tolera errores de escritura; hace falta Atlas Search u otra técnica.
   - nv-37: sus pruebas incluyen unirse por enlace, que es de nv-38.
@@ -282,6 +282,16 @@
 - Privacidad: la capa gratuita usa lo enviado para mejorar los productos de Google y permite revisión humana. Solo viaja texto anonimizado y datos públicos de negocios; el aviso lo dice en `docs/aviso-privacidad.md`. Sus términos exigen 18 años o más (el registro ya lo exige) y prohíben la capa gratuita para personas del EEE, Suiza y Reino Unido.
 - Red: sin cambios; las instancias ya salen por 443 a cualquier destino.
 - A evitar: en Windows, Control de aplicaciones bloquea `gofmt`, `vet` y los `*.test.exe`; correr todo en `golang:1.27.3` con Docker.
+
+## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
+- Estado: spec revisada y completa, sigue pospuesta (fuera de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
+- Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.
+- Decisión propuesta: cabecera ausente o ilegible no bloquea; solo un semver numérico válido y menor da 426. Es aviso de compatibilidad, no control de acceso.
+- Decisión propuesta: auth queda exenta del 426 para poder cerrar sesión, refrescar y recuperar la cuenta durante la actualización; `configuracion` queda exenta para que la app sepa qué instalar. En mantenimiento, la configuración sigue en 200/304 y el resto no exento da 503 con `Retry-After: 60`.
+- Decisión propuesta: los valores viven en `APP_VERSION_MINIMA`, `APP_VERSION_ACTUAL`, `TERMINOS_VERSION`, `AVISO_VERSION` y `MODO_MANTENIMIENTO` (Parameter Store en el servidor); se leen al arrancar. El actualizador no reinicia por un cambio de parámetro: encender el mantenimiento es un paso manual por Systems Manager en cada instancia.
+- Decisión propuesta: ETag débil (`W/`), porque la compresión puede mandar el cuerpo en gzip y un ETag fuerte debería cambiar con la codificación.
+- Corrección de drift: la lista del pipeline en la constitución §4 omitía `request_timeout`; la enmienda de nv-16 la deja igual al código real.
+- A evitar: comparar versiones como texto (`1.10.0` quedaría antes que `1.9.0`); crear otro tipo de error con estado 503 para mantenimiento (`KindFromStatus` recorre un mapa y el resultado no sería determinista).
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

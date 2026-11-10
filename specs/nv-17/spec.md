@@ -8,7 +8,7 @@ Todas las listas nuevas necesitan una paginación común que no se pueda manipul
 2. **Validadores HTTP:** `ETag` e `If-None-Match` en los GET públicos de catálogo (304 si no cambió).
 
 ## Diseño
-- **Paquetes:** `internal/shared/paginacion` (codifica y firma el cursor con HMAC para que no se pueda manipular), `internal/shared/cache`, `internal/platform/versionado` (middleware de cabeceras y 426), `internal/configuracion`, `internal/consentimientos`.
+- **Paquetes:** `internal/shared/paginacion` (codifica y firma el cursor con HMAC para que no se pueda manipular) y reutiliza `internal/shared/etag` de nv-16 para el 304. Caché y consentimientos llegan con nv-18 y nv-19.
 - **Cursor:** guarda la llave de orden y el `_id` del último elemento, base64url y firmado.
 
 ## Contratos
