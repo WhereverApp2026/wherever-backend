@@ -31,7 +31,7 @@ La app envía en lote lo hecho sin internet, sin duplicar ni perder datos. **Ori
 - Sin resolución automática de conflictos: la decide la app.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🕓 Pospuesta: fuera de la ruta prioritaria hasta la evaluación del 2 de diciembre de 2026 (ver `Memoria.md`)
+- **Estado:** 🚧 Borrador (2026-11-08), con hallazgos en `Memoria.md`; ola 7: sin conexión y cifrado, después de la ruta prioritaria (ver `Memoria.md`)
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor antes de ejecutar:** Confirmar el alcance y los valores propuestos en Diseño.

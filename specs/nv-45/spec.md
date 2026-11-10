@@ -39,7 +39,7 @@ La persona sube una foto directo a S3; la API la valida, la modera y la publica 
 - Solo fotos; sin video.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🕓 Pospuesta: fuera de la ruta prioritaria hasta la evaluación del 2 de diciembre de 2026 (ver `Memoria.md`)
+- **Estado:** 🚧 Borrador (2026-11-08), con hallazgos en `Memoria.md`; ola 6: imágenes y moderación, después de la ruta prioritaria (ver `Memoria.md`)
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor antes de ejecutar:** Confirmar el alcance y los valores propuestos en Diseño.
