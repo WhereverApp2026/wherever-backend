@@ -115,7 +115,7 @@ func TestAsistente_GeneraPlanSinGuardarConCandidatosReales(t *testing.T) {
 	frase := "unos tacos con la banda, escríbeme a yo@correo.mx"
 
 	resp := sendJSON(t, env.App(), http.MethodPost, generarPath, generarBody(frase, inicio), token)
-	require.Equal(t, http.StatusOK, resp.StatusCode, readAll(t, resp))
+	requireStatus(t, resp, http.StatusOK)
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 	var out asistente.GenerarResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
@@ -182,7 +182,7 @@ func TestAsistente_AnimoSoloConConsentimiento(t *testing.T) {
 	env.IA.Responder(interpretacionTacos).Responder(itinerario(t, inicio,
 		paradaPrueba{idDe(t, env, "taqueria"), 0}, paradaPrueba{idDe(t, env, "bar"), 70}))
 	resp := sendJSON(t, env.App(), http.MethodPost, generarPath, generarBody("tacos de fiesta", inicio), token)
-	require.Equal(t, http.StatusOK, resp.StatusCode, readAll(t, resp))
+	requireStatus(t, resp, http.StatusOK)
 	assert.Equal(t, "festivo", obj(t, decode(t, resp)["parametros"])["animo"])
 	assert.Contains(t, env.IA.Peticiones()[1].TextoUsuario, "ánimo festivo", "con consentimiento el ánimo orienta el itinerario")
 }
