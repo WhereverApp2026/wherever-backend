@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -28,6 +29,10 @@ const (
 	ResultadoInvalida  = "invalida"
 	ResultadoBloqueada = "bloqueada"
 	ResultadoError     = "error"
+	// nv-28: rechazos de los límites, sin llamar al proveedor.
+	ResultadoLimiteUsuario = "limite_usuario"
+	ResultadoLimiteGlobal  = "limite_global"
+	ResultadoSinLimite     = "limite_desconocido"
 )
 
 // Contador es el gasto del mes en micro-USD (Redis). Leer dice si la llave existía.
@@ -50,48 +55,68 @@ type Cache interface {
 	Guardar(ctx context.Context, huella string, valor []byte, vida time.Duration) error
 }
 
-// GuardiaConfig son el tope y los precios (IA_TOPE_USD_MES, IA_PRECIO_*).
+// GuardiaConfig son el tope, los precios y los límites (IA_TOPE_USD_MES, IA_PRECIO_*,
+// IA_LIMITE_*).
 type GuardiaConfig struct {
 	TopeUSDMes float64
 	Precios    Precios
+	Limites    Limites
+	// Limitador cuenta los límites (Redis); sin él la guardia no se arma.
+	Limitador Limitador
 	// Ahora vacío usa time.Now; las pruebas fijan el reloj.
 	Ahora func() time.Time
 }
 
-// Guardia envuelve un Modelo con el tope de gasto mensual y la caché (nv-27). Es a su vez un
-// Modelo: cada llamada al proveedor pasa por el tope, incluido el reintento de GenerarValidado.
+func (cfg GuardiaConfig) validar() error {
+	if !(cfg.TopeUSDMes > 0) || cfg.Precios.EntradaUSDMTok < 0 || cfg.Precios.SalidaUSDMTok < 0 {
+		return errors.New("ia: el tope debe ser positivo y los precios no negativos")
+	}
+	return cfg.Limites.validar()
+}
+
+// Guardia envuelve un Modelo con el tope de gasto mensual y la caché (nv-27) y con los límites
+// por usuario y globales (nv-28). Es a su vez un Modelo: cada llamada al proveedor pasa por el
+// tope y el límite global, incluido el reintento de GenerarValidado.
 type Guardia struct {
-	modelo   Modelo
-	contador Contador
-	registro Registro
-	cache    Cache
-	tope     int64
-	precios  Precios
-	ahora    func() time.Time
-	log      *slog.Logger
+	modelo    Modelo
+	contador  Contador
+	registro  Registro
+	cache     Cache
+	limitador Limitador
+	limites   Limites
+	zona      *time.Location
+	tope      int64
+	precios   Precios
+	ahora     func() time.Time
+	log       *slog.Logger
 }
 
 // NewGuardia valida el tope y arma la guardia.
 func NewGuardia(m Modelo, c Contador, r Registro, k Cache, cfg GuardiaConfig, log *slog.Logger) (*Guardia, error) {
-	if m == nil || c == nil || r == nil || k == nil || log == nil {
-		return nil, errors.New("ia: la guardia necesita modelo, contador, registro, caché y logger")
+	if m == nil || c == nil || r == nil || k == nil || cfg.Limitador == nil || log == nil {
+		return nil, errors.New("ia: la guardia necesita modelo, contador, registro, caché, limitador y logger")
 	}
-	if !(cfg.TopeUSDMes > 0) || cfg.Precios.EntradaUSDMTok < 0 || cfg.Precios.SalidaUSDMTok < 0 {
-		return nil, errors.New("ia: el tope debe ser positivo y los precios no negativos")
+	if err := cfg.validar(); err != nil {
+		return nil, err
+	}
+	zona, err := time.LoadLocation(zonaProveedor)
+	if err != nil {
+		return nil, fmt.Errorf("ia: zona del proveedor: %w", err)
 	}
 	ahora := cfg.Ahora
 	if ahora == nil {
 		ahora = time.Now
 	}
-	return &Guardia{modelo: m, contador: c, registro: r, cache: k, tope: MicroUSD(cfg.TopeUSDMes),
-		precios: cfg.Precios, ahora: ahora, log: log}, nil
+	return &Guardia{modelo: m, contador: c, registro: r, cache: k, limitador: cfg.Limitador, limites: cfg.Limites,
+		zona: zona, tope: MicroUSD(cfg.TopeUSDMes), precios: cfg.Precios, ahora: ahora, log: log}, nil
 }
 
 // Nombre es el del modelo envuelto.
 func (g *Guardia) Nombre() string { return g.modelo.Nombre() }
 
-// Generar llama al proveedor solo si el gasto del mes no llegó al tope, suma el costo
-// estimado con los tokens reales y registra la llamada.
+// Generar llama al proveedor solo si el gasto del mes no llegó al tope y la app no llegó a sus
+// llamadas del minuto ni del día; suma el costo estimado con los tokens reales y registra la
+// llamada.
 func (g *Guardia) Generar(ctx context.Context, pet Peticion) (Respuesta, error) {
 	ahora := g.ahora()
 	mes := Mes(ahora)
@@ -103,6 +128,10 @@ func (g *Guardia) Generar(ctx context.Context, pet Peticion) (Respuesta, error) 
 	if gastado >= g.tope {
 		g.registrar(ctx, ahora, Respuesta{}, 0, ResultadoTope)
 		return Respuesta{}, ErrTope
+	}
+	if err := g.tomarGlobal(ctx, ahora); err != nil {
+		g.registrar(ctx, ahora, Respuesta{}, 0, resultadoDe(err))
+		return Respuesta{}, err
 	}
 	r, err := g.modelo.Generar(ctx, pet)
 	costo := g.precios.CostoMicroUSD(r.TokensEntrada, r.TokensSalida)
@@ -116,13 +145,18 @@ func (g *Guardia) Generar(ctx context.Context, pet Peticion) (Respuesta, error) 
 }
 
 // GenerarValidado responde desde la caché si la misma petición ya tiene una salida válida;
-// si no, llama con el tope y la validación estricta, y guarda la salida por una hora. Una
-// salida que repite la frase del usuario no se guarda.
+// si no, cuenta la generación en el límite del usuario, llama con el tope y la validación
+// estricta, y guarda la salida por una hora. Un acierto de caché no cuenta: no llama al
+// proveedor. Una salida que repite la frase del usuario no se guarda.
 func (g *Guardia) GenerarValidado(ctx context.Context, pet Peticion, destino any) (Respuesta, error) {
 	huella := Huella(g.modelo.Nombre(), pet)
 	if datos, ok := g.leerCache(ctx, huella); ok && Decodificar(datos, destino) == nil {
 		g.registrar(ctx, g.ahora(), Respuesta{}, 0, ResultadoCache)
 		return Respuesta{JSON: datos}, nil
+	}
+	if err := g.tomarUsuario(ctx, g.ahora()); err != nil {
+		g.registrar(ctx, g.ahora(), Respuesta{}, 0, resultadoDe(err))
+		return Respuesta{}, err
 	}
 	r, err := GenerarValidado(ctx, g, pet, destino)
 	if err == nil && !contieneTexto(r.JSON, pet.TextoUsuario) {
@@ -180,21 +214,31 @@ func (g *Guardia) registrar(ctx context.Context, ahora time.Time, r Respuesta, c
 	}
 }
 
+// resultados traduce cada error al resultado que se registra; el orden importa poco porque
+// los errores no se envuelven entre sí.
+var resultados = []struct {
+	err       error
+	resultado string
+}{
+	{ErrLimiteProveedor, ResultadoLimite},
+	{ErrTiempo, ResultadoTiempo},
+	{ErrRespuestaInvalida, ResultadoInvalida},
+	{ErrBloqueada, ResultadoBloqueada},
+	{ErrLimiteUsuario, ResultadoLimiteUsuario},
+	{ErrLimiteGlobal, ResultadoLimiteGlobal},
+	{ErrLimiteDesconocido, ResultadoSinLimite},
+}
+
 func resultadoDe(err error) string {
-	switch {
-	case err == nil:
+	if err == nil {
 		return ResultadoOK
-	case errors.Is(err, ErrLimiteProveedor):
-		return ResultadoLimite
-	case errors.Is(err, ErrTiempo):
-		return ResultadoTiempo
-	case errors.Is(err, ErrRespuestaInvalida):
-		return ResultadoInvalida
-	case errors.Is(err, ErrBloqueada):
-		return ResultadoBloqueada
-	default:
-		return ResultadoError
 	}
+	for _, r := range resultados {
+		if errors.Is(err, r.err) {
+			return r.resultado
+		}
+	}
+	return ResultadoError
 }
 
 // Normalizar es la forma de la frase que entra a la huella: anonimizada, en minúsculas y con

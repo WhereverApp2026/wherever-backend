@@ -51,6 +51,14 @@ const (
 	defaultIATopeUSDMes = 5.0
 	maxIATopeUSDMes     = 50.0
 	maxIAPrecioUSDMTok  = 100.0
+	// Límites de la IA (nv-28): por usuario y hora, y globales al 80 % de la capa gratuita de
+	// gemini-3.5-flash-lite (15 por minuto, 500 por día). El máximo es el límite del proveedor.
+	defaultIALimiteHora = 5
+	maxIALimiteHora     = 50
+	defaultIALimiteMin  = 12
+	maxIALimiteMin      = 15
+	defaultIALimiteDia  = 400
+	maxIALimiteDia      = 500
 	jwtKeyPlaceholder   = "PLACEHOLDER"
 )
 
@@ -93,6 +101,9 @@ const (
 	KeyIATopeUSDMes     = "IA_TOPE_USD_MES"
 	KeyIAPrecioEntrada  = "IA_PRECIO_ENTRADA_USD_MTOK"
 	KeyIAPrecioSalida   = "IA_PRECIO_SALIDA_USD_MTOK"
+	KeyIALimiteHora     = "IA_LIMITE_HORA"
+	KeyIALimiteMin      = "IA_LIMITE_MIN"
+	KeyIALimiteDia      = "IA_LIMITE_DIA"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -113,6 +124,7 @@ var optionalKeys = []string{
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 	KeyJobHour, KeyHideInternals,
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
+	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -158,6 +170,12 @@ type IA struct {
 	// Precios en USD por millón de tokens; 0 en la capa gratuita.
 	PrecioEntradaUSDMTok float64
 	PrecioSalidaUSDMTok  float64
+	// LimiteHora son las generaciones por usuario y hora (nv-28).
+	LimiteHora int
+	// LimiteMin y LimiteDia son las llamadas al proveedor de toda la app por minuto y por día
+	// (hora del Pacífico).
+	LimiteMin int
+	LimiteDia int
 }
 
 // Enabled indica si hay proveedor de IA configurado.
@@ -253,6 +271,9 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyMailQueueSize, &c.Mail.QueueSize, defaultMailQueue},
 		{KeyJobHour, &c.JobHour, DefaultJobHour},
 		{KeyTrustedProxyHops, &c.TrustedProxyHops, DefaultTrustedProxyHops},
+		{KeyIALimiteHora, &c.IA.LimiteHora, defaultIALimiteHora},
+		{KeyIALimiteMin, &c.IA.LimiteMin, defaultIALimiteMin},
+		{KeyIALimiteDia, &c.IA.LimiteDia, defaultIALimiteDia},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -508,10 +529,21 @@ func (i IA) validate() []error {
 	}
 	errs = append(errs, validatePrice(KeyIAPrecioEntrada, i.PrecioEntradaUSDMTok)...)
 	errs = append(errs, validatePrice(KeyIAPrecioSalida, i.PrecioSalidaUSDMTok)...)
+	errs = append(errs, validateLimit(KeyIALimiteHora, i.LimiteHora, maxIALimiteHora)...)
+	errs = append(errs, validateLimit(KeyIALimiteMin, i.LimiteMin, maxIALimiteMin)...)
+	errs = append(errs, validateLimit(KeyIALimiteDia, i.LimiteDia, maxIALimiteDia)...)
 	if strings.ContainsAny(i.ModeloID, "/?#: ") {
 		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-3.5-flash-lite)", KeyIAModeloID))
 	}
 	return errs
+}
+
+// validateLimit acepta de 1 al máximo (nv-28).
+func validateLimit(key string, value, maxValue int) []error {
+	if value < 1 || value > maxValue {
+		return []error{fmt.Errorf("%s debe estar entre 1 y %d", key, maxValue)}
+	}
+	return nil
 }
 
 // validatePrice acepta de 0 al máximo; !(x >= 0) también rechaza NaN.

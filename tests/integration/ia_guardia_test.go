@@ -38,7 +38,7 @@ func guardiaIA(t *testing.T, mes time.Time, tope float64) (*ia.Guardia, *modeloI
 	t.Helper()
 	ctx := context.Background()
 	clave := ia.Mes(mes)
-	require.NoError(t, redisClient.Del(ctx, "cuota:ia_gasto:"+clave).Err())
+	require.NoError(t, redisClient.Del(ctx, "cuota:ia_gasto:"+clave, "rate:ia_usuario:sin_usuario").Err())
 	db := mongoClient.DB()
 	_, err := db.Collection(ia.ColeccionUsos).DeleteMany(ctx, bson.D{{Key: "mes", Value: clave}})
 	require.NoError(t, err)
@@ -46,7 +46,9 @@ func guardiaIA(t *testing.T, mes time.Time, tope float64) (*ia.Guardia, *modeloI
 	m := &modeloIA{salida: `{"ids":["n1","n2"]}`}
 	reg := ia.NewRegistroMongo(db)
 	g, err := ia.NewGuardia(m, ia.NewContadorRedis(redisClient), reg, ia.NewCacheRedis(redisClient),
-		ia.GuardiaConfig{TopeUSDMes: tope, Precios: ia.Precios{EntradaUSDMTok: 0.10, SalidaUSDMTok: 0.40}, Ahora: func() time.Time { return mes }},
+		ia.GuardiaConfig{TopeUSDMes: tope, Precios: ia.Precios{EntradaUSDMTok: 0.10, SalidaUSDMTok: 0.40},
+			Limites: ia.Limites{PorHora: 50, PorMinuto: 15, PorDia: 500}, Limitador: ia.NewLimitadorRedis(redisClient),
+			Ahora: func() time.Time { return mes }},
 		slog.New(slog.NewTextHandler(io.Discard, nil)))
 	require.NoError(t, err)
 	return g, m, reg
