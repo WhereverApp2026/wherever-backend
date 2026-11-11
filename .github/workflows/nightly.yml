@@ -1,4 +1,4 @@
-# Corrida nocturna: mutación completa (constitución §7: no bloquea), DAST con ZAP (nv-09) y fuzz (nv-10).
+# Corrida semanal (domingo; antes diaria, se cambió para ahorrar minutos de Actions): mutación completa (constitución §7: no bloquea), DAST con ZAP (nv-09) y fuzz (nv-10).
 # Línea base medida en nv-04: score 0,62 (31 min en Windows). Límite: go-mutesting solo muta
 # archivos con `_test.go` del mismo nombre (12 de 36 en internal/); el service de auth, que se
 # prueba en tests/integration, no entra. Ver Memoria.md.
@@ -6,7 +6,7 @@ name: nightly
 
 on:
   schedule:
-    - cron: "0 9 * * *" # 03:00 en America/Mexico_City
+    - cron: "0 9 * * 0" # domingo 03:00 en America/Mexico_City
   workflow_dispatch:
     inputs:
       solo:
