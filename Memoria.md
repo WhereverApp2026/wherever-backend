@@ -309,6 +309,15 @@
 - Pendiente para nv-23: `alergenos[]` lista lo que el negocio contiene y una lista vacía no distingue «sin alérgenos» de «sin dato». Antes del filtro duro, definir cómo se marca un negocio sin dato para no recomendarlo a alguien con alergias.
 - Proceso: PR 36 se fusionó en `specs-nv-16` después de que esa rama entró a `main`, así que su commit llega a `main` con el PR de nv-20. Revisar la base de un PR apilado antes de fusionarlo.
 
+## Spec nv-17 — Paginación firmada y validadores HTTP (2026-11-10)
+- Estado: spec revisada y completa, va en la ola 4. Reutiliza `internal/shared/pagination` y `internal/shared/etag` (nv-16); no crea paquetes ni endpoints.
+- Decisión propuesta: firmar el cursor con HMAC-SHA-256 y una llave dedicada `CURSOR_HMAC_KEY` (32+ bytes), no con `JWT_KEY` ni `PHONE_HMAC_KEY`. La clave entra en config, `.env.example` y SSM con la primera lista posterior, no en nv-17: todavía no hay lista que la use y sería una obligatoria sin consumidor. Rotarla invalida los cursores activos; el cliente reinicia en la primera página.
+- Decisión propuesta: el JSON firmado lleva `_id`, `orden` y `ambito`; el service comprueba el ámbito con `PaginationQuery.Position(signer, scope)`. Un cursor de otra ruta, filtro o usuario da 422 `cursor`. El token es firmado, no cifrado: no lleva datos personales.
+- Decisión propuesta: `validation.New` no cambia; la regla `cursor` solo comprueba la forma con `pagination.Valid`. `Position` verifica firma y ámbito y es el único punto que convierte el cursor en posición; no hay estado global.
+- Decisión propuesta: ETag/304 solo en el catálogo público `GET /ciudades/autocompletar` (`public, max-age=60`); `/usuarios/yo` y `/auth/sesiones` llevan `no-store` y nunca 304. El ETag del perfil sigue siendo para `If-Match` (nv-05).
+- Corrección: esto sustituye la decisión de nv-02 del cursor sin firmar. Aunque el service filtre por dueño, la integridad y el ámbito evitan páginas ambiguas y preparan las listas con filtros posteriores.
+- A evitar: creer que el validador verifica la firma (no: la verifica `Position`); agregar `CURSOR_HMAC_KEY` sin consumidor; prometer que el 304 evita la consulta a Mongo (no: la caché es nv-18).
+
 ## Spec nv-21 — Lista, ficha y mapa de lugares (2026-11-10)
 - Estado (2026-11-10): implementada sobre `main` (ya trae nv-20); falta la firma. Crea `GET /api/v1/lugares`, `/lugares/mapa` y `/lugares/{id}` dentro de `internal/negocios` (sin paquete nuevo ni índices nuevos).
 - Corrección de drift: la spec decía «minutos de la semana»; nv-20 guarda `horario_min[]` como `{dia, desde, hasta}` por día con `hasta` > 1440 al cruzar medianoche. Abierto = ventana de hoy con `desde ≤ m < hasta` o la de ayer con `hasta > m + 1440`, en `America/Mexico_City`. Misma regla en Go (`OpenAt`) y en Mongo (`openAtFilter`, `$elemMatch`).
