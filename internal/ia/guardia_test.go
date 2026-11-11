@@ -93,7 +93,9 @@ type banco struct {
 	contador *contadorMem
 	registro *registroMem
 	cache    *cacheMem
+	limites  *limitadorMem
 	guardia  *Guardia
+	frases   int
 	ahora    time.Time
 }
 
@@ -104,10 +106,13 @@ func nuevoBanco(t *testing.T, tope float64, precios Precios) *banco {
 		contador: &contadorMem{valores: map[string]int64{}},
 		registro: &registroMem{},
 		cache:    &cacheMem{valores: map[string][]byte{}},
+		limites:  &limitadorMem{totales: map[string]int64{}, nacidas: map[string]time.Time{}},
 		ahora:    noviembre,
 	}
+	b.limites.ahora = func() time.Time { return b.ahora }
 	g, err := NewGuardia(b.modelo, b.contador, b.registro, b.cache,
-		GuardiaConfig{TopeUSDMes: tope, Precios: precios, Ahora: func() time.Time { return b.ahora }},
+		GuardiaConfig{TopeUSDMes: tope, Precios: precios, Limites: limitesPrueba, Limitador: b.limites,
+			Ahora: func() time.Time { return b.ahora }},
 		slog.New(slog.NewTextHandler(io.Discard, nil)))
 	require.NoError(t, err)
 	b.guardia = g
@@ -218,12 +223,17 @@ func TestGuardia_CuentaLosTokensDeUnaSalidaInvalida(t *testing.T) {
 
 func TestNewGuardia_RechazaTopeYPreciosInvalidos(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m, c, r, k := &modeloFijo{}, &contadorMem{}, &registroMem{}, &cacheMem{}
-	for _, cfg := range []GuardiaConfig{{TopeUSDMes: 0}, {TopeUSDMes: 5, Precios: Precios{EntradaUSDMTok: -1}}} {
+	m, c, r, k, l := &modeloFijo{}, &contadorMem{}, &registroMem{}, &cacheMem{}, &limitadorMem{}
+	for _, cfg := range []GuardiaConfig{
+		{TopeUSDMes: 0, Limites: limitesPrueba, Limitador: l},
+		{TopeUSDMes: 5, Precios: Precios{EntradaUSDMTok: -1}, Limites: limitesPrueba, Limitador: l},
+		{TopeUSDMes: 5, Limites: Limites{PorHora: 0, PorMinuto: 12, PorDia: 400}, Limitador: l},
+		{TopeUSDMes: 5, Limites: limitesPrueba},
+	} {
 		_, err := NewGuardia(m, c, r, k, cfg, log)
 		assert.Error(t, err)
 	}
-	_, err := NewGuardia(nil, c, r, k, GuardiaConfig{TopeUSDMes: 5}, log)
+	_, err := NewGuardia(nil, c, r, k, GuardiaConfig{TopeUSDMes: 5, Limites: limitesPrueba, Limitador: l}, log)
 	assert.Error(t, err)
 }
 
