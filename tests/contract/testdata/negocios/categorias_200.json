@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "body": {
+    "categorias": [
+      {
+        "conteo": "number",
+        "id": "string",
+        "nombre": "string"
+      }
+    ],
+    "etiquetas": [
+      {
+        "conteo": "number",
+        "id": "string",
+        "nombre": "string"
+      }
+    ],
+    "filtros": {
+      "accesibilidad": [
+        "string"
+      ],
+      "nivel_precio": [
+        "number"
+      ],
+      "opciones_dieta": [
+        "string"
+      ]
+    },
+    "servicios": [
+      {
+        "conteo": "number",
+        "id": "string",
+        "nombre": "string"
+      }
+    ]
+  }
+}

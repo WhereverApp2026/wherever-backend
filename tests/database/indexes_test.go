@@ -12,6 +12,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -25,6 +26,7 @@ var expected = map[string][]string{
 	privacidad.ExportsCollection: {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
 	auth.SessionsCollection:      {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
 	auth.TokensCollection:        {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
+	negocios.Collection:          {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -79,6 +81,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		ciudades.Collection:     {"ux_ciudad"},
 		auth.SessionsCollection: {"ux_refresh_hash"},
 		auth.TokensCollection:   {"ux_token_hash"},
+		negocios.Collection:     {"ux_slug", "ux_qr_checkin"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
@@ -91,6 +94,30 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)
 	}
+}
+
+func TestIndexes_NegociosTextAndPartial(t *testing.T) {
+	db := freshDB(t)
+	ctx := context.Background()
+	require.NoError(t, mongo.EnsureIndexes(ctx, db, indexes.All()...))
+
+	cur, err := db.Collection(negocios.Collection).Indexes().List(ctx)
+	require.NoError(t, err)
+	var docs []bson.M
+	require.NoError(t, cur.All(ctx, &docs))
+	byName := make(map[string]bson.M, len(docs))
+	for _, doc := range docs {
+		name, ok := doc["name"].(string)
+		require.True(t, ok)
+		byName[name] = doc
+	}
+	text, ok := byName["ix_texto"]
+	require.True(t, ok)
+	assert.NotNil(t, text["weights"])
+	assert.Equal(t, "spanish", text["default_language"])
+	partial, ok := byName["ix_destacados"]
+	require.True(t, ok)
+	assert.NotNil(t, partial["partialFilterExpression"])
 }
 
 // ux_google_id y ux_telefono_hash son parciales: muchas cuentas sin el campo no chocan, dos

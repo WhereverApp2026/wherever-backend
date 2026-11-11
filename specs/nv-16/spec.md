@@ -91,7 +91,7 @@ Desde nv-16 toda ruta no exenta puede responder además **426** (cabecera válid
 - No hay entorno de staging: las pruebas finales se hacen en el servidor de desarrollo, y el modo mantenimiento corta a quien lo esté usando en ese momento.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-09); pospuesta: fuera de la ruta prioritaria hasta la evaluación del 2 de diciembre de 2026 (ver `Memoria.md`)
+- **Estado:** 🚧 Borrador revisado (2026-11-09); ola 4: plataforma y catálogo completo, después de la ruta prioritaria (ver `Memoria.md`)
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor antes de ejecutar:**

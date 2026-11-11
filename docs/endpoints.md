@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -42,6 +42,8 @@
 | DELETE | `/api/v1/usuarios/yo` → `{confirmacion: "ELIMINAR"}` → 202 `{eliminar_en}` (hoy + 30 días); cierra todas las sesiones | JWT, dueño | global | 202/400/401/422 | nv-05 (A1) |
 | POST | `/api/v1/usuarios/yo/cancelar-eliminacion` → perfil; fuera de plazo o sin eliminación pendiente = 409 | JWT, dueño | global | 200/401/409 | nv-05 (A1) |
 | GET | `/api/v1/ciudades/autocompletar` con `?q=&limite=` → `[{id, nombre, estado}]`; `q` de 2 letras o más, sin acentos; `limite` 8 por defecto, máx. 50; primero las de cobertura | no | global | 200/400/422 | nv-05 (A1) |
+| GET | `/api/v1/categorias` → `{categorias[{id,nombre,conteo}], etiquetas[{id,nombre,conteo}], servicios[{id,nombre,conteo}], filtros{nivel_precio[], opciones_dieta[], accesibilidad[]}}`; 6 giros aunque tengan 0; sin token, sin `ETag` y `Cache-Control: no-store` hasta NV-18 | no | global | 200/503 | nv-20 (A2) |
+| POST | `/api/v1/admin/negocios/importar` → multipart `archivo` `.csv` o `.json` o arreglo JSON de 1–100; idempotente por `slug`; responde `{creados, actualizados, errores[{fila,campo,mensaje}]}` y los válidos quedan `aprobado` | JWT administrador | admin 200/min | 200/400/401/403/413/422/503 | nv-20 (A2/A5) |
 
 Convención JSON: `snake_case`. `PageResult{items, siguiente_cursor, limite}` (desde nv-02). Errores `{codigo, mensaje, campos[], detalle?, traza_id}`.
 
@@ -54,6 +56,8 @@ Consentimiento (nv-15): al retirar `datos_sensibles` se borran las alergias guar
 Concurrencia (nv-05): `GET /usuarios/yo` y cada cambio devuelven `version` y `ETag`. `PATCH /usuarios/yo` exige `If-Match: "<version>"`: sin la cabecera = **400**; con una versión vieja = **409**, que la app debe mostrar como "tus datos cambiaron en otro dispositivo, recarga" y volver a pedir `GET /usuarios/yo` (la constitución §5 no usa 412 ni 428).
 
 Cuenta en eliminación pendiente (nv-05): puede iniciar sesión, pero con sesión solo responden `GET /usuarios/yo`, `POST /usuarios/yo/cancelar-eliminacion`, `POST /auth/logout` y `POST /auth/logout-todos`; las demás rutas con JWT dan **403** hasta cancelar.
+
+Catálogo de negocios (nv-20): `GET /categorias` no pagina, no lleva token y solo cuenta `estado=aprobado` sin `eliminado_en`; devuelve `Cache-Control: no-store` y ningún `ETag` hasta NV-18. La semilla (A5) usa el encabezado de `docs/semilla-negocios.csv` o un arreglo JSON: BOM tolerado, listas con `|`, 3–10 fotos, 1–100 filas y `slug` único; las filas válidas quedan `aprobado` y los errores no detienen el archivo. `propietario_correo` es opcional: si falta, el administrador que importa queda como dueño provisional.
 
 ## Diferidos (sin ruta en código todavía)
 - `POST /api/v1/auth/google` (`{id_token, dispositivo{}}` → 200 con tokens, 201 si es cuenta nueva) — nv-04 T7, espera la decisión D-1 (cuenta sin `fecha_nacimiento`) y la excepción de stack `google.golang.org/api/idtoken`. Hoja J1.

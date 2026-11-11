@@ -253,14 +253,18 @@
 
 ## Ruta hacia la evaluación (nv-16 a nv-53)
 - Estado (2026-11-08): 38 specs en borrador, revisadas contra el código. 19 en la ruta prioritaria y 19 pospuestas hasta después del 2 de diciembre. Ninguna ejecutada.
-- Decisión: ejecutar solo la ruta que responde a la auditoría. Porqué: son unas 240 tareas y quedan unos 24 días; nv-11 a nv-14 tomaron cerca de dos días cada una.
+- Decisión (2026-11-10, Osmar Reséndiz): se ejecutan **todas** las specs, no solo la ruta prioritaria. Las olas 1 a 3 siguen primero porque responden a la auditoría; las olas 4 a 7 siguen después, en orden de dependencias. Riesgo: son unas 240 tareas y quedan unos 22 días; nv-11 a nv-14 tomaron cerca de dos días cada una. Si el tiempo no alcanza, lo que quede sin hacer el 2 de diciembre es de las olas 4 a 7.
   - Ola 1, catálogo y recomendaciones: nv-20, 21, 23, 24.
   - Ola 2, planes con IA (hallazgo C1): nv-26 a nv-33, con Gemini (ver nv-26).
   - Ola 3, amistades, ML y grafo: nv-34, 35, 36, 50, 51, 52, 53. nv-34 a 36 entran porque el grafo de nv-52 y 53 necesita amistades.
-  - Pospuestas: nv-16 a 19, 22, 25 y 37 a 49.
+  - Ola 4, plataforma y catálogo completo: nv-16 → 17 → 18 → 19, y nv-22 y 25. Va antes que las demás porque nv-42 y nv-46 dependen de la caché de nv-18, y nv-19 publica el aviso con el proveedor de IA.
+  - Ola 5, grupos y notificaciones: nv-37 → 38 → 39, nv-40 → 41.
+  - Ola 6, imágenes y moderación: nv-42 → 43, nv-44 → 45.
+  - Ola 7, sin conexión y cifrado: nv-46 → 47, nv-48 → 49. nv-48 y 49 solo dependen de nv-05: si se adelantan, se cifran menos datos ya guardados.
+- Costos nuevos fuera de la ruta prioritaria: S3 y la distribución de imágenes (nv-44) y Firebase (nv-41, gratis en su capa básica). Revisar el presupuesto de US$50 antes de la ola 6.
 - Falta en la ruta: el correo (C4) sigue sin proveedor y ninguna spec lo resuelve.
-- Estimación de Redis con la ruta prioritaria: la base sigue en unos 40 % de la cuota. Generar planes suma unos 11 comandos por petición (límite 3, revocación 1, límite de IA 3, caché 2, gasto 2); con 50 al día, menos del 2 %. Las demás rutas nuevas no usan Redis fuera del limitador. Total estimado: unos 42 %. Rehacer si entran las pospuestas: el cierre de votaciones de nv-39 por sí solo sumaría cerca del 7 %.
-- Hallazgos para cuando se retomen las pospuestas:
+- Estimación de Redis con la ruta prioritaria: la base sigue en unos 40 % de la cuota. Generar planes suma unos 11 comandos por petición (límite 3, revocación 1, límite de IA 3, caché 2, gasto 2); con 50 al día, menos del 2 %. Las demás rutas nuevas no usan Redis fuera del limitador. Total estimado: unos 42 %. Con todas las specs hay que rehacerla: el cierre de votaciones de nv-39 por sí solo suma cerca del 7 % (unos 49 %) y el tope diario de IA lleno otro 16 % (unos 65 %). La caché de nv-18 suma comandos por cada lectura de catálogo: medir con `TestPresupuestoRedis_*` antes de fusionarla, porque es la que puede pasar la cuota.
+- Hallazgos de la revisión de las olas 4 a 7 (aplicarlos al ejecutar cada una):
   - nv-17: ya existe `internal/shared/pagination`; lo que falta es firmar el cursor y reutilizar `internal/shared/etag` de nv-16.
   - nv-19: `version_terminos` y la fecha de aceptación ya viven en la privacidad del usuario (nv-05).
   - nv-22: el índice de texto de Mongo no tolera errores de escritura; hace falta Atlas Search u otra técnica.
@@ -284,7 +288,7 @@
 - A evitar: en Windows, Control de aplicaciones bloquea `gofmt`, `vet` y los `*.test.exe`; correr todo en `golang:1.27.3` con Docker.
 
 ## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
-- Estado: spec revisada y completa, sigue pospuesta (fuera de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
+- Estado: spec revisada y completa, en la ola 4 (después de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
 - Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.
 - Decisión propuesta: cabecera ausente o ilegible no bloquea; solo un semver numérico válido y menor da 426. Es aviso de compatibilidad, no control de acceso.
 - Decisión propuesta: auth queda exenta del 426 para poder cerrar sesión, refrescar y recuperar la cuenta durante la actualización; `configuracion` queda exenta para que la app sepa qué instalar. En mantenimiento, la configuración sigue en 200/304 y el resto no exento da 503 con `Retry-After: 60`.
@@ -292,6 +296,18 @@
 - Decisión propuesta: ETag débil (`W/`), porque la compresión puede mandar el cuerpo en gzip y un ETag fuerte debería cambiar con la codificación.
 - Corrección de drift: la lista del pipeline en la constitución §4 omitía `request_timeout`; la enmienda de nv-16 la deja igual al código real.
 - A evitar: comparar versiones como texto (`1.10.0` quedaría antes que `1.9.0`); crear otro tipo de error con estado 503 para mantenimiento (`KindFromStatus` recorre un mapa y el resultado no sería determinista).
+
+## Spec nv-20 — Negocios aprobados, categorías y carga semilla (2026-11-10)
+- Estado (2026-11-10): implementada en la rama `nv-20`, con las cinco suites verdes, lint, gosec y Semgrep en 0. Falta la firma y cargar el CSV real de 20 a 30 negocios del piloto (T21): todavía no existe. Crea `negocios` (A2/A5), `POST /api/v1/admin/negocios/importar` y `GET /api/v1/categorias`; corre antes que nv-17 y nv-18 (ola 4).
+- Corrección de drift: el stub hablaba de 15 gustos y estados `pendiente/suspendido`; el Excel A2/A5 define 6 giros (`categoria` singular), estados `borrador/en_revision/aprobado/rechazado/pausado`, `slug` único, `nombre_normalizado`, `nivel_precio` y `calificacion` como objeto. Los gustos de A1 son texto libre (3–10) y no se tocan.
+- Decisión propuesta: no hay colección ni paquete `categorias`; el catálogo de 6 giros es una constante en `internal/negocios` y los conteos salen de `negocios` aprobados. `GET /categorias` devuelve giros, etiquetas/servicios con conteo y filtros estáticos; no ETag/304 y `no-store` hasta nv-18.
+- Decisión propuesta: semilla idempotente por `slug` (CSV o JSON, 1–100 filas), valida fila por fila, éxito parcial y deja `aprobado`. `propietario_correo` opcional; si falta, el admin que importa es el dueño provisional. `qr_checkin` se genera al crear y no cambia; reimportar no pisa calificación, cupones ni sello.
+- Decisión propuesta: extensiones al modelo A2: `version` (futuro If-Match de A5), `horario_min[]` (filtro de nv-21) y `alergenos[]` (filtro duro de nv-23). Los 9 índices salen de A2/A5 y solo los crea `scripts/indexes`.
+- A evitar: usar `categorias[]`/`precio_nivel`/`nombre_norm` del stub; contar negocios no aprobados; crear `internal/categorias` o `scripts/indices_negocios`; duplicar al reimportar; resetear campos de control; agregar ETag sin nv-18.
+- Lección: la validación por fila supera el gocyclo de 10 si va en una sola función. Se parte en ayudantes (`csvRow`, `checkHorario`, `validateIdentity`, `activeAdmin`, `owner`, `newBusiness`); correr `golangci-lint` v2.15.0 en Docker antes de abrir el PR.
+- Lección: `version` va solo en `$inc` (MongoDB rechaza el mismo campo en `$setOnInsert` e `$inc`); en un alta queda en 1.
+- Pendiente para nv-23: `alergenos[]` lista lo que el negocio contiene y una lista vacía no distingue «sin alérgenos» de «sin dato». Antes del filtro duro, definir cómo se marca un negocio sin dato para no recomendarlo a alguien con alergias.
+- Proceso: PR 36 se fusionó en `specs-nv-16` después de que esa rama entró a `main`, así que su commit llega a `main` con el PR de nv-20. Revisar la base de un PR apilado antes de fusionarlo.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

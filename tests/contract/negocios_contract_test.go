@@ -1,0 +1,64 @@
+package contract
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
+)
+
+func contractBusiness(slug string) negocios.ImportRow {
+	return negocios.ImportRow{
+		Slug: slug, Name: "Contrato Negocio", Category: "restaurante",
+		Description: "Negocio para el contrato", PriceLevel: 2, AveragePrice: 150,
+		Location: negocios.Location{Type: "Point", Coordinates: []float64{-99.1332, 19.4326}},
+		Address: negocios.Direccion{
+			Calle: "Calle Contrato", Numero: "1", Colonia: "Centro",
+			Municipio: "Cuauhtémoc", Estado: "CDMX", CP: "06000",
+		},
+		Phone: "+5215512345678",
+		Schedules: []negocios.Horario{
+			{Dia: 1, Abre: "09:00", Cierra: "18:00"},
+		},
+		Photos: []negocios.Foto{
+			{URL: "https://example.test/fachada.jpg", Tipo: "fachada", Orden: 1},
+			{URL: "https://example.test/interior.jpg", Tipo: "interior", Orden: 2},
+			{URL: "https://example.test/producto.jpg", Tipo: "producto", Orden: 3},
+		},
+		Services:            []string{"terraza"},
+		Accessibility:       negocios.Accesibilidad{SillaRuedas: true},
+		DietOptions:         []string{"vegetariano"},
+		Allergens:           []string{"gluten"},
+		Tags:                []string{"tacos"},
+		AcceptsReservations: true,
+		Rating:              negocios.Calificacion{Promedio: 4.5, TotalResenas: 10},
+	}
+}
+
+func TestContract_Negocios(t *testing.T) {
+	env := authtest.New(t, mongoClient, redisClient, testutil.Config(config.EnvProd))
+	admin := env.CreateAdmin(t, "admin-contrato@wherever.test")
+
+	first, err := json.Marshal([]negocios.ImportRow{contractBusiness("contrato-categorias")})
+	require.NoError(t, err)
+	_, err = env.Negocios.Import(context.Background(), admin.ID.Hex(), bytes.NewReader(first), "json")
+	require.NoError(t, err)
+
+	app := env.App()
+	status, body := call(t, app, http.MethodGet, "/api/v1/categorias", nil, "")
+	check(t, "negocios/categorias_200", status, body)
+
+	second := []negocios.ImportRow{contractBusiness("contrato-importado")}
+	token := testutil.ValidTokenFor(t, admin.ID.Hex(), "jti-contrato-negocios", middleware.RoleAdmin)
+	status, body = call(t, app, http.MethodPost, "/api/v1/admin/negocios/importar", second, token)
+	check(t, "negocios/importar_200", status, body)
+}
