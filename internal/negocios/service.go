@@ -24,6 +24,22 @@ type Service struct {
 	log   *slog.Logger
 	newQR func() (string, error)
 	now   func() time.Time
+	emb   Embeddings
+}
+
+// Embeddings rehace los vectores de significado desactualizados (nv-50). Si falla, la
+// importación sale igual: sin vectores responde el motor de reglas.
+type Embeddings interface {
+	Refrescar(ctx context.Context) error
+}
+
+// plazoEmbeddings acota cuánto espera la importación a los vectores.
+const plazoEmbeddings = 30 * time.Second
+
+// WithEmbeddings activa el recálculo de vectores al importar; sin llamarla no se calculan.
+func (s *Service) WithEmbeddings(e Embeddings) *Service {
+	s.emb = e
+	return s
 }
 
 // NewService recibe el repositorio de negocios, el de usuarios y el logger por constructor.
@@ -74,6 +90,7 @@ func (s *Service) Import(ctx context.Context, adminSubject string, r io.Reader, 
 	}
 	// Solo conteos: ni correos de dueños ni slugs.
 	s.log.Info("semilla de negocios importada", "creados", report.Created, "actualizados", report.Updated, "errores", len(report.Errors))
+	s.refreshEmbeddings(ctx, report)
 	return report, nil
 }
 
@@ -190,4 +207,17 @@ func randomQR() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// refreshEmbeddings rehace los vectores tras una importación con cambios. Usa su propio plazo
+// y no la cancelación de la petición: el reporte ya está listo y el error solo se registra.
+func (s *Service) refreshEmbeddings(ctx context.Context, report ImportReport) {
+	if s.emb == nil || report.Created+report.Updated == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), plazoEmbeddings)
+	defer cancel()
+	if err := s.emb.Refrescar(ctx); err != nil {
+		s.log.Warn("embeddings de negocios no actualizados; responde el motor de reglas", "error", err.Error())
+	}
 }

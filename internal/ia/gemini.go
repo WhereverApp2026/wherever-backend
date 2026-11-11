@@ -120,39 +120,48 @@ func (g *Gemini) Generar(ctx context.Context, pet Peticion) (Respuesta, error) {
 	if err != nil {
 		return Respuesta{}, fmt.Errorf("%w: esquema no serializable", ErrProveedor)
 	}
-	ctx, cancel := context.WithTimeout(ctx, g.timeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.endpoint, bytes.NewReader(cuerpo))
+	datos, duracion, err := postGemini(ctx, g.cliente, g.endpoint, g.apiKey, cuerpo, g.timeout)
 	if err != nil {
-		return Respuesta{}, fmt.Errorf("%w: petición inválida", ErrProveedor)
+		return Respuesta{Duracion: duracion}, err
+	}
+	r, err := leerRespuesta(datos)
+	r.Duracion = duracion
+	return r, err
+}
+
+// postGemini manda un cuerpo JSON a la API de Gemini y devuelve el cuerpo de un 200. La llave
+// va en un encabezado, nunca en la URL, para que no aparezca en errores ni logs.
+func postGemini(ctx context.Context, cliente *http.Client, endpoint, apiKey string, cuerpo []byte, plazo time.Duration) ([]byte, time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, plazo)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(cuerpo))
+	if err != nil {
+		return nil, 0, fmt.Errorf("%w: petición inválida", ErrProveedor)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// La llave va en un encabezado, nunca en la URL, para que no aparezca en errores ni logs.
-	req.Header.Set("x-goog-api-key", g.apiKey)
+	req.Header.Set("x-goog-api-key", apiKey)
 
 	inicio := time.Now()
-	resp, err := g.cliente.Do(req)
+	resp, err := cliente.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return Respuesta{Duracion: time.Since(inicio)}, ErrTiempo
+			return nil, time.Since(inicio), ErrTiempo
 		}
-		return Respuesta{Duracion: time.Since(inicio)}, fmt.Errorf("%w: sin conexión", ErrProveedor)
+		return nil, time.Since(inicio), fmt.Errorf("%w: sin conexión", ErrProveedor)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	datos, err := io.ReadAll(io.LimitReader(resp.Body, geminiMaxRespuesta))
 	duracion := time.Since(inicio)
 	if err != nil {
 		if ctx.Err() != nil {
-			return Respuesta{Duracion: duracion}, ErrTiempo
+			return nil, duracion, ErrTiempo
 		}
-		return Respuesta{Duracion: duracion}, fmt.Errorf("%w: respuesta cortada", ErrProveedor)
+		return nil, duracion, fmt.Errorf("%w: respuesta cortada", ErrProveedor)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Respuesta{Duracion: duracion}, errorDeEstado(resp, datos)
+		return nil, duracion, errorDeEstado(resp, datos)
 	}
-	r, err := leerRespuesta(datos)
-	r.Duracion = duracion
-	return r, err
+	return datos, duracion, nil
 }
 
 func (g *Gemini) armar(pet Peticion) geminiPeticion {
