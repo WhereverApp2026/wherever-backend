@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "abierto_ahora": "bool",
+        "calificacion": {
+          "promedio": "number",
+          "total_resenas": "number"
+        },
+        "categoria": "string",
+        "distancia_m": "number",
+        "foto_portada": "string",
+        "id": "string",
+        "nivel_precio": "number",
+        "nombre": "string",
+        "precio_promedio": "number",
+        "slug": "string",
+        "ubicacion": {
+          "lat": "number",
+          "lng": "number"
+        }
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

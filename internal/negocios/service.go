@@ -23,6 +23,7 @@ type Service struct {
 	users *usuarios.Repository
 	log   *slog.Logger
 	newQR func() (string, error)
+	now   func() time.Time
 }
 
 // NewService recibe el repositorio de negocios, el de usuarios y el logger por constructor.
@@ -30,7 +31,7 @@ func NewService(repo *Repository, users *usuarios.Repository, log *slog.Logger) 
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{repo: repo, users: users, log: log, newQR: randomQR}
+	return &Service{repo: repo, users: users, log: log, newQR: randomQR, now: time.Now}
 }
 
 // Import carga la semilla y devuelve el reporte por fila. Las filas inválidas no detienen

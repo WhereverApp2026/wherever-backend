@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "agrupado": "bool",
+    "celdas": [],
+    "pines": [
+      {
+        "calificacion": "number",
+        "categoria": "string",
+        "id": "string",
+        "nombre": "string",
+        "ubicacion": {
+          "lat": "number",
+          "lng": "number"
+        }
+      }
+    ]
+  }
+}

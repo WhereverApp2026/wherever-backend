@@ -1,0 +1,72 @@
+{
+  "status": 200,
+  "body": {
+    "abierto_ahora": "bool",
+    "accesibilidad": {
+      "apto_ninos": "bool",
+      "pet_friendly": "bool",
+      "silla_ruedas": "bool"
+    },
+    "acepta_reservas": "bool",
+    "alergenos": [
+      "string"
+    ],
+    "calificacion": {
+      "aspectos": {
+        "ambiente": "number",
+        "atencion": "number",
+        "espera": "number",
+        "precio_calidad": "number",
+        "sabor": "number"
+      },
+      "promedio": "number",
+      "total_resenas": "number"
+    },
+    "categoria": "string",
+    "descripcion": "string",
+    "direccion": {
+      "calle": "string",
+      "colonia": "string",
+      "cp": "string",
+      "estado": "string",
+      "municipio": "string",
+      "numero": "string"
+    },
+    "etiquetas": [
+      "string"
+    ],
+    "fotos": [
+      {
+        "orden": "number",
+        "tipo": "string",
+        "url": "string"
+      }
+    ],
+    "horarios": [
+      {
+        "abre": "string",
+        "cerrado": "bool",
+        "cierra": "string",
+        "dia": "number"
+      }
+    ],
+    "id": "string",
+    "nivel_precio": "number",
+    "nombre": "string",
+    "opciones_dieta": [
+      "string"
+    ],
+    "precio_promedio": "number",
+    "sello_excelencia": "bool",
+    "servicios": [
+      "string"
+    ],
+    "slug": "string",
+    "telefono": "string",
+    "ubicacion": {
+      "lat": "number",
+      "lng": "number"
+    },
+    "verificado": "bool"
+  }
+}
