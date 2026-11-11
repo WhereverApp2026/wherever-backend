@@ -19,6 +19,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
@@ -131,14 +132,16 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
 	businessSvc := negocios.NewService(negocios.NewRepository(db), users, log)
 	exports := privacidad.NewExports(db)
+	iaUses := ia.NewRegistroMongo(db)
 
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
+	registry.RegisterExporter(iaUses)
 
 	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)

@@ -1,12 +1,12 @@
 # task.md — NV-27 Tope de gasto y caché de la IA
 
 ## Fase 0 — Preparación
-- [ ] T01 Aprobar la spec; rama `nv-27`.
+- [x] T01 Rama `nv-27` desde `main` (solo depende de nv-26). Falta la firma de la spec.
 
 ## Fase 1 — Implementación
-- [ ] T02 Tope de gasto mensual (IA_TOPE_USD_MES, 5 por defecto): se estima el costo por…
-- [ ] T03 Caché de respuestas por huella de la entrada normalizada, 1 hora de vida.
+- [x] T02 Tope de gasto mensual: `ia.Guardia`, `cuota:ia_gasto:{mes}`, `usos_ia`, `IA_TOPE_USD_MES` y `IA_PRECIO_*`.
+- [x] T03 Caché `cache:ia:{huella}`, 1 hora, solo salidas validadas y sin la frase.
 
 ## Fase 2 — Cierre
-- [ ] T04 Pruebas, documentos y `Memoria.md`.
-- [ ] T05 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [x] T04 Pruebas, documentos y `Memoria.md`.
+- [ ] T05 En local `go build`, `go vet`, Unit, lint, `critic`, `check_sdd` y `check_endpoints` (listo); Integration, Security, Database, Contract y cobertura en el CI del PR (pendiente); evidencia en `gates.md`.
