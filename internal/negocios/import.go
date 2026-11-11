@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/mail"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -489,7 +490,7 @@ func validateRow(row ImportRow) []apperr.FieldError {
 	validateList("etiquetas", row.Tags, MaxTags, add)
 	validateList("servicios", row.Services, MaxServices, add)
 	validateCatalog("opciones_dieta", row.DietOptions, MaxDiet, ValidDietOption, add)
-	validateCatalog("alergenos", row.Allergens, MaxAllergens, ValidAllergen, add)
+	validateAllergens(row.Allergens, add)
 	validateRating(row.Rating, add)
 	validateOwnerEmail(row.OwnerEmail, add)
 	return errs
@@ -641,6 +642,15 @@ func validateCatalog(field string, values []string, max int, valid func(string) 
 			add(field, "valor no válido: "+value)
 			return
 		}
+	}
+}
+
+// validateAllergens revisa el catálogo y que AllergenNone vaya solo: «ninguno» junto a un
+// alérgeno se contradice.
+func validateAllergens(values []string, add func(string, string)) {
+	validateCatalog("alergenos", values, MaxAllergens, ValidAllergen, add)
+	if len(values) > 1 && slices.Contains(values, AllergenNone) {
+		add("alergenos", AllergenNone+" va solo")
 	}
 }
 

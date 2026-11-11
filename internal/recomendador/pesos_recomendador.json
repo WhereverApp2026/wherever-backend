@@ -1,0 +1,8 @@
+{
+  "presupuesto": 0.20,
+  "distancia": 0.20,
+  "horario": 0.10,
+  "clima": 0.10,
+  "gustos": 0.25,
+  "calificacion": 0.15
+}

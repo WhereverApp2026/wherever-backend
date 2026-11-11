@@ -318,6 +318,14 @@
 - A evitar: escribir `` `lat`/`lng` `` en `docs/endpoints.md`: `check_endpoints` lee `` `/` `` como la ruta `GET /`. Los scripts con `git rev-parse` fallan en Docker desde un worktree; montar el `.git` principal y usar `GIT_DIR=/gitmain/worktrees/<nombre>` con `GIT_WORK_TREE=/src`.
 - A evitar: editar con Python en Windows sin `newline=''`: deja CRLF y `gofmt -l` marca el archivo entero.
 
+## Spec nv-23 — Filtros duros y puntuación de recomendaciones (2026-11-10)
+- Estado (2026-11-10): implementada en la rama `nv-23` sobre `main` (ya trae nv-21); falta la firma. Paquete `internal/recomendador` sin endpoints: `Recomendar(ctx, fuente, pesos, contexto, n)` para nv-24 y nv-31.
+- Corrección de drift: el plan creaba `internal/clima` (es nv-25) e `internal/inicio` (es nv-24) y tocaba `cmd/api`, `.env.example` y `docs/endpoints.md`; no hacen falta. Los pesos van embebidos en `internal/recomendador/pesos_recomendador.json` (la imagen no copia `configs/`) y se validan al llamar `Recomendar` (`ErrPesos`); nv-24 los valida al arrancar cuando haya consumidor.
+- Decisión (cierra el pendiente de nv-20): `alergenos: ["ninguno"]` (`negocios.AllergenNone`, va solo) = declaró que no contiene ninguno; lista vacía = sin dato. Con alergias pasa solo quien tiene dato y no contiene ninguna; si `gustos.alergias` (texto libre) trae algo fuera del catálogo, pasa solo `["ninguno"]`. Los negocios ya cargados con lista vacía dejan de recomendarse a quien tiene alergias hasta que declaren.
+- Decisión: filtros duros en `$geoNear.query` vía `negocios.Repository.Candidates` (reusa `List` de nv-21 por distancia, sin índices nuevos) y otra vez en Go (`Filtro.Cumple`) antes de puntuar. Dieta: solo las `restricciones` que están en el catálogo. «No me interesa» llega como ids: aún no hay colección.
+- Decisión: pesos presupuesto 0,20, distancia 0,20, horario 0,10, clima 0,10 (fijo 0,5 hasta nv-25), gustos 0,25, calificación 0,15; total a un decimal para que el orden no dependa del redondeo; empates por calificación y luego id.
+- A evitar: tratar una lista vacía de `alergenos` como «sin alérgenos»; poner cifras, alergias o dieta en `por_que`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

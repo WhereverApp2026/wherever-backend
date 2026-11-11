@@ -28,6 +28,11 @@ var accessibilityCatalog = []string{"silla_ruedas", "apto_ninos", "pet_friendly"
 
 var allergenCatalog = []string{"gluten", "lacteos", "huevo", "soya", "cacahuate", "nueces", "pescado", "mariscos", "ajonjoli"}
 
+// AllergenNone marca en `alergenos` que el negocio declaró no contener ninguno del
+// catálogo. Va solo. Una lista vacía significa «sin dato», y NV-23 no recomienda ese
+// negocio a quien declara alergias.
+const AllergenNone = "ninguno"
+
 // CategoryCatalog devuelve los giros en el orden de A2. Es una copia para que nadie mute
 // el catálogo vivo.
 func CategoryCatalog() []CatalogItem { return slices.Clone(categoryCatalog) }
@@ -65,5 +70,7 @@ func ValidDietOption(value string) bool { return slices.Contains(dietCatalog, va
 // ValidAccessibilityOption dice si value es una bandera de accesibilidad conocida.
 func ValidAccessibilityOption(value string) bool { return slices.Contains(accessibilityCatalog, value) }
 
-// ValidAllergen dice si value está en el catálogo de alérgenos.
-func ValidAllergen(value string) bool { return slices.Contains(allergenCatalog, value) }
+// ValidAllergen dice si value está en el catálogo de alérgenos o es AllergenNone.
+func ValidAllergen(value string) bool {
+	return value == AllergenNone || slices.Contains(allergenCatalog, value)
+}

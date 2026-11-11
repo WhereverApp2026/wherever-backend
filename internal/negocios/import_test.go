@@ -242,6 +242,21 @@ func TestValidateRows_RatingAndPhone(t *testing.T) {
 	assert.Contains(t, fieldsOf(errs), "telefono")
 }
 
+func TestValidateRows_AllergenNoneGoesAlone(t *testing.T) {
+	values := validRowValues()
+	values["alergenos"] = "ninguno"
+	rows, _, err := Parse(strings.NewReader(csvBody(values)), "csv")
+	require.NoError(t, err)
+	_, errs := validateRows(rows)
+	assert.Empty(t, errs)
+
+	values["alergenos"] = "ninguno|gluten"
+	rows, _, err = Parse(strings.NewReader(csvBody(values)), "csv")
+	require.NoError(t, err)
+	_, errs = validateRows(rows)
+	assert.Contains(t, fieldsOf(errs), "alergenos")
+}
+
 func TestValidateRows_OwnerEmail(t *testing.T) {
 	values := validRowValues()
 	values["propietario_correo"] = "no-es-correo"
