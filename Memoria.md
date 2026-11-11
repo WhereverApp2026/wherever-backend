@@ -380,6 +380,16 @@
 - Privacidad: al paso 2 van nombre, giro, precio y horario del día de los candidatos, inicio y presupuesto; en el turno de usuario solo compañía, ánimo (con consentimiento) y palabras clave. Nunca la frase, ubicación ni perfil.
 - A evitar: heredocs con comillas y acentos en Bash fallan aunque el delimitador vaya entre comillas; escribir el script de Python en el scratchpad. Las pruebas de integración fijan `fecha` (ahora + 2 h) para poder escribir las horas de la IA con el reloj real.
 
+## NV-33 — Respaldo, cancelación y «otra idea» (2026-11-11)
+- Estado: rama `nv-33` desde `origin/nv-32` con `origin/nv-28` fusionada (trae nv-27 y nv-28); PR contra `nv-32`, se reduce al fusionar #44 y #46. Build, vet, Unit, lint y las cuatro suites con contenedor en verde en local. Falta la medición con IA real (20 frases) y la firma.
+- Decisión: toda falla de la IA (tiempo, 429, falla, inválida, bloqueada, tope, gasto o límites desconocidos, límite global o del usuario, IA apagada) responde el motor de reglas con `fuente: reglas` y aviso. Ya no hay 429 ni 503 por la IA. El respaldo no llama al modelo: no cuenta contra el tope ni los límites.
+- Decisión: plazo de 7 s para las dos llamadas + 1 s de reserva = 8 s. Respaldo secuencial, no en paralelo como decía la spec: reutiliza la interpretación si el paso 1 respondió y no duplica la consulta al catálogo. `authtest.PlazoIA` = 2 s para las pruebas.
+- Decisión: `cmd/api` y `authtest` arman `ia.Guardia` (Redis + `usos_ia`); el asistente usa `Guardia.GenerarValidado` (caché y límite del usuario) con `ia.ConUsuario`. Un plan son 2 generaciones: `IA_LIMITE_HORA` pasa de 5 a 10.
+- Decisión: `POST /planes/generar/otra-idea` = cuerpo de generar + `excluir` (1 a 30 ids) sobre `recomendador.Contexto.Excluidos`.
+- Límite: Fiber (fasthttp) no avisa cuando el cliente corta; la cancelación llega por el contexto de la petición (60 s o apagado) y el plazo de 7 s acota el gasto.
+- Corrección de la pila: `ia.Decodificar` deja el destino en cero si falla (un id inyectado quedaba en la salida; fallaba `Security/IA` de nv-28). En `asistente_test.go` `require.Equal(..., readAll(t, resp))` consumía el cuerpo antes de decodificar (fallaba en nv-32): usar `exigirEstado`.
+- A evitar: el CI solo corre en PRs a `main`; los PRs de la pila no prueban Integration. Se pueden correr en local con `docker run --network host -v //var/run/docker.sock:/var/run/docker.sock` (las suites usan `127.0.0.1` con puerto fijo). En PowerShell 5.1 las comillas dobles dentro de `sh -c` se pierden: escribir el script en el scratchpad y montarlo. `Set-Content -Encoding utf8` mete BOM: usar `UTF8Encoding $false`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
