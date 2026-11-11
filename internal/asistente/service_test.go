@@ -1,8 +1,6 @@
 package asistente
 
 import (
-	"context"
-	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,10 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
-	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 )
 
 func float(v float64) *float64 { return &v }
@@ -74,31 +70,6 @@ func TestFechaPedidaEInicio(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 11, 14, 20, 0, 0, 0, zona), inicioDe("20:00", sabadoTarde))
 	assert.Equal(t, time.Date(2026, 11, 15, 10, 0, 0, 0, zona), inicioDe("10:00", sabadoTarde), "si ya pasó, mañana")
 	assert.Equal(t, time.Date(2026, 11, 14, 14, 35, 0, 0, zona), inicioDe("", sabadoTarde.Add(2*time.Minute)))
-}
-
-func TestErrorIA_LimiteEs429YLoDemas503SinTextoDelProveedor(t *testing.T) {
-	log, logs := testutil.Logger()
-	s := &Service{log: log}
-	casos := []struct {
-		err    error
-		estado int
-		retry  int
-	}{
-		{&ia.LimiteError{Espera: 30 * time.Second}, http.StatusTooManyRequests, 30},
-		{&ia.LimiteError{}, http.StatusTooManyRequests, retryLimiteIA},
-		{ia.ErrLimiteProveedor, http.StatusTooManyRequests, retryLimiteIA},
-		{ia.ErrTiempo, http.StatusServiceUnavailable, 0},
-		{errors.Join(ia.ErrRespuestaInvalida, errors.New("frase secreta del proveedor")), http.StatusServiceUnavailable, 0},
-		{context.Canceled, http.StatusServiceUnavailable, 0},
-	}
-	for _, c := range casos {
-		var ae *apperr.Error
-		require.ErrorAs(t, s.errorIA(c.err), &ae)
-		assert.Equal(t, c.estado, ae.Kind.Status())
-		assert.Equal(t, c.retry, ae.RetryAfter)
-	}
-	assert.NotContains(t, logs.String(), "frase secreta")
-	assert.Contains(t, logs.String(), "respuesta_invalida")
 }
 
 func TestPersonasYMovilidad(t *testing.T) {

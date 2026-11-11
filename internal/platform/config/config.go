@@ -53,7 +53,7 @@ const (
 	maxIAPrecioUSDMTok  = 100.0
 	// Límites de la IA (nv-28): por usuario y hora, y globales al 80 % de la capa gratuita de
 	// gemini-3.5-flash-lite (15 por minuto, 500 por día). El máximo es el límite del proveedor.
-	defaultIALimiteHora = 5
+	defaultIALimiteHora = 10
 	maxIALimiteHora     = 50
 	defaultIALimiteMin  = 12
 	maxIALimiteMin      = 15

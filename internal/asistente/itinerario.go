@@ -83,7 +83,7 @@ func esquemaItinerario() map[string]any {
 // GenerarItinerario pide a la IA de 2 a 4 paradas elegidas de los candidatos.
 func GenerarItinerario(ctx context.Context, m ia.Modelo, recs []recomendador.Recomendacion, p Pedido, in Interpretacion) (Itinerario, error) {
 	var out Itinerario
-	_, err := ia.GenerarValidado(ctx, m, PeticionItinerario(recs, p, in), &out)
+	_, err := generarValidado(ctx, m, PeticionItinerario(recs, p, in), &out)
 	return out, err
 }
 

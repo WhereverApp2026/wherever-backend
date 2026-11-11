@@ -120,7 +120,7 @@ func esquemaInterpretar() map[string]any {
 // fijas, el día y la hora local (sin datos de la persona) y la frase anonimizada.
 func Interpretar(ctx context.Context, m ia.Modelo, frase string, ahora time.Time) (Interpretacion, error) {
 	var out Interpretacion
-	_, err := ia.GenerarValidado(ctx, m, PeticionInterpretar(frase, ahora), &out)
+	_, err := generarValidado(ctx, m, PeticionInterpretar(frase, ahora), &out)
 	return out, err
 }
 

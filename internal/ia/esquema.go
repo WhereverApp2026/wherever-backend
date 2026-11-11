@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 )
 
 // Validable es una salida que sabe revisar sus propias reglas, como que cada id esté en la
@@ -37,8 +38,24 @@ func SoloDeLaLista(elegidos, permitidos []string) error {
 }
 
 // Decodificar lee la salida con reglas estrictas: un solo objeto JSON, sin campos que el
-// esquema no declara y sin texto extra. Después corre Validar si el destino la tiene.
-func Decodificar(data []byte, destino any) error {
+// esquema no declara y sin texto extra. Después corre Validar si el destino la tiene. Si
+// falla, deja el destino en cero: una salida rechazada (un id inyectado) no queda a mano.
+func Decodificar(data []byte, destino any) (err error) {
+	defer func() {
+		if err != nil {
+			limpiar(destino)
+		}
+	}()
+	return decodificar(data, destino)
+}
+
+func limpiar(destino any) {
+	if v := reflect.ValueOf(destino); v.Kind() == reflect.Pointer && !v.IsNil() {
+		v.Elem().SetZero()
+	}
+}
+
+func decodificar(data []byte, destino any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(destino); err != nil {

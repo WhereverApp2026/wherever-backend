@@ -138,7 +138,7 @@ func TestLoad_IAApagadaSinLlave(t *testing.T) {
 	assert.InDelta(t, 5.0, cfg.IA.TopeUSDMes, 1e-9, "nv-27: tope de 5 USD al mes por defecto")
 	assert.Zero(t, cfg.IA.PrecioEntradaUSDMTok, "capa gratuita: costo cero")
 	assert.Zero(t, cfg.IA.PrecioSalidaUSDMTok)
-	assert.Equal(t, 5, cfg.IA.LimiteHora, "nv-28: 5 generaciones por usuario y hora")
+	assert.Equal(t, 10, cfg.IA.LimiteHora, "nv-33: 10 generaciones por usuario y hora (5 planes de dos pasos)")
 	assert.Equal(t, 12, cfg.IA.LimiteMin, "nv-28: 80 %% de 15 por minuto")
 	assert.Equal(t, 400, cfg.IA.LimiteDia, "nv-28: 80 %% de 500 por día")
 }
