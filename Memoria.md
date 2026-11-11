@@ -326,6 +326,15 @@
 - Decisión: pesos presupuesto 0,20, distancia 0,20, horario 0,10, clima 0,10 (fijo 0,5 hasta nv-25), gustos 0,25, calificación 0,15; total a un decimal para que el orden no dependa del redondeo; empates por calificación y luego id.
 - A evitar: tratar una lista vacía de `alergenos` como «sin alérgenos»; poner cifras, alergias o dieta en `por_que`.
 
+## Spec nv-24 — Recomendaciones y «No me interesa» (2026-11-11)
+- Estado (2026-11-11): implementada en la rama `nv-24` sobre `nv-23` (PR apilado; nv-23 aún sin fusionar). Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration, Security y Database las corre el CI. Falta la firma.
+- Corrección de drift: el plan decía «ver Diseño» sin archivos; el paquete es `internal/recomendaciones` (no `internal/inicio`). Contratos con 401/403/503 además de 200/422 y 204/404.
+- Decisión: `cmd/api` valida los pesos al arrancar (`recomendaciones.NewService`): cierra el pendiente de nv-23. `lat` y `lng` son obligatorios; `hora` HH:MM de hoy en `America/Mexico_City`; la compañía suma términos a los gustos, no filtra.
+- Decisión propuesta (privacidad): alergias solo con `datos_sensibles` (regla de nv-05) y solo como filtro duro; dietas siempre filtro duro; gustos y presupuesto guardados solo con `aprendizaje_personalizado`. El ánimo todavía no entra al motor.
+- Decisión: `descartes_usuario` con índice único `ux_usuario_negocio`; POST idempotente (404 si el negocio no es público); DELETE de un descarte inexistente o ajeno = 404. Se excluyen los 1000 más recientes en `$geoNear.query`. Entra en ARCO (exportar, borrar historial y cuenta).
+- A evitar: olvidar `scripts/routes/main.go` al agregar un módulo (`check_endpoints` no ve sus rutas); leer el cuerpo con `readAll` dentro de los argumentos de `require` y luego decodificarlo (ya se consumió).
+- Pendiente: sin prueba Contract propia (el golden se genera con `CONTRACT_CAPTURE=1` y contenedores).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

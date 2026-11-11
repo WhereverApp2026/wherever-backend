@@ -25,6 +25,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -36,20 +38,21 @@ const Password = "Prueba_1234"
 
 // Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
 type Env struct {
-	Cfg      config.Config
-	Mongo    *platformmongo.Client
-	Redis    *goredis.Client
-	Users    *usuarios.Repository
-	Service  *auth.Service
-	Account  *account.Service
-	Cities   *ciudades.Service
-	Negocios *negocios.Service
-	Exports  *privacidad.Exports
-	Job      *privacidad.Job
-	Mail     *mailer.Memory
-	Log      *slog.Logger
-	Logs     *testutil.LogBuffer
-	modules  []httpapi.Module
+	Cfg             config.Config
+	Mongo           *platformmongo.Client
+	Redis           *goredis.Client
+	Users           *usuarios.Repository
+	Service         *auth.Service
+	Account         *account.Service
+	Cities          *ciudades.Service
+	Negocios        *negocios.Service
+	Recomendaciones *recomendaciones.Service
+	Exports         *privacidad.Exports
+	Job             *privacidad.Job
+	Mail            *mailer.Memory
+	Log             *slog.Logger
+	Logs            *testutil.LogBuffer
+	modules         []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -103,26 +106,34 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 
 	authRepo := auth.NewRepository(client.DB())
 	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
-	businesses := negocios.NewService(negocios.NewRepository(client.DB()), users, log)
+	businessRepo := negocios.NewRepository(client.DB())
+	businesses := negocios.NewService(businessRepo, users, log)
+	recoRepo := recomendaciones.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
+	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
+	pesos, err := recomendador.PesosPorDefecto()
+	require.NoError(t, err)
+	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
+	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Exports: exports,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Recomendaciones: reco, Exports: exports,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
 			negocios.NewHandler(businesses, v),
+			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
 }

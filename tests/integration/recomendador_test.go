@@ -9,6 +9,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
 )
 
 // recoSpec es un negocio de la prueba del recomendador con lo que nv-21 no fija.
@@ -41,6 +42,12 @@ func diezNegocios() []recoSpec {
 
 func insertReco(t *testing.T) *negocios.Repository {
 	t.Helper()
+	return negocios.NewRepository(insertRecoEnv(t).Mongo.DB())
+}
+
+// insertRecoEnv carga los 10 negocios y devuelve el entorno con la app (nv-24).
+func insertRecoEnv(t *testing.T) *authtest.Env {
+	t.Helper()
 	env := negociosEnv(t)
 	docs := make([]any, 0, 10)
 	for _, s := range diezNegocios() {
@@ -51,7 +58,7 @@ func insertReco(t *testing.T) *negocios.Repository {
 	}
 	_, err := env.Mongo.DB().Collection(negocios.Collection).InsertMany(context.Background(), docs)
 	require.NoError(t, err)
-	return negocios.NewRepository(env.Mongo.DB())
+	return env
 }
 
 func recoCtx() recomendador.Contexto {

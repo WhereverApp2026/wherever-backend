@@ -48,3 +48,13 @@ func (r *Repository) Candidates(ctx context.Context, q CandidateQuery) ([]Candid
 
 // OpenAtCondition es la regla de OpenAt lista para un `$and` de MongoDB.
 func OpenAtCondition(now time.Time) bson.D { return bson.D{openAtFilter(now)} }
+
+// ItemOf arma la tarjeta de GET /lugares de un candidato; la reutiliza GET /recomendaciones
+// (nv-24) para que las dos listas tengan la misma forma.
+func ItemOf(c Candidate, now time.Time) PlaceItem {
+	distance := c.DistanceM
+	return toItem(placeRow{Business: c.Business, DistanceM: &distance}, now)
+}
+
+// MexicoCity es la zona de los horarios (la misma de OpenAt).
+func MexicoCity() *time.Location { return mexicoCity }
