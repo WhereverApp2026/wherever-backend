@@ -154,7 +154,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	assistant, err := buildAsistente(cfg.IA, businessRepo, users, log)
+	assistant, err := buildAsistente(cfg.IA, businessRepo, users, asistente.NewDescartes(mongoClient.DB()), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -170,7 +170,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 
 // buildAsistente arma el asistente de planes (nv-31). Sin GEMINI_API_KEY o IA_MODELO_ID la IA
 // queda apagada y POST /planes/generar responde 503 hasta el respaldo de nv-33.
-func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.Usuarios, log *slog.Logger) (*asistente.Service, error) {
+func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, error) {
 	pesos, err := recomendador.PesosPorDefecto()
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.U
 	} else {
 		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes queda apagado")
 	}
-	return asistente.NewService(modelo, fuente, users, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
+	return asistente.NewService(modelo, fuente, users, descartes, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
 }
 
 // mailers son los dos caminos del correo (nv-06): las peticiones encolan y nunca esperan al

@@ -52,15 +52,16 @@ type Config struct {
 
 // Service arma planes desde una frase. Sin modelo (IA apagada) responde 503 hasta nv-33.
 type Service struct {
-	modelo ia.Modelo
-	fuente recomendador.Fuente
-	users  Usuarios
-	cfg    Config
-	log    *slog.Logger
+	modelo    ia.Modelo
+	fuente    recomendador.Fuente
+	users     Usuarios
+	descartes Descartes
+	cfg       Config
+	log       *slog.Logger
 }
 
 // NewService valida los pesos al arrancar. modelo puede ser nil.
-func NewService(modelo ia.Modelo, fuente recomendador.Fuente, users Usuarios, cfg Config, log *slog.Logger) (*Service, error) {
+func NewService(modelo ia.Modelo, fuente recomendador.Fuente, users Usuarios, descartes Descartes, cfg Config, log *slog.Logger) (*Service, error) {
 	if err := cfg.Pesos.Validate(); err != nil {
 		return nil, errors.Join(recomendador.ErrPesos, err)
 	}
@@ -70,10 +71,11 @@ func NewService(modelo ia.Modelo, fuente recomendador.Fuente, users Usuarios, cf
 	if cfg.Ahora == nil {
 		cfg.Ahora = time.Now
 	}
-	return &Service{modelo: modelo, fuente: fuente, users: users, cfg: cfg, log: log}, nil
+	return &Service{modelo: modelo, fuente: fuente, users: users, descartes: descartes, cfg: cfg, log: log}, nil
 }
 
-// Generar: frase → Interpretar (IA) → Recomendar (15 candidatos) → Armar → Recalcular.
+// Generar: frase → Interpretar (IA) → Recomendar (15 candidatos) → itinerario (IA) →
+// Verificar contra los candidatos → Recalcular.
 func (s *Service) Generar(ctx context.Context, subject string, req GenerarRequest) (GenerarResponse, error) {
 	if s.modelo == nil {
 		return GenerarResponse{}, apperr.Unavailable("el asistente no está disponible")
@@ -105,15 +107,45 @@ func (s *Service) Generar(ctx context.Context, subject string, req GenerarReques
 		s.log.ErrorContext(ctx, "asistente: candidatos no disponibles")
 		return GenerarResponse{}, apperr.Unavailable("servicio no disponible")
 	}
-	plan, usados, err := Armar(recs, pedido, s.cfg.Velocidades)
-	if errors.Is(err, ErrSinCandidatos) {
-		return GenerarResponse{}, apperr.Validation("no hay lugares abiertos y compatibles cerca; prueba otra hora o zona")
-	}
+	plan, usados, err := s.itinerario(ctx, recs, pedido, in)
 	if err != nil {
 		return GenerarResponse{}, err
 	}
-	s.log.InfoContext(ctx, "asistente: plan generado", "fuente", FuenteIA, "candidatos", len(recs), "paradas", len(plan.Paradas))
 	return GenerarResponse{Fuente: FuenteIA, Aviso: avisoIA, Parametros: parametros(in), Plan: planDTO(plan, usados)}, nil
+}
+
+// itinerario pide las paradas a la IA, las verifica contra los candidatos y registra los
+// descartes. Sin candidatos no llama a la IA.
+func (s *Service) itinerario(ctx context.Context, recs []recomendador.Recomendacion, pedido Pedido, in Interpretacion) (planes.Plan, []recomendador.Recomendacion, error) {
+	sinLugares := apperr.Validation("no hay lugares abiertos y compatibles cerca; prueba otra hora o zona")
+	if len(recs) == 0 {
+		return planes.Plan{}, nil, sinLugares
+	}
+	it, err := GenerarItinerario(ctx, s.modelo, recs, pedido, in)
+	if err != nil {
+		return planes.Plan{}, nil, s.errorIA(err)
+	}
+	plan, usados, descartes, err := Verificar(it, recs, pedido, s.cfg.Velocidades)
+	s.registrar(ctx, descartes)
+	if errors.Is(err, ErrSinCandidatos) {
+		return planes.Plan{}, nil, sinLugares
+	}
+	if err != nil {
+		return planes.Plan{}, nil, err
+	}
+	s.log.InfoContext(ctx, "asistente: plan generado", "fuente", FuenteIA, "candidatos", len(recs),
+		"propuestas", len(it.Paradas), "descartes", len(descartes), "paradas", len(plan.Paradas))
+	return plan, usados, nil
+}
+
+// registrar guarda los descartes; si la base falla solo se avisa: la medición no tumba el plan.
+func (s *Service) registrar(ctx context.Context, ds []Descarte) {
+	for _, d := range ds {
+		s.log.InfoContext(ctx, "asistente: parada descartada", "motivo", d.Motivo)
+	}
+	if err := s.descartes.Registrar(ctx, s.modelo.Nombre(), ds); err != nil {
+		s.log.WarnContext(ctx, "asistente: no se registraron los descartes", "cantidad", len(ds))
+	}
 }
 
 func (s *Service) user(ctx context.Context, subject string) (usuarios.User, error) {
