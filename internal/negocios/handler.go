@@ -11,6 +11,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
@@ -23,18 +24,24 @@ const (
 
 // Handler traduce HTTP ↔ service.
 type Handler struct {
-	svc *Service
+	svc       *Service
+	validator *validation.Validator
 }
 
 // NewHandler recibe el service y el validador por constructor (el DTO de la semilla no
-// usa etiquetas `validate`: las reglas son de negocio y se acumulan por fila).
-func NewHandler(svc *Service, _ *validation.Validator) *Handler {
-	return &Handler{svc: svc}
+// usa etiquetas `validate`: las reglas son de negocio y se acumulan por fila; las consultas
+// de lugares sí).
+func NewHandler(svc *Service, v *validation.Validator) *Handler {
+	return &Handler{svc: svc, validator: v}
 }
 
-// Routes registra /api/v1/categorias y la semilla admin. Cumple httpapi.Module.
+// Routes registra /api/v1/categorias, /api/v1/lugares y la semilla admin. Cumple
+// httpapi.Module. `/lugares/mapa` va antes de `/lugares/:id`.
 func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/categorias", h.categories)
+	v1.Get("/lugares", h.list)
+	v1.Get("/lugares/mapa", h.mapa)
+	v1.Get("/lugares/:id", h.detail)
 	v1.Post("/admin/negocios/importar",
 		limiter.Window(adminPolicy, adminLimit, adminWindow),
 		middleware.RequireRoles(middleware.RoleAdmin),
@@ -48,6 +55,44 @@ func (h *Handler) categories(c *fiber.Ctx) error {
 	}
 	// Sin ETag ni 304 hasta NV-18: los conteos no se cachean.
 	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+func (h *Handler) list(c *fiber.Ctx) error {
+	q := ListQuery{Limit: pagination.DefaultLimit}
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.List(c.UserContext(), q)
+	if err != nil {
+		return err
+	}
+	return c.JSON(out)
+}
+
+func (h *Handler) mapa(c *fiber.Ctx) error {
+	var q MapQuery
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.Map(c.UserContext(), q)
+	if err != nil {
+		return err
+	}
+	return c.JSON(out)
+}
+
+func (h *Handler) detail(c *fiber.Ctx) error {
+	out, err := h.svc.Detail(c.UserContext(), c.Params("id"))
+	if err != nil {
+		return err
+	}
 	return c.JSON(out)
 }
 

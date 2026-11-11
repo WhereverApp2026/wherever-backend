@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
@@ -61,4 +62,18 @@ func TestContract_Negocios(t *testing.T) {
 	token := testutil.ValidTokenFor(t, admin.ID.Hex(), "jti-contrato-negocios", middleware.RoleAdmin)
 	status, body = call(t, app, http.MethodPost, "/api/v1/admin/negocios/importar", second, token)
 	check(t, "negocios/importar_200", status, body)
+
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares?lat=19.4326&lng=-99.1332&limite=1", nil, "")
+	check(t, "negocios/lugares_200", status, body)
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares?orden=distancia", nil, "")
+	check(t, "negocios/lugares_422", status, body)
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/mapa?min_lat=19.4&max_lat=19.5&min_lng=-99.2&max_lng=-99.1&zoom=14", nil, "")
+	check(t, "negocios/lugares_mapa_200", status, body)
+	var business negocios.Business
+	require.NoError(t, env.Mongo.DB().Collection(negocios.Collection).
+		FindOne(context.Background(), bson.D{{Key: "slug", Value: "contrato-importado"}}).Decode(&business))
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+business.ID.Hex(), nil, "")
+	check(t, "negocios/lugares_ficha_200", status, body)
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+business.OwnerID.Hex(), nil, "")
+	check(t, "negocios/lugares_ficha_404", status, body)
 }

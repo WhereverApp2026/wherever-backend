@@ -64,13 +64,13 @@
 - Headers outermost + HSTS 365d no-dev + CORS 1 origen.
 - Rate 4 políticas + 429 uniforme + limitador antes de Auth.
 - Timeout 60s + body 10MB + `slog` con filtro de secretos.
-- SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada noche; Sonar informativo; `Dependabot` activo. `RESTler` diferido, documentado, no exigido.
+- SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada semana (domingo, `nightly.yml`); Sonar informativo; `Dependabot` activo. `RESTler` diferido, documentado, no exigido.
 
 ## 7. Testing quirks
 - `testing` + `testify`; mocks solo de interfaces externas; Integration y Security usan la app real en proceso.
 - `Security` reutiliza el helper `internal/testutil` (tokens válidos/vencidos/sin firma).
 - `scripts/ci/cambios.sh` decide qué jobs corren y `resumen-gate.sh` escribe el gate del PR. Dockle y Trivy se fijan por digest en `ci-pr.yml`; ZAP por versión en `nightly.yml`.
-- Fuzz (nv-10): los objetivos `Fuzz*` corren como pruebas normales con sus semillas; `scripts/ci/fuzz.sh` hace el fuzz real de noche. Un fallo deja un caso en `testdata/fuzz/`: se versiona y se corrige en el mismo PR. No usan repositorios simulados: `authtest.Build` con dependencias caídas.
+- Fuzz (nv-10): los objetivos `Fuzz*` corren como pruebas normales con sus semillas; `scripts/ci/fuzz.sh` hace el fuzz real cada semana. Un fallo deja un caso en `testdata/fuzz/`: se versiona y se corrige en el mismo PR. No usan repositorios simulados: `authtest.Build` con dependencias caídas.
 - Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`). Desde nv-06 el stack incluye Mailpit (SMTP 1026, API 8026) y `testutil.Mailpit` lee los correos.
 - Correo (nv-06): las peticiones encolan con `mailer.Async` y nunca esperan al servidor; el trabajo nocturno envía directo con `mailer.Retrying`. Enlaces siempre con el token en el fragmento (`#token=`).
 - Paquetes de usuarios (nv-05): `internal/usuarios` es modelo, repositorio y el guardia `RequireActive`; `internal/usuarios/account` es service, handler y DTO. Van separados porque auth usa el repositorio de usuarios y el service de usuarios usa a auth. El test de arquitectura trata `internal/usuarios/account/handler.go` como handler: no puede importar drivers ni usar `recover`.

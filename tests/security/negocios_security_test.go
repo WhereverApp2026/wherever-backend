@@ -75,3 +75,38 @@ func TestNegociosSecurity_RequiresAdminAndOnlyApprovedInCatalog(t *testing.T) {
 	assert.NotContains(t, catalog.body, "secreto")
 	assert.Contains(t, catalog.body, "tacos")
 }
+
+// TestLugaresSecurity_HiddenNeverPublic: un negocio no aprobado o eliminado no sale por
+// ningún endpoint público, y ninguno expone el QR de check-in ni el dueño.
+func TestLugaresSecurity_HiddenNeverPublic(t *testing.T) {
+	env := authEnv(t)
+	app := env.App()
+	visibleID, hiddenID := bson.NewObjectID(), bson.NewObjectID()
+	doc := func(id bson.ObjectID, slug, status string) bson.D {
+		return bson.D{
+			{Key: "_id", Value: id}, {Key: "slug", Value: slug}, {Key: "qr_checkin", Value: "qr-" + slug},
+			{Key: "nombre", Value: slug}, {Key: "estado", Value: status}, {Key: "categoria", Value: "bar"},
+			{Key: "propietario_id", Value: bson.NewObjectID()},
+			{Key: "ubicacion", Value: bson.D{{Key: "type", Value: "Point"}, {Key: "coordinates", Value: bson.A{-99.1332, 19.4326}}}},
+		}
+	}
+	_, err := env.Mongo.DB().Collection(negocios.Collection).InsertMany(context.Background(), []any{
+		doc(visibleID, "visible", negocios.StatusApproved),
+		doc(hiddenID, "oculto-pausado", negocios.StatusPaused),
+	})
+	require.NoError(t, err)
+
+	for _, path := range []string{
+		"/api/v1/lugares",
+		"/api/v1/lugares?lat=19.4326&lng=-99.1332",
+		"/api/v1/lugares/mapa?min_lat=19.4&max_lat=19.5&min_lng=-99.2&max_lng=-99.1&zoom=14",
+		"/api/v1/lugares/" + visibleID.Hex(),
+	} {
+		got := send(t, app, http.MethodGet, path, nil, "")
+		require.Equal(t, http.StatusOK, got.status, path)
+		assert.NotContains(t, got.body, "oculto-pausado", path)
+		assert.NotContains(t, got.body, "qr-", path)
+		assert.NotContains(t, got.body, "propietario", path)
+	}
+	assert.Equal(t, http.StatusNotFound, send(t, app, http.MethodGet, "/api/v1/lugares/"+hiddenID.Hex(), nil, "").status)
+}
