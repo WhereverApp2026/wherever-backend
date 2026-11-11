@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
@@ -41,22 +42,23 @@ const Password = "Prueba_1234"
 
 // Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
 type Env struct {
-	Cfg      config.Config
-	Mongo    *platformmongo.Client
-	Redis    *goredis.Client
-	Users    *usuarios.Repository
-	Service  *auth.Service
-	Account  *account.Service
-	Cities   *ciudades.Service
-	Negocios *negocios.Service
-	Planes   *planes.Service
-	Exports  *privacidad.Exports
-	Job      *privacidad.Job
-	IA       *iatest.Modelo // doble del proveedor de IA (nv-31)
-	Mail     *mailer.Memory
-	Log      *slog.Logger
-	Logs     *testutil.LogBuffer
-	modules  []httpapi.Module
+	Cfg             config.Config
+	Mongo           *platformmongo.Client
+	Redis           *goredis.Client
+	Users           *usuarios.Repository
+	Service         *auth.Service
+	Account         *account.Service
+	Cities          *ciudades.Service
+	Negocios        *negocios.Service
+	Planes          *planes.Service
+	Recomendaciones *recomendaciones.Service
+	Exports         *privacidad.Exports
+	Job             *privacidad.Job
+	IA              *iatest.Modelo // doble del proveedor de IA (nv-31)
+	Mail            *mailer.Memory
+	Log             *slog.Logger
+	Logs            *testutil.LogBuffer
+	modules         []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -117,25 +119,29 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.NewDescartes(client.DB()), asistente.Config{Pesos: pesos}, log)
 	require.NoError(t, err)
+	recoRepo := recomendaciones.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	iaUses := ia.NewRegistroMongo(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
+	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
+	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
+	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports, IA: modelo,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, IA: modelo,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -144,6 +150,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
+			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
 }

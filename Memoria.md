@@ -379,6 +379,14 @@
 - Decisión: `ia_descartes` (`motivo`, `negocio_id`, `modelo`, `creado_en`, `expira_en`), TTL con `expira_en` y `ExpireAfterSeconds(0)` como el resto del proyecto (la prueba de índices lo exige). Sin id ni texto de la persona: fuera de ARCO. Si falla la escritura, el plan sale igual.
 - Privacidad: al paso 2 van nombre, giro, precio y horario del día de los candidatos, inicio y presupuesto; en el turno de usuario solo compañía, ánimo (con consentimiento) y palabras clave. Nunca la frase, ubicación ni perfil.
 - A evitar: heredocs con comillas y acentos en Bash fallan aunque el delimitador vaya entre comillas; escribir el script de Python en el scratchpad. Las pruebas de integración fijan `fecha` (ahora + 2 h) para poder escribir las horas de la IA con el reloj real.
+## Spec nv-24 — Recomendaciones y «No me interesa» (2026-11-11)
+- Estado (2026-11-11): implementada en la rama `nv-24` sobre `nv-23` (PR apilado; nv-23 aún sin fusionar). Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration, Security y Database las corre el CI. Falta la firma.
+- Corrección de drift: el plan decía «ver Diseño» sin archivos; el paquete es `internal/recomendaciones` (no `internal/inicio`). Contratos con 401/403/503 además de 200/422 y 204/404.
+- Decisión: `cmd/api` valida los pesos al arrancar (`recomendaciones.NewService`): cierra el pendiente de nv-23. `lat` y `lng` son obligatorios; `hora` HH:MM de hoy en `America/Mexico_City`; la compañía suma términos a los gustos, no filtra.
+- Decisión propuesta (privacidad): alergias solo con `datos_sensibles` (regla de nv-05) y solo como filtro duro; dietas siempre filtro duro; gustos y presupuesto guardados solo con `aprendizaje_personalizado`. El ánimo todavía no entra al motor.
+- Decisión: `descartes_usuario` con índice único `ux_usuario_negocio`; POST idempotente (404 si el negocio no es público); DELETE de un descarte inexistente o ajeno = 404. Se excluyen los 1000 más recientes en `$geoNear.query`. Entra en ARCO (exportar, borrar historial y cuenta).
+- A evitar: olvidar `scripts/routes/main.go` al agregar un módulo (`check_endpoints` no ve sus rutas); leer el cuerpo con `readAll` dentro de los argumentos de `require` y luego decodificarlo (ya se consumió).
+- Pendiente: sin prueba Contract propia (el golden se genera con `CONTRACT_CAPTURE=1` y contenedores).
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

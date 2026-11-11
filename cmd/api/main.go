@@ -31,6 +31,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -142,14 +143,26 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
+	recoRepo := recomendaciones.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
+	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+
+	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
+	pesos, err := recomendador.PesosPorDefecto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("recomendador: %w", err)
+	}
+	recoSvc, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("recomendaciones: %w", err)
+	}
 
 	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
@@ -169,6 +182,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
+		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
