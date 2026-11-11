@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-30)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -46,6 +46,16 @@
 | GET | `/api/v1/lugares` con `?categoria=&precio_max=&abierto_ahora=&lat=&lng=&radio_m=&orden=&cursor=&limite=` → `{items[{id,slug,nombre,categoria,nivel_precio,precio_promedio,calificacion{promedio,total_resenas},foto_portada,ubicacion{lat,lng},distancia_m?,abierto_ahora}], siguiente_cursor, limite}`; `lat` y `lng` juntos, `radio_m` 5,000 por defecto y 20,000 máx.; `orden` `distancia` (por defecto con ubicación), `calificacion` (sin ella) o `precio` | opcional | global | 200/401/422 | nv-21 (A2) |
 | GET | `/api/v1/lugares/mapa` con `?min_lat=&min_lng=&max_lat=&max_lng=&zoom=&categoria=` → `{agrupado, pines[{id,nombre,categoria,calificacion,ubicacion}], celdas[{centro{lat,lng},conteo}]}`; hasta 100 pines; si hay más, celdas de `360/2^zoom/4` grados (máx. 400); `zoom` 3–20, ancho < 180° | no | global | 200/422 | nv-21 (A2) |
 | GET | `/api/v1/lugares/{id}` → ficha pública con `abierto_ahora` (hora de `America/Mexico_City`); sin dueño, QR, plan, revisión ni versión; no aprobado, eliminado o id mal formado = 404 | no | global | 200/404 | nv-21 (A2) |
+| POST | `/api/v1/planes` → `{nombre, fecha (día), personas, presupuesto, movilidad, origen?, paradas[{negocio_id, llega, minutos, precio, nota?}]}` (1 a 6 paradas); responde el plan calculado con `ETag` | JWT | global | 201/400/401/403/422 | nv-30 (A4) |
+| GET | `/api/v1/planes` con `?pestana=&cursor=&limite=`; `pestana` es `proximos` (por defecto), `guardados` o `pasados`; solo los planes activos de quien llama | JWT | global | 200/401/422 | nv-30 (A4) |
+| GET | `/api/v1/planes/{id}` → plan con `traslados`, `costo_total`, `costo_por_persona` y `version`; ajeno o borrado = 404 | JWT, dueño | global | 200/401/404 | nv-30 (A4) |
+| PATCH | `/api/v1/planes/{id}` con `If-Match` → cambia nombre, fecha (mueve las paradas), personas, presupuesto o movilidad | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
+| DELETE | `/api/v1/planes/{id}` con `If-Match` → borrado lógico | JWT, dueño | global | 204/400/401/403/404/409 | nv-30 (A4) |
+| POST | `/api/v1/planes/{id}/clonar` → `{fecha, nombre?}`; plan nuevo con las mismas horas en el día nuevo, sin reservas ni integrantes | JWT, dueño | global | 201/401/403/404/422 | nv-30 (A4) |
+| POST | `/api/v1/planes/{id}/paradas` con `If-Match` → agrega una parada | JWT, dueño | global | 201/400/401/403/404/409/422 | nv-30 (A4) |
+| PUT | `/api/v1/planes/{id}/paradas/orden` con `If-Match` → `{orden[ids]}`; reparte las mismas horas de llegada en el orden pedido | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
+| PATCH | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → mueve la parada o cambia minutos, precio o nota | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
+| DELETE | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → quita la parada (la última no, 422) | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | POST | `/api/v1/admin/negocios/importar` → multipart `archivo` `.csv` o `.json` o arreglo JSON de 1–100; idempotente por `slug`; responde `{creados, actualizados, errores[{fila,campo,mensaje}]}` y los válidos quedan `aprobado` | JWT administrador | admin 200/min | 200/400/401/403/413/422/503 | nv-20 (A2/A5) |
 | POST | `/api/v1/planes/generar` con `{frase, lat, lng, fecha?, personas?, movilidad?}` → plan sin guardar `{fuente, aviso, parametros{compania, con_ninos, con_mascota, presupuesto_max, hora, animo?, palabras_clave[]}, plan{nombre, fecha, personas, presupuesto, movilidad, paradas[{id, negocio_id, llega, minutos, precio, nombre, categoria, por_que}], traslados[], costo_total, costo_por_persona, origen}}`; `frase` de 1 a 300 caracteres; `fecha` de ahora a 30 días; de 2 a 4 paradas que propone la IA y la API verifica contra los candidatos | JWT | global | 200/400/401/403/422/429/503 | nv-31, nv-32 (A4) |
 

@@ -1,5 +1,5 @@
 // Package planes es el modelo de plan de nv-29: paradas, traslados estimados y costos que
-// se recalculan siempre con Recalcular. Los endpoints llegan con nv-30.
+// se recalculan siempre con Recalcular. Los endpoints (nv-30) están en service.go y handler.go.
 package planes
 
 import (

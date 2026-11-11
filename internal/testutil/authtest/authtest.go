@@ -20,6 +20,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -48,6 +49,7 @@ type Env struct {
 	Account  *account.Service
 	Cities   *ciudades.Service
 	Negocios *negocios.Service
+	Planes   *planes.Service
 	Exports  *privacidad.Exports
 	Job      *privacidad.Job
 	IA       *iatest.Modelo // doble del proveedor de IA (nv-31)
@@ -114,22 +116,25 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	pesos, err := recomendador.PesosPorDefecto()
 	require.NoError(t, err)
 	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.NewDescartes(client.DB()), asistente.Config{Pesos: pesos}, log)
-	require.NoError(t, err)
 	exports := privacidad.NewExports(client.DB())
-	planPrivacy := planes.NewPrivacy(planes.NewRepository(client.DB()))
+	planRepo := planes.NewRepository(client.DB())
+	planPrivacy := planes.NewPrivacy(planRepo)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
+	iaUses := ia.NewRegistroMongo(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
+	registry.RegisterExporter(iaUses)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Exports: exports, IA: modelo,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports, IA: modelo,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -137,6 +142,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			ciudades.NewHandler(cities, v),
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
+			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
 }
