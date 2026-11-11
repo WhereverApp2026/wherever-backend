@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -27,8 +28,10 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 )
@@ -49,6 +52,7 @@ type Env struct {
 	Planes   *planes.Service
 	Exports  *privacidad.Exports
 	Job      *privacidad.Job
+	IA       *iatest.Modelo // doble del proveedor de IA (nv-31)
 	Mail     *mailer.Memory
 	Log      *slog.Logger
 	Logs     *testutil.LogBuffer
@@ -108,6 +112,11 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
 	businessRepo := negocios.NewRepository(client.DB())
 	businesses := negocios.NewService(businessRepo, users, log)
+	modelo := iatest.Nuevo()
+	pesos, err := recomendador.PesosPorDefecto()
+	require.NoError(t, err)
+	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.NewDescartes(client.DB()), asistente.Config{Pesos: pesos}, log)
+	require.NoError(t, err)
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
@@ -126,13 +135,14 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports, IA: modelo,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
 			negocios.NewHandler(businesses, v),
+			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}

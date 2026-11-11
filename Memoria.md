@@ -362,6 +362,24 @@
 - Decisión: las escrituras pasan por `usuarios.RequireActive` (cuenta en eliminación pendiente = 403); los errores de MongoDB salen como 503 sin texto (podría repetir nombre o notas).
 - A evitar: devolver 403 para un plan ajeno; usar `apperr` como variable de paquete (se crea en cada llamada).
 
+## Spec nv-31 — Interpretar la frase y armar candidatos (2026-11-11)
+- Estado: implementada en la rama `nv-31` sobre `nv-29` (PR contra `nv-29`); falta la firma y el CI del PR. Paquete `internal/asistente` con `POST /api/v1/planes/generar`; doble de IA en `internal/testutil/iatest` y en `authtest.Env.IA`.
+- Corrección de drift: el flujo de la spec incluía `armarItinerario` con IA y verificar, que son de nv-32; nv-31 arma por reglas (hasta 3 paradas de los 15 candidatos, giros distintos primero, abierta al llegar y al salir, dentro del presupuesto) y `Recalcular`. No existe `docs/ia.md` y `Recomendar` ya era pública. Sin colección ni índices nuevos.
+- Decisión: depende solo de `ia.Modelo`; sin llave la IA queda apagada y la ruta da 503 hasta el respaldo de nv-33. Proveedor sin cupo = 429 con `Retry-After`; lento, bloqueado o inválido tras el reintento = 503; sin candidatos = 422.
+- Decisión: al modelo van las instrucciones fijas (`prompts/interpretar.txt`, embebido), el día y la hora y la frase anonimizada (el asistente también llama `ia.Anonimizar`, no solo el adaptador). Nada del perfil, ni ids ni ubicación. Alergias y dieta del perfil son filtro duro siempre; el ánimo se devuelve solo con `privacidad.estado_animo`.
+- Decisión propuesta: estancias por giro (restaurante 90, cafetería 60, bar 90, entretenimiento 120, servicios 60, comercio 45); `presupuesto` del plan = por persona × personas; `pareja` = 2 personas.
+- Riesgo: la ruta no tiene límite propio (los de IA viven en `ia.Guardia`, nv-28). No fusionar a `main` sin nv-33 o un límite equivalente.
+- A evitar: el anonimizador también tapa cifras largas (un ObjectId en la frase sale como `[teléfono]`); en pruebas comparar contra `ia.Anonimizar(frase)`. `staticcheck` S1016 pide convertir structs con los mismos campos (`Parametros(in)`).
+
+## Spec nv-32 — Itinerario con IA y verificación contra el catálogo (2026-11-11)
+- Estado: implementada en la rama `nv-32` sobre `nv-31` (PR contra `nv-31`); falta la firma y el CI del PR. Local: build, vet, Unit y `golangci-lint` verdes.
+- Corrección de drift: la spec no decía el flujo, los motivos, los campos de `ia_descartes` ni qué viaja al modelo; ahora sí. `Unit/Verificar 10` ya existe con nombre real (`verificar_test.go`).
+- Decisión: segundo paso de IA (`GenerarItinerario`, `prompts/itinerario.txt`) con 2 a 4 paradas `{id, llega, minutos}`. `Validar` revisa solo la forma (se reintenta una vez); ids, horas y presupuesto los revisa `Verificar`, que reemplaza en lugar de reintentar para poder medir la alucinación.
+- Decisión: `Armar` y `Verificar` comparten `armado` (cabe, agregar, completar). Motivos: `fuera_de_candidatos` (incluye negocios filtrados por alergia: nunca están en la lista), `repetido`, `cerrado`, `presupuesto`, `orden_horas` (antes de poder llegar o más de 60 min de espera). El reemplazo va al final del plan.
+- Decisión: `ia_descartes` (`motivo`, `negocio_id`, `modelo`, `creado_en`, `expira_en`), TTL con `expira_en` y `ExpireAfterSeconds(0)` como el resto del proyecto (la prueba de índices lo exige). Sin id ni texto de la persona: fuera de ARCO. Si falla la escritura, el plan sale igual.
+- Privacidad: al paso 2 van nombre, giro, precio y horario del día de los candidatos, inicio y presupuesto; en el turno de usuario solo compañía, ánimo (con consentimiento) y palabras clave. Nunca la frase, ubicación ni perfil.
+- A evitar: heredocs con comillas y acentos en Bash fallan aunque el delimitador vaya entre comillas; escribir el script de Python en el scratchpad. Las pruebas de integración fijan `fecha` (ahora + 2 h) para poder escribir las horas de la IA con el reloj real.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

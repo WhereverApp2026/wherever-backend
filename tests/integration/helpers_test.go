@@ -24,6 +24,15 @@ func readAll(t *testing.T, resp *http.Response) string {
 	return string(raw)
 }
 
+// requireStatus lee el cuerpo solo si el estado no coincide, para mostrarlo en el fallo;
+// si coincide lo deja intacto para decodificarlo después.
+func requireStatus(t *testing.T, resp *http.Response, want int) {
+	t.Helper()
+	if resp.StatusCode != want {
+		require.Equal(t, want, resp.StatusCode, readAll(t, resp))
+	}
+}
+
 var snakeCase = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 
 // assertSnakeCase revisa todas las llaves del JSON, también las anidadas.

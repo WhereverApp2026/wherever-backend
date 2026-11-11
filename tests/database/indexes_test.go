@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	mongodrv "go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
@@ -22,13 +23,14 @@ import (
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
 // `exportaciones` (colección nueva de nv-05).
 var expected = map[string][]string{
-	usuarios.Collection:          {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash"},
-	ciudades.Collection:          {"_id_", "ux_ciudad", "ix_centro"},
-	privacidad.ExportsCollection: {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
-	auth.SessionsCollection:      {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
-	auth.TokensCollection:        {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
-	negocios.Collection:          {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
-	planes.Collection:            {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
+	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash"},
+	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
+	privacidad.ExportsCollection:  {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
+	auth.SessionsCollection:       {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
+	auth.TokensCollection:         {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
+	negocios.Collection:           {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
+	planes.Collection:             {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
+	asistente.DescartesCollection: {"_id_", "ttl_descarte", "ix_motivo_fecha"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -91,7 +93,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 			assert.True(t, *got[name].Unique, name)
 		}
 	}
-	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion"} {
+	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion", asistente.DescartesCollection: "ttl_descarte"} {
 		ttl := specs(t, db, collection)[name]
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)

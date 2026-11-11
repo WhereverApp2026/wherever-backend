@@ -15,6 +15,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -30,6 +31,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
@@ -156,14 +158,39 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
+	assistant, err := buildAsistente(cfg.IA, businessRepo, users, asistente.NewDescartes(mongoClient.DB()), log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("asistente: %w", err)
+	}
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
 		negocios.NewHandler(businessSvc, validator),
+		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
+}
+
+// buildAsistente arma el asistente de planes (nv-31). Sin GEMINI_API_KEY o IA_MODELO_ID la IA
+// queda apagada y POST /planes/generar responde 503 hasta el respaldo de nv-33.
+func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, error) {
+	pesos, err := recomendador.PesosPorDefecto()
+	if err != nil {
+		return nil, err
+	}
+	var modelo ia.Modelo
+	if cfg.Enabled() {
+		g, err := ia.NewGemini(ia.GeminiConfig{APIKey: cfg.GeminiAPIKey, ModeloID: cfg.ModeloID, Timeout: cfg.Timeout})
+		if err != nil {
+			return nil, err
+		}
+		modelo = g
+	} else {
+		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes queda apagado")
+	}
+	return asistente.NewService(modelo, fuente, users, descartes, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
 }
 
 // mailers son los dos caminos del correo (nv-06): las peticiones encolan y nunca esperan al
