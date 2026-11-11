@@ -1,8 +1,8 @@
 # plan.md — NV-30 Guardar, leer, editar y repetir planes
 
 1. Mapeo
-- Crear: Ver Diseño de esta spec.
-- Modificar: Ver Diseño de esta spec.
+- Crear: `internal/planes/dto.go`, `service.go`, `handler.go`, `dto_test.go`; `tests/integration/planes_api_test.go`; `tests/security/planes_security_test.go`.
+- Modificar: `internal/planes/repository.go` (`List`, `DeleteIfVersion`), `internal/negocios/horario.go` (`MexicoCity`), `cmd/api/main.go`, `internal/testutil/authtest/authtest.go`, `scripts/routes/main.go`, `docs/endpoints.md`.
 - Sin cambios: lo que esta spec no nombra.
 
 2. Guardarraíles
@@ -15,4 +15,4 @@
 3. Cierre
 
 4. Verificación
-- `go build`, `go vet`, cinco suites, `critic`, `check_endpoints`, `check_sdd`, cobertura ≥ 45 %, Semgrep en 0.
+- Local: `go build`, `go vet`, Unit y `golangci-lint`; CI: Integration, Security, Database y Contract, `critic`, `check_endpoints`, `check_sdd`, cobertura ≥ 45 %, Semgrep en 0.

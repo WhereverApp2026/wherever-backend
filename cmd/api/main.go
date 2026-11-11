@@ -130,11 +130,14 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
-	businessSvc := negocios.NewService(negocios.NewRepository(db), users, log)
+	businessRepo := negocios.NewRepository(db)
+	businessSvc := negocios.NewService(businessRepo, users, log)
 	exports := privacidad.NewExports(db)
 
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
-	planPrivacy := planes.NewPrivacy(planes.NewRepository(db))
+	planRepo := planes.NewRepository(db)
+	planPrivacy := planes.NewPrivacy(planRepo)
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	registry := privacidad.NewRegistry()
 	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, planPrivacy, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
@@ -155,6 +158,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
 		negocios.NewHandler(businessSvc, validator),
+		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
