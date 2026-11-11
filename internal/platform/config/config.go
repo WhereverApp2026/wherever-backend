@@ -45,9 +45,21 @@ const (
 	maxMailQueue       = 10000
 	defaultPort        = 8080
 	// IA generativa (nv-26): plazo por llamada al proveedor.
-	defaultIATimeout  = 25 * time.Second
-	maxIATimeout      = 55 * time.Second
-	jwtKeyPlaceholder = "PLACEHOLDER"
+	defaultIATimeout = 25 * time.Second
+	maxIATimeout     = 55 * time.Second
+	// Tope de gasto de la IA (nv-27), en USD al mes; el máximo es el presupuesto de la cuenta.
+	defaultIATopeUSDMes = 5.0
+	maxIATopeUSDMes     = 50.0
+	maxIAPrecioUSDMTok  = 100.0
+	// Límites de la IA (nv-28): por usuario y hora, y globales al 80 % de la capa gratuita de
+	// gemini-3.5-flash-lite (15 por minuto, 500 por día). El máximo es el límite del proveedor.
+	defaultIALimiteHora = 5
+	maxIALimiteHora     = 50
+	defaultIALimiteMin  = 12
+	maxIALimiteMin      = 15
+	defaultIALimiteDia  = 400
+	maxIALimiteDia      = 500
+	jwtKeyPlaceholder   = "PLACEHOLDER"
 )
 
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
@@ -86,6 +98,12 @@ const (
 	KeyGeminiAPIKey     = "GEMINI_API_KEY" // #nosec G101 -- nombre de la variable, no su valor
 	KeyIAModeloID       = "IA_MODELO_ID"
 	KeyIATimeout        = "IA_TIMEOUT"
+	KeyIATopeUSDMes     = "IA_TOPE_USD_MES"
+	KeyIAPrecioEntrada  = "IA_PRECIO_ENTRADA_USD_MTOK"
+	KeyIAPrecioSalida   = "IA_PRECIO_SALIDA_USD_MTOK"
+	KeyIALimiteHora     = "IA_LIMITE_HORA"
+	KeyIALimiteMin      = "IA_LIMITE_MIN"
+	KeyIALimiteDia      = "IA_LIMITE_DIA"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -105,7 +123,8 @@ var optionalKeys = []string{
 	KeySMTPHost, KeySMTPPort, KeySMTPUser, KeySMTPPassword, KeySMTPTLS, KeyMailFrom,
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 	KeyJobHour, KeyHideInternals,
-	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout,
+	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
+	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -146,6 +165,17 @@ type IA struct {
 	GeminiAPIKey string
 	ModeloID     string
 	Timeout      time.Duration
+	// TopeUSDMes es el gasto estimado máximo del mes para toda la app (nv-27).
+	TopeUSDMes float64
+	// Precios en USD por millón de tokens; 0 en la capa gratuita.
+	PrecioEntradaUSDMTok float64
+	PrecioSalidaUSDMTok  float64
+	// LimiteHora son las generaciones por usuario y hora (nv-28).
+	LimiteHora int
+	// LimiteMin y LimiteDia son las llamadas al proveedor de toda la app por minuto y por día
+	// (hora del Pacífico).
+	LimiteMin int
+	LimiteDia int
 }
 
 // Enabled indica si hay proveedor de IA configurado.
@@ -241,6 +271,9 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyMailQueueSize, &c.Mail.QueueSize, defaultMailQueue},
 		{KeyJobHour, &c.JobHour, DefaultJobHour},
 		{KeyTrustedProxyHops, &c.TrustedProxyHops, DefaultTrustedProxyHops},
+		{KeyIALimiteHora, &c.IA.LimiteHora, defaultIALimiteHora},
+		{KeyIALimiteMin, &c.IA.LimiteMin, defaultIALimiteMin},
+		{KeyIALimiteDia, &c.IA.LimiteDia, defaultIALimiteDia},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -264,6 +297,31 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		value, err := durationOr(getenv(item.key), item.fallback)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: no es una duración (ej. 60s)", item.key))
+		}
+		*item.target = value
+	}
+	return append(errs, c.parseFloats(getenv)...)
+}
+
+func (c *Config) parseFloats(getenv func(string) string) []error {
+	var errs []error
+	floats := []struct {
+		key      string
+		target   *float64
+		fallback float64
+	}{
+		{KeyIATopeUSDMes, &c.IA.TopeUSDMes, defaultIATopeUSDMes},
+		{KeyIAPrecioEntrada, &c.IA.PrecioEntradaUSDMTok, 0},
+		{KeyIAPrecioSalida, &c.IA.PrecioSalidaUSDMTok, 0},
+	}
+	for _, item := range floats {
+		value := item.fallback
+		if raw := strings.TrimSpace(getenv(item.key)); raw != "" {
+			parsed, err := strconv.ParseFloat(raw, 64)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s: no es un número", item.key))
+			}
+			value = parsed
 		}
 		*item.target = value
 	}
@@ -465,8 +523,33 @@ func (i IA) validate() []error {
 	if strings.HasPrefix(i.GeminiAPIKey, jwtKeyPlaceholder) {
 		errs = append(errs, fmt.Errorf("%s no puede ser el marcador de ejemplo; déjala vacía para apagar la IA", KeyGeminiAPIKey))
 	}
+	// nv-27: !(x > 0) también rechaza NaN.
+	if !(i.TopeUSDMes > 0) || i.TopeUSDMes > maxIATopeUSDMes {
+		errs = append(errs, fmt.Errorf("%s debe ser positivo y no mayor a %v", KeyIATopeUSDMes, maxIATopeUSDMes))
+	}
+	errs = append(errs, validatePrice(KeyIAPrecioEntrada, i.PrecioEntradaUSDMTok)...)
+	errs = append(errs, validatePrice(KeyIAPrecioSalida, i.PrecioSalidaUSDMTok)...)
+	errs = append(errs, validateLimit(KeyIALimiteHora, i.LimiteHora, maxIALimiteHora)...)
+	errs = append(errs, validateLimit(KeyIALimiteMin, i.LimiteMin, maxIALimiteMin)...)
+	errs = append(errs, validateLimit(KeyIALimiteDia, i.LimiteDia, maxIALimiteDia)...)
 	if strings.ContainsAny(i.ModeloID, "/?#: ") {
 		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-3.5-flash-lite)", KeyIAModeloID))
 	}
 	return errs
+}
+
+// validateLimit acepta de 1 al máximo (nv-28).
+func validateLimit(key string, value, maxValue int) []error {
+	if value < 1 || value > maxValue {
+		return []error{fmt.Errorf("%s debe estar entre 1 y %d", key, maxValue)}
+	}
+	return nil
+}
+
+// validatePrice acepta de 0 al máximo; !(x >= 0) también rechaza NaN.
+func validatePrice(key string, price float64) []error {
+	if !(price >= 0) || price > maxIAPrecioUSDMTok {
+		return []error{fmt.Errorf("%s debe estar entre 0 y %v", key, maxIAPrecioUSDMTok)}
+	}
+	return nil
 }

@@ -287,6 +287,24 @@
 - Red: sin cambios; las instancias ya salen por 443 a cualquier destino.
 - A evitar: en Windows, Control de aplicaciones bloquea `gofmt`, `vet` y los `*.test.exe`; correr todo en `golang:1.27.3` con Docker.
 
+## NV-27 — Tope de gasto y caché de la IA (en curso)
+- Estado (2026-11-11): rama `nv-27` desde `main`. `ia.Guardia` envuelve el modelo con el tope mensual y la caché; `usos_ia` registra cada llamada. Unit, lint, critic, SDD y endpoints en verde; Integration en el CI del PR. Falta la firma. Sin cableado: lo arma quien llame a la IA (nv-31, nv-33).
+- Decisión: la guardia es a su vez un `ia.Modelo`, así el reintento de `ia.GenerarValidado` también pasa por el tope. La caché va en `Guardia.GenerarValidado` y solo guarda salidas ya validadas; si guardara antes de validar, el reintento leería la misma salida inválida.
+- Decisión: colección `usos_ia` (la spec decía `ia_uso`; la regla pide plural en español). Llaves `cuota:ia_gasto:{AAAA-MM}` (micro-USD, mes en UTC) y `cache:ia:{huella}` (1 h).
+- Decisión: sin la llave del mes se reconstruye desde `usos_ia` con `SET NX`; con Redis caído se lee `usos_ia`; sin los dos se cierra (`ErrGastoDesconocido`). La caché no cierra.
+- Privacidad: ARCO quita `usuario_id` de `usos_ia` en lugar de borrar, para no bajar el gasto del mes; la exportación lista los usos sin ids. TTL de 400 días.
+- Configuración: `IA_TOPE_USD_MES` (5, máximo 50), `IA_PRECIO_ENTRADA_USD_MTOK` e `IA_PRECIO_SALIDA_USD_MTOK` (0 en la capa gratuita). Con costo cero el gasto cuesta un solo `GET` por llamada.
+- A evitar: escribir en los logs campos `dependencia` o `evento` fuera de su uso: alimentan alarmas de CloudWatch. La guardia usa `parte`.
+
+## NV-28 — Límites y protección de datos en la IA (en curso)
+- Estado (2026-11-11): rama `nv-28` desde `nv-27`, PR contra `nv-27`. Límite por usuario y global dentro de `ia.Guardia` (`internal/ia/limite.go`), `ia.SoloDeLaLista` para los ids y `IA_LIMITE_HORA/MIN/DIA`. Build, vet, Unit, lint, critic, SDD y endpoints en verde; Integration (`ia_limite_test.go`) y Security (`ia_security_test.go`) en el CI del PR. Falta la firma. Sin cableado: lo arma nv-31/nv-33.
+- Corrección de drift: la spec decía `ia_uso` (es `usos_ia`) y la tarea 10 por hora (son 5 generaciones, hasta 10 llamadas); los límites no eran una pieza aparte sino parte de la guardia.
+- Decisión: el global va en `Guardia.Generar` (cuenta cada llamada, también el reintento) y el del usuario en `GenerarValidado` después de la caché (cuenta generaciones; un acierto no cuenta). Sin usuario en el contexto se usa la cubeta `rate:ia_usuario:sin_usuario`: olvidar `ia.ConUsuario` no quita el límite.
+- Decisión: ventanas fijas con `SET NX` + `INCR` + `PTTL` en un Pipeline (3 comandos por ventana, `TestPresupuestoRedis_LimitesIA`). La hora del usuario empieza con su primera generación y `Regreso` sale del TTL real. Las llamadas rechazadas también cuentan. Sin Redis se cierra (`ErrLimiteDesconocido`).
+- Decisión: el día global es el de `America/Los_Angeles`, como la cuota del proveedor; `cmd/api` ya importa `time/tzdata`. Los máximos de configuración (15 por minuto, 500 por día) son los de la capa gratuita.
+- Privacidad: `Security/IA` prueba con el adaptador real contra un servidor local que la frase solo va en el turno de usuario, que un id ajeno se descarta, que ni correo, teléfono, coordenadas, enlaces ni el id del usuario viajan, y que ni `usos_ia` ni la caché guardan la frase.
+- A evitar: `resultadoDe` con un `switch` por error superaba el gocyclo de 10; ahora es una tabla. Agregar un error nuevo de la guardia es una fila.
+
 ## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
 - Estado: spec revisada y completa, en la ola 4 (después de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
 - Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.

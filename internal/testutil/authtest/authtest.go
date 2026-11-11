@@ -20,6 +20,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
+	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -117,13 +118,15 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	exports := privacidad.NewExports(client.DB())
 	planPrivacy := planes.NewPrivacy(planes.NewRepository(client.DB()))
+	iaUses := ia.NewRegistroMongo(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, planPrivacy, iaUses, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
+	registry.RegisterExporter(iaUses)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
