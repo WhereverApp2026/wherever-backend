@@ -1,8 +1,9 @@
 # plan.md — NV-23 Filtros duros y puntuación de recomendaciones
 
 1. Mapeo
-- Crear: `internal/recomendador/*`, `internal/clima/*`, `internal/inicio/*`, `configs/pesos_recomendador.json`, pruebas en `tests/`.
-- Modificar: `internal/usuarios` (lectura de gustos y preferencias, solo lectura), `cmd/api`, `.env.example`, `docs/endpoints.md`, `Memoria.md`.
+- Crear: `internal/recomendador/*` (con `pesos_recomendador.json` embebido), `internal/negocios/candidatos.go`, `tests/integration/recomendador_test.go`.
+- Modificar: `internal/negocios/catalog.go` e `import.go` (`ninguno` en `alergenos`), `Memoria.md`.
+- Fuera de esta spec (drift corregido): `internal/clima` es nv-25 e `internal/inicio` es nv-24; sin cambios en `cmd/api`, `.env.example` ni `docs/endpoints.md` porque no hay endpoints ni variables nuevas. `internal/usuarios` no cambia: `Contexto` recibe los gustos ya leídos.
 - Sin cambios: lo que esta spec no nombra.
 
 2. Guardarraíles
