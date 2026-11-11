@@ -24,7 +24,7 @@ import (
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
 // `exportaciones` (colección nueva de nv-05) y el único de `descartes_usuario` (nv-24).
 var expected = map[string][]string{
-	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash"},
+	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
 	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
 	privacidad.ExportsCollection:  {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
 	auth.SessionsCollection:       {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
@@ -83,7 +83,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
 
 	for collection, names := range map[string][]string{
-		usuarios.Collection:        {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash"},
+		usuarios.Collection:        {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash", "ux_nombre_usuario"},
 		ciudades.Collection:        {"ux_ciudad"},
 		auth.SessionsCollection:    {"ux_refresh_hash"},
 		auth.TokensCollection:      {"ux_token_hash"},

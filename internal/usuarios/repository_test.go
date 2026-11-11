@@ -30,3 +30,11 @@ func TestCanSignIn(t *testing.T) {
 	assert.False(t, User{Status: StatusBlocked}.CanSignIn())
 	assert.False(t, User{}.CanSignIn())
 }
+
+// buscable_por_usuario nace encendido: ausente en cuentas previas a nv-34 cuenta como true.
+func TestPrivacy_SearchableByUsernameDefaultsOn(t *testing.T) {
+	off, on := false, true
+	assert.True(t, Privacy{}.SearchableByUsername())
+	assert.True(t, Privacy{UsernameSearchable: &on}.SearchableByUsername())
+	assert.False(t, Privacy{UsernameSearchable: &off}.SearchableByUsername())
+}

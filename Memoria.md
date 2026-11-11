@@ -407,6 +407,13 @@
 - Corrección de la pila: `ia.Decodificar` deja el destino en cero si falla (un id inyectado quedaba en la salida; fallaba `Security/IA` de nv-28). En `asistente_test.go` `require.Equal(..., readAll(t, resp))` consumía el cuerpo antes de decodificar (fallaba en nv-32): usar `exigirEstado`.
 - A evitar: el CI solo corre en PRs a `main`; los PRs de la pila no prueban Integration. Se pueden correr en local con `docker run --network host -v //var/run/docker.sock:/var/run/docker.sock` (las suites usan `127.0.0.1` con puerto fijo). En PowerShell 5.1 las comillas dobles dentro de `sh -c` se pierden: escribir el script en el scratchpad y montarlo. `Set-Content -Encoding utf8` mete BOM: usar `UTF8Encoding $false`.
 
+## NV-34 — Nombre de usuario y privacidad de búsqueda (2026-11-11)
+- Estado: implementada desde `main`; local build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde. Las suites con contenedor las corre el CI del PR. Falta la firma.
+- Drift corregido: el plan creaba `internal/amistades` y `internal/personas` (son de nv-35/36) y tocaba el purger y la matriz de límites (no hay colección nueva).
+- Decisión: `nombre_usuario` solo minúsculas, números y guion bajo (3 a 20); las mayúsculas son 422, no se convierten, y así `ux_nombre_usuario` (único parcial) ya es único sin importar mayúsculas. Lista corta de reservados en la regla `username`.
+- Decisión: `privacidad.buscable_por_usuario` es `*bool` con `omitempty`; ausente = encendido (`Privacy.SearchableByUsername`). Para buscar en Mongo (nv-35) usa `{$ne: false}`, nunca `true`.
+- Contract: `nombre_usuario` y `buscable_por_usuario` entran en `yo_200`, `yo_patch_200` (el PATCH del contrato ahora manda `nombre_usuario`), `privacidad_200`, `cancelar_eliminacion_200` y `exportacion_descargar_200`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
