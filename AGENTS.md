@@ -36,6 +36,8 @@
 - No incluir módulos de negocio en `nv-00…nv-03`.
 
 ## 4. Verificación por módulo
+- Ritmo (2026-11-11): en local solo `go build`, `go vet`, Unit y `golangci-lint`; Integration, Security, Database y Contract las corre el CI del PR, y si fallan se corrigen en el mismo PR. El CI completo sigue siendo obligatorio para fusionar.
+- Pruebas por spec: por endpoint, el caso feliz, el error principal y la autorización (401/403); los casos de validación van en Unit. Privacidad, alergias y propiedad de recursos se prueban completos.
 - `go build ./...` y `go vet ./...` sin errores antes de test.
 - `Unit/Integration/Security/Database/Contract` 100% verdes (`-count=1`).
 - `scripts/critic-guardrails.sh → PASS`, `scripts/check_sdd.sh → SDD-OK`, `scripts/check_endpoints.sh → OK`, `scripts/check_coverage.sh --min 45`, `check_delta_coverage.py --min 80 --advisory` informa (no bloquea), `semgrep scan --metrics=off --error --severity=ERROR --config=p/golang --config=p/owasp-top-ten --config=p/secrets` y `semgrep scan --metrics=off --error --config=.semgrep/semgrep.yaml` 0 nuevos.
