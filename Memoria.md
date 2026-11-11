@@ -309,6 +309,15 @@
 - Pendiente para nv-23: `alergenos[]` lista lo que el negocio contiene y una lista vacía no distingue «sin alérgenos» de «sin dato». Antes del filtro duro, definir cómo se marca un negocio sin dato para no recomendarlo a alguien con alergias.
 - Proceso: PR 36 se fusionó en `specs-nv-16` después de que esa rama entró a `main`, así que su commit llega a `main` con el PR de nv-20. Revisar la base de un PR apilado antes de fusionarlo.
 
+## Spec nv-21 — Lista, ficha y mapa de lugares (2026-11-10)
+- Estado (2026-11-10): implementada sobre `main` (ya trae nv-20); falta la firma. Crea `GET /api/v1/lugares`, `/lugares/mapa` y `/lugares/{id}` dentro de `internal/negocios` (sin paquete nuevo ni índices nuevos).
+- Corrección de drift: la spec decía «minutos de la semana»; nv-20 guarda `horario_min[]` como `{dia, desde, hasta}` por día con `hasta` > 1440 al cruzar medianoche. Abierto = ventana de hoy con `desde ≤ m < hasta` o la de ayer con `hasta > m + 1440`, en `America/Mexico_City`. Misma regla en Go (`OpenAt`) y en Mongo (`openAtFilter`, `$elemMatch`).
+- Decisión: todos los filtros van en `$geoNear.query` o `$match` antes del `$limit`, unidos en `$and` para que los dos `$or` (abierto ahora y cursor) no choquen. Por distancia, la página siguiente usa `minDistance` y un `$match` quita los empates ya entregados por `_id`.
+- Decisión: el cursor compartido guarda `orden:valor` en `orden`; un cursor de otro orden es 422. Radio 5 km por defecto y 20 km máx.; mapa con 100 pines y luego celdas de `360/2^zoom/4` grados (máx. 400).
+- Privacidad: el error de `List` no lleva el texto de MongoDB (podría repetir la ubicación); un test revisa que `lat`/`lng` no lleguen a los logs.
+- A evitar: escribir `` `lat`/`lng` `` en `docs/endpoints.md`: `check_endpoints` lee `` `/` `` como la ruta `GET /`. Los scripts con `git rev-parse` fallan en Docker desde un worktree; montar el `.git` principal y usar `GIT_DIR=/gitmain/worktrees/<nombre>` con `GIT_WORK_TREE=/src`.
+- A evitar: editar con Python en Windows sin `newline=''`: deja CRLF y `gofmt -l` marca el archivo entero.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
