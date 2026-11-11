@@ -21,8 +21,15 @@ type GenerarRequest struct {
 	Movilidad string     `json:"movilidad" validate:"omitempty,oneof=a_pie bicicleta auto transporte_publico"`
 }
 
+// OtraIdeaRequest es el cuerpo de POST /planes/generar/otra-idea: la misma petición más los
+// negocios ya propuestos, que no se repiten.
+type OtraIdeaRequest struct {
+	GenerarRequest
+	Excluir []string `json:"excluir" validate:"required,min=1,max=30,dive,objectid"`
+}
+
 // GenerarResponse es el plan sin guardar (la app lo guarda con POST /planes, nv-30). El
-// respaldo por reglas de nv-33 responde con esta misma forma y `fuente: reglas`.
+// respaldo por reglas (nv-33) responde con esta misma forma y `fuente: reglas`.
 type GenerarResponse struct {
 	Fuente     string     `json:"fuente"`
 	Aviso      string     `json:"aviso"`

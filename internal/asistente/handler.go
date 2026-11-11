@@ -26,14 +26,16 @@ func (h *Handler) WithActiveGuard(guard fiber.Handler) *Handler {
 	return h
 }
 
-// Routes registra POST /api/v1/planes/generar. Cumple httpapi.Module. Los límites de IA por
-// usuario y globales (nv-27/nv-28) se aplican dentro de ia.Guardia al armarse en nv-33.
+// Routes registra POST /api/v1/planes/generar y /planes/generar/otra-idea. Cumple
+// httpapi.Module. Los límites de IA por usuario y globales (nv-27/nv-28) viven en ia.Guardia;
+// al llegar a ellos responde el motor de reglas.
 func (h *Handler) Routes(v1 fiber.Router, _ *middleware.Limiter) {
 	chain := []fiber.Handler{middleware.RequireAuth()}
 	if h.active != nil {
 		chain = append(chain, h.active)
 	}
 	v1.Post("/planes/generar", append(chain, h.generar)...)
+	v1.Post("/planes/generar/otra-idea", append(chain, h.otraIdea)...)
 }
 
 func (h *Handler) generar(c *fiber.Ctx) error {
@@ -47,6 +49,24 @@ func (h *Handler) generar(c *fiber.Ctx) error {
 	}
 	cl, _ := middleware.ClaimsFrom(c)
 	out, err := h.svc.Generar(c.UserContext(), cl.Subject, req)
+	return responder(c, out, err)
+}
+
+func (h *Handler) otraIdea(c *fiber.Ctx) error {
+	var req OtraIdeaRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	normalizarFrase(&req.GenerarRequest)
+	if err := h.validator.Struct(req); err != nil {
+		return err
+	}
+	cl, _ := middleware.ClaimsFrom(c)
+	out, err := h.svc.OtraIdea(c.UserContext(), cl.Subject, req)
+	return responder(c, out, err)
+}
+
+func responder(c *fiber.Ctx, out GenerarResponse, err error) error {
 	if err != nil {
 		return err
 	}
