@@ -1,6 +1,7 @@
 {
   "status": 200,
   "body": {
+    "descartes_usuario": [],
     "planes": [],
     "sesiones": [
       {
