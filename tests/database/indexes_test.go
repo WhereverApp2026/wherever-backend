@@ -13,6 +13,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -27,6 +28,7 @@ var expected = map[string][]string{
 	auth.SessionsCollection:      {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
 	auth.TokensCollection:        {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
 	negocios.Collection:          {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
+	planes.Collection:            {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {

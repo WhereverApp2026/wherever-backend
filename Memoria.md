@@ -335,6 +335,15 @@
 - Decisión: pesos presupuesto 0,20, distancia 0,20, horario 0,10, clima 0,10 (fijo 0,5 hasta nv-25), gustos 0,25, calificación 0,15; total a un decimal para que el orden no dependa del redondeo; empates por calificación y luego id.
 - A evitar: tratar una lista vacía de `alergenos` como «sin alérgenos»; poner cifras, alergias o dieta en `por_que`.
 
+## Spec nv-29 — Modelo de plan, paradas y traslados (2026-11-11)
+- Estado: implementada en la rama `nv-29` sobre `main`; falta la firma y el CI del PR (Integration, Security, Database, Contract). Paquete `internal/planes` sin endpoints (llegan con nv-30): modelo, `Recalcular`, `Calculadora`, repositorio con `UpdateIfVersion` y ARCO.
+- Corrección de drift: movilidades con el catálogo de nv-05 (`a_pie`, `bicicleta`, `auto`, `transporte_publico`), no «bici/transporte». Velocidades en `planes.DefaultVelocidades()` por constructor, no en `.env.example` (sin consumidor que las ajuste). `Contract/Planes 3` pasa a `Unit/Plan_FormaJSON`: sin rutas no hay contrato HTTP. Sin cambios en `docs/endpoints.md` ni `scripts/routes`.
+- Decisión: `Recalcular(plan, lugares, velocidades)` es pura y es la única que escribe `traslados` y costos; si falla no deja cálculos a medias. `Calculadora.Aplicar` carga los negocios con `negocios.Repository.FindVisibleMany` (aprobados y no eliminados, solo ubicación y horario). Abierto = `OpenAt` al llegar y en el último minuto de la estancia.
+- Decisión propuesta: `precio` de la parada es por persona; `costo_total` = suma × `personas`. Km a 2 decimales y minutos hacia arriba.
+- Decisión: versión vieja = `ErrVersionConflict` (409) y plan ajeno o borrado = `ErrNotFound` (404), como nv-05. Ojo nv-30: su tabla dice 412/428; usar 409/400 como el perfil.
+- Decisión: ARCO registra `planes.Privacy` antes de `usuarios` (el usuario se borra al final). «Borrar mi historial» no borra planes (contenido, no historial).
+- A evitar: guardar un plan sin pasar por `Recalcular`; `type assertion` sin comprobar en pruebas (errcheck de golangci-lint): decodificar a un struct.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
