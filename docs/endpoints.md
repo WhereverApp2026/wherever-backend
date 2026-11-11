@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-30)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-30)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -56,8 +56,12 @@
 | PUT | `/api/v1/planes/{id}/paradas/orden` con `If-Match` → `{orden[ids]}`; reparte las mismas horas de llegada en el orden pedido | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | PATCH | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → mueve la parada o cambia minutos, precio o nota | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | DELETE | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → quita la parada (la última no, 422) | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
+| GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |
+| POST | `/api/v1/recomendaciones/{negocio_id}/no-me-interesa` → sin cuerpo; idempotente; negocio no aprobado, eliminado o id mal formado = 404 | JWT | global | 204/401/403/404 | nv-24 (A2) |
+| DELETE | `/api/v1/recomendaciones/{negocio_id}/no-me-interesa` → deshace el descarte; si el usuario no lo tenía = 404 (incluye el de otro usuario) | JWT | global | 204/401/403/404 | nv-24 (A2) |
 | POST | `/api/v1/admin/negocios/importar` → multipart `archivo` `.csv` o `.json` o arreglo JSON de 1–100; idempotente por `slug`; responde `{creados, actualizados, errores[{fila,campo,mensaje}]}` y los válidos quedan `aprobado` | JWT administrador | admin 200/min | 200/400/401/403/413/422/503 | nv-20 (A2/A5) |
-| POST | `/api/v1/planes/generar` con `{frase, lat, lng, fecha?, personas?, movilidad?}` → plan sin guardar `{fuente, aviso, parametros{compania, con_ninos, con_mascota, presupuesto_max, hora, animo?, palabras_clave[]}, plan{nombre, fecha, personas, presupuesto, movilidad, paradas[{id, negocio_id, llega, minutos, precio, nombre, categoria, por_que}], traslados[], costo_total, costo_por_persona, origen}}`; `frase` de 1 a 300 caracteres; `fecha` de ahora a 30 días; de 2 a 4 paradas que propone la IA y la API verifica contra los candidatos | JWT | global | 200/400/401/403/422/429/503 | nv-31, nv-32 (A4) |
+| POST | `/api/v1/planes/generar` con `{frase, lat, lng, fecha?, personas?, movilidad?}` → plan sin guardar `{fuente, aviso, parametros{compania, con_ninos, con_mascota, presupuesto_max, hora, animo?, palabras_clave[]}, plan{nombre, fecha, personas, presupuesto, movilidad, paradas[{id, negocio_id, llega, minutos, precio, nombre, categoria, por_que}], traslados[], costo_total, costo_por_persona, origen}}`; `frase` de 1 a 300 caracteres; `fecha` de ahora a 30 días; de 2 a 4 paradas que propone la IA y la API verifica contra los candidatos; si la IA tarda más de 7 s, falla, da 429, está apagada o se llegó al tope o a un límite, responde el motor de reglas con la misma forma, `fuente: reglas` y 3 paradas | JWT | global | 200/400/401/403/422/429/503 | nv-31, nv-32, nv-33 (A4) |
+| POST | `/api/v1/planes/generar/otra-idea` con el cuerpo de generar más `excluir` (de 1 a 30 ids de negocios ya propuestos) → otro plan sin guardar con la misma forma, sin esos lugares; con el mismo respaldo por reglas | JWT | global | 200/400/401/403/422/429/503 | nv-33 (A4) |
 
 Convención JSON: `snake_case`. `PageResult{items, siguiente_cursor, limite}` (desde nv-02). Errores `{codigo, mensaje, campos[], detalle?, traza_id}`.
 

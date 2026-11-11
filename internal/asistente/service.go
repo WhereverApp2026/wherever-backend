@@ -24,7 +24,6 @@ const (
 
 const (
 	avisoIA          = "Plan sugerido a partir de tu frase. Revisa horarios y precios antes de salir."
-	retryLimiteIA    = 60 // segundos, si el proveedor no dice cuánto esperar
 	maxAnticipacion  = 30 * 24 * time.Hour
 	toleranciaPasado = 5 * time.Minute
 )
@@ -48,9 +47,12 @@ type Config struct {
 	Pesos       recomendador.Pesos
 	Velocidades planes.Velocidades
 	Ahora       func() time.Time // nil = time.Now
+	// PlazoIA es lo que esperan las dos llamadas a la IA juntas; 0 = PlazoTotal menos 1 s
+	// de reserva para el respaldo.
+	PlazoIA time.Duration
 }
 
-// Service arma planes desde una frase. Sin modelo (IA apagada) responde 503 hasta nv-33.
+// Service arma planes desde una frase. Sin modelo (IA apagada) responde el motor de reglas.
 type Service struct {
 	modelo    ia.Modelo
 	fuente    recomendador.Fuente
@@ -71,15 +73,25 @@ func NewService(modelo ia.Modelo, fuente recomendador.Fuente, users Usuarios, de
 	if cfg.Ahora == nil {
 		cfg.Ahora = time.Now
 	}
+	if cfg.PlazoIA <= 0 {
+		cfg.PlazoIA = PlazoTotal - reservaRespaldo
+	}
 	return &Service{modelo: modelo, fuente: fuente, users: users, descartes: descartes, cfg: cfg, log: log}, nil
 }
 
 // Generar: frase → Interpretar (IA) → Recomendar (15 candidatos) → itinerario (IA) →
-// Verificar contra los candidatos → Recalcular.
+// Verificar contra los candidatos → Recalcular. Si la IA falla, tarda, se queda sin cupo o
+// está apagada, responde el motor de reglas (nv-33).
 func (s *Service) Generar(ctx context.Context, subject string, req GenerarRequest) (GenerarResponse, error) {
-	if s.modelo == nil {
-		return GenerarResponse{}, apperr.Unavailable("el asistente no está disponible")
-	}
+	return s.generar(ctx, subject, req, nil)
+}
+
+// OtraIdea es Generar sin los lugares ya propuestos (nv-33).
+func (s *Service) OtraIdea(ctx context.Context, subject string, req OtraIdeaRequest) (GenerarResponse, error) {
+	return s.generar(ctx, subject, req.GenerarRequest, idsExcluidos(req.Excluir))
+}
+
+func (s *Service) generar(ctx context.Context, subject string, req GenerarRequest, excluir []bson.ObjectID) (GenerarResponse, error) {
 	user, err := s.user(ctx, subject)
 	if err != nil {
 		return GenerarResponse{}, err
@@ -89,10 +101,11 @@ func (s *Service) Generar(ctx context.Context, subject string, req GenerarReques
 	if err != nil {
 		return GenerarResponse{}, err
 	}
-	in, err := Interpretar(ctx, s.modelo, req.Frase, ahora)
-	if err != nil {
-		return GenerarResponse{}, s.errorIA(err)
-	}
+	// Las dos llamadas a la IA comparten un plazo; si la app corta, el contexto de la
+	// petición cancela también la llamada al modelo.
+	ictx, cancel := context.WithTimeout(ia.ConUsuario(ctx, user.ID), s.cfg.PlazoIA)
+	defer cancel()
+	in, fallo := s.interpretar(ictx, req.Frase, ahora)
 	if !user.Privacy.Mood {
 		in.Animo = ""
 	}
@@ -102,28 +115,70 @@ func (s *Service) Generar(ctx context.Context, subject string, req GenerarReques
 	pedido := Pedido{Inicio: inicio, Personas: personasDe(req.Personas, in), Movilidad: s.movilidad(req.Movilidad, user)}
 	cctx := contexto(*req.Lat, *req.Lng, inicio, in, user.Tastes)
 	pedido.PresupuestoMax = cctx.PresupuestoMax
+	cctx.Excluidos = excluir
 	recs, err := recomendador.Recomendar(ctx, s.fuente, s.cfg.Pesos, cctx, MaxCandidatos)
 	if err != nil {
 		s.log.ErrorContext(ctx, "asistente: candidatos no disponibles")
 		return GenerarResponse{}, apperr.Unavailable("servicio no disponible")
 	}
-	plan, usados, err := s.itinerario(ctx, recs, pedido, in)
+	if len(recs) == 0 {
+		return GenerarResponse{}, errSinLugares()
+	}
+	if fallo == nil {
+		plan, usados, err := s.itinerario(ictx, recs, pedido, in)
+		if err == nil {
+			return GenerarResponse{Fuente: FuenteIA, Aviso: avisoIA, Parametros: parametros(in), Plan: planDTO(plan, usados)}, nil
+		}
+		if !errors.As(err, new(errIA)) {
+			return GenerarResponse{}, err
+		}
+		fallo = err
+	}
+	return s.respaldo(ctx, recs, pedido, in, fallo)
+}
+
+// interpretar devuelve la interpretación vacía y la falla si la IA no está o no respondió.
+func (s *Service) interpretar(ctx context.Context, frase string, ahora time.Time) (Interpretacion, error) {
+	if s.modelo == nil {
+		return interpretacionVacia(), errApagada
+	}
+	in, err := Interpretar(ctx, s.modelo, frase, ahora)
+	if err != nil {
+		return interpretacionVacia(), err
+	}
+	return in, nil
+}
+
+// respaldo arma el plan con el motor de reglas (US-039): no llama al modelo, así que no cuenta
+// contra el tope ni los límites. Si la petición ya se canceló no arma nada.
+func (s *Service) respaldo(ctx context.Context, recs []recomendador.Recomendacion, pedido Pedido, in Interpretacion, fallo error) (GenerarResponse, error) {
+	if ctx.Err() != nil {
+		s.log.WarnContext(ctx, "asistente: petición cancelada", "motivo", motivoCancelada)
+		return GenerarResponse{}, apperr.Unavailable("petición cancelada")
+	}
+	plan, usados, err := Armar(recs, pedido, s.cfg.Velocidades)
+	if errors.Is(err, ErrSinCandidatos) {
+		return GenerarResponse{}, errSinLugares()
+	}
 	if err != nil {
 		return GenerarResponse{}, err
 	}
-	return GenerarResponse{Fuente: FuenteIA, Aviso: avisoIA, Parametros: parametros(in), Plan: planDTO(plan, usados)}, nil
+	s.log.WarnContext(ctx, "asistente: plan por reglas", "fuente", FuenteReglas, "motivo", motivoIA(fallo),
+		"candidatos", len(recs), "paradas", len(plan.Paradas))
+	return GenerarResponse{Fuente: FuenteReglas, Aviso: avisoReglas, Parametros: parametros(in), Plan: planDTO(plan, usados)}, nil
+}
+
+func errSinLugares() error {
+	return apperr.Validation("no hay lugares abiertos y compatibles cerca; prueba otra hora o zona")
 }
 
 // itinerario pide las paradas a la IA, las verifica contra los candidatos y registra los
-// descartes. Sin candidatos no llama a la IA.
+// descartes. Una falla del modelo vuelve como errIA para el respaldo.
 func (s *Service) itinerario(ctx context.Context, recs []recomendador.Recomendacion, pedido Pedido, in Interpretacion) (planes.Plan, []recomendador.Recomendacion, error) {
-	sinLugares := apperr.Validation("no hay lugares abiertos y compatibles cerca; prueba otra hora o zona")
-	if len(recs) == 0 {
-		return planes.Plan{}, nil, sinLugares
-	}
+	sinLugares := errSinLugares()
 	it, err := GenerarItinerario(ctx, s.modelo, recs, pedido, in)
 	if err != nil {
-		return planes.Plan{}, nil, s.errorIA(err)
+		return planes.Plan{}, nil, errIA{err}
 	}
 	plan, usados, descartes, err := Verificar(it, recs, pedido, s.cfg.Velocidades)
 	s.registrar(ctx, descartes)
@@ -161,42 +216,6 @@ func (s *Service) user(ctx context.Context, subject string) (usuarios.User, erro
 		return usuarios.User{}, apperr.Unavailable("servicio no disponible")
 	}
 	return u, nil
-}
-
-// errorIA traduce la falla del proveedor. El log lleva solo el tipo: ni la frase ni el
-// texto del proveedor.
-func (s *Service) errorIA(err error) error {
-	var limite *ia.LimiteError
-	switch {
-	case errors.As(err, &limite):
-		s.log.Warn("asistente: límite del proveedor de IA")
-		retry := int(limite.Espera.Seconds())
-		if retry <= 0 {
-			retry = retryLimiteIA
-		}
-		return apperr.RateLimited(retry)
-	case errors.Is(err, ia.ErrLimiteProveedor):
-		s.log.Warn("asistente: límite del proveedor de IA")
-		return apperr.RateLimited(retryLimiteIA)
-	default:
-		s.log.Warn("asistente: la IA no respondió", "motivo", motivoIA(err))
-		return apperr.Unavailable("el asistente no está disponible; intenta de nuevo")
-	}
-}
-
-func motivoIA(err error) string {
-	for _, m := range []struct {
-		err    error
-		motivo string
-	}{
-		{ia.ErrTiempo, "tiempo"}, {ia.ErrRespuestaInvalida, "respuesta_invalida"},
-		{ia.ErrBloqueada, "bloqueada"}, {context.Canceled, "cancelada"},
-	} {
-		if errors.Is(err, m.err) {
-			return m.motivo
-		}
-	}
-	return "proveedor"
 }
 
 func (s *Service) movilidad(pedida string, u usuarios.User) string {

@@ -17,11 +17,12 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
-// `exportaciones` (colección nueva de nv-05).
+// `exportaciones` (colección nueva de nv-05) y el único de `descartes_usuario` (nv-24).
 var expected = map[string][]string{
 	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash"},
 	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
@@ -31,6 +32,7 @@ var expected = map[string][]string{
 	negocios.Collection:           {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
 	planes.Collection:             {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
 	asistente.DescartesCollection: {"_id_", "ttl_descarte", "ix_motivo_fecha"},
+	recomendaciones.Collection:    {"_id_", "ux_usuario_negocio"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -81,11 +83,12 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
 
 	for collection, names := range map[string][]string{
-		usuarios.Collection:     {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash"},
-		ciudades.Collection:     {"ux_ciudad"},
-		auth.SessionsCollection: {"ux_refresh_hash"},
-		auth.TokensCollection:   {"ux_token_hash"},
-		negocios.Collection:     {"ux_slug", "ux_qr_checkin"},
+		usuarios.Collection:        {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash"},
+		ciudades.Collection:        {"ux_ciudad"},
+		auth.SessionsCollection:    {"ux_refresh_hash"},
+		auth.TokensCollection:      {"ux_token_hash"},
+		negocios.Collection:        {"ux_slug", "ux_qr_checkin"},
+		recomendaciones.Collection: {"ux_usuario_negocio"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

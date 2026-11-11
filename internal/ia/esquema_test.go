@@ -51,3 +51,11 @@ func TestEsquema_Rechazos(t *testing.T) {
 		})
 	}
 }
+
+func TestSoloDeLaLista_RechazaIDsAjenosYRepetidos(t *testing.T) {
+	lista := []string{"n1", "n2", "n3"}
+	assert.NoError(t, ia.SoloDeLaLista([]string{"n3", "n1"}, lista))
+	assert.NoError(t, ia.SoloDeLaLista(nil, lista))
+	assert.ErrorContains(t, ia.SoloDeLaLista([]string{"n1", "x9"}, lista), "fuera de la lista")
+	assert.ErrorContains(t, ia.SoloDeLaLista([]string{"n2", "n2"}, lista), "repetido")
+}

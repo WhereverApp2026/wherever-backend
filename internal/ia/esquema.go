@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 )
 
 // Validable es una salida que sabe revisar sus propias reglas, como que cada id esté en la
@@ -15,9 +16,46 @@ type Validable interface {
 	Validar() error
 }
 
+// SoloDeLaLista revisa que cada id elegido esté en la lista que la API entregó y no se repita
+// (nv-28): aunque una frase con instrucciones engañe al modelo, no puede inventar ids ni traer
+// otros. Las salidas lo llaman desde su Validar.
+func SoloDeLaLista(elegidos, permitidos []string) error {
+	lista := make(map[string]bool, len(permitidos))
+	for _, id := range permitidos {
+		lista[id] = true
+	}
+	vistos := make(map[string]bool, len(elegidos))
+	for _, id := range elegidos {
+		if !lista[id] {
+			return fmt.Errorf("id %q fuera de la lista", id)
+		}
+		if vistos[id] {
+			return fmt.Errorf("id %q repetido", id)
+		}
+		vistos[id] = true
+	}
+	return nil
+}
+
 // Decodificar lee la salida con reglas estrictas: un solo objeto JSON, sin campos que el
-// esquema no declara y sin texto extra. Después corre Validar si el destino la tiene.
-func Decodificar(data []byte, destino any) error {
+// esquema no declara y sin texto extra. Después corre Validar si el destino la tiene. Si
+// falla, deja el destino en cero: una salida rechazada (un id inyectado) no queda a mano.
+func Decodificar(data []byte, destino any) (err error) {
+	defer func() {
+		if err != nil {
+			limpiar(destino)
+		}
+	}()
+	return decodificar(data, destino)
+}
+
+func limpiar(destino any) {
+	if v := reflect.ValueOf(destino); v.Kind() == reflect.Pointer && !v.IsNil() {
+		v.Elem().SetZero()
+	}
+}
+
+func decodificar(data []byte, destino any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(destino); err != nil {

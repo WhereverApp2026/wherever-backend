@@ -31,6 +31,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -142,14 +143,26 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
+	recoRepo := recomendaciones.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
+	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+
+	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
+	pesos, err := recomendador.PesosPorDefecto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("recomendador: %w", err)
+	}
+	recoSvc, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("recomendaciones: %w", err)
+	}
 
 	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
@@ -158,7 +171,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	assistant, err := buildAsistente(cfg.IA, businessRepo, users, asistente.NewDescartes(mongoClient.DB()), log)
+	assistant, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -169,13 +182,21 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
+		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
 
-// buildAsistente arma el asistente de planes (nv-31). Sin GEMINI_API_KEY o IA_MODELO_ID la IA
-// queda apagada y POST /planes/generar responde 503 hasta el respaldo de nv-33.
-func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, error) {
+// iaDeps son las bases que usa ia.Guardia: Redis (gasto, caché y límites) y usos_ia.
+type iaDeps struct {
+	redis *goredis.Client
+	usos  *ia.RegistroMongo
+}
+
+// buildAsistente arma el asistente de planes (nv-31) con Gemini detrás de ia.Guardia (tope,
+// caché y límites de nv-27/nv-28). Sin GEMINI_API_KEY o IA_MODELO_ID la IA queda apagada y
+// POST /planes/generar responde con el motor de reglas (nv-33).
+func buildAsistente(cfg config.IA, deps iaDeps, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, error) {
 	pesos, err := recomendador.PesosPorDefecto()
 	if err != nil {
 		return nil, err
@@ -186,9 +207,18 @@ func buildAsistente(cfg config.IA, fuente recomendador.Fuente, users asistente.U
 		if err != nil {
 			return nil, err
 		}
-		modelo = g
+		guardia, err := ia.NewGuardia(g, ia.NewContadorRedis(deps.redis), deps.usos, ia.NewCacheRedis(deps.redis), ia.GuardiaConfig{
+			TopeUSDMes: cfg.TopeUSDMes,
+			Precios:    ia.Precios{EntradaUSDMTok: cfg.PrecioEntradaUSDMTok, SalidaUSDMTok: cfg.PrecioSalidaUSDMTok},
+			Limites:    ia.Limites{PorHora: cfg.LimiteHora, PorMinuto: cfg.LimiteMin, PorDia: cfg.LimiteDia},
+			Limitador:  ia.NewLimitadorRedis(deps.redis),
+		}, log)
+		if err != nil {
+			return nil, err
+		}
+		modelo = guardia
 	} else {
-		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes queda apagado")
+		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes responde solo con el motor de reglas")
 	}
 	return asistente.NewService(modelo, fuente, users, descartes, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
 }

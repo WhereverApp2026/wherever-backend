@@ -4,7 +4,9 @@ package iatest
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 )
@@ -17,6 +19,7 @@ type Modelo struct {
 	respuestas []resultado
 	ultima     resultado
 	peticiones []ia.Peticion
+	espera     time.Duration
 }
 
 type resultado struct {
@@ -47,7 +50,7 @@ func (m *Modelo) Fallar(err error) *Modelo {
 func (m *Modelo) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.respuestas, m.peticiones = nil, nil
+	m.respuestas, m.peticiones, m.espera = nil, nil, 0
 	m.ultima = resultado{json: []byte(`{}`)}
 }
 
@@ -58,11 +61,32 @@ func (m *Modelo) Peticiones() []ia.Peticion {
 	return append([]ia.Peticion(nil), m.peticiones...)
 }
 
+// Tardar hace que cada llamada espere d antes de responder, o hasta que se cancele el
+// contexto (como el adaptador real): para probar el plazo y la cancelación.
+func (m *Modelo) Tardar(d time.Duration) *Modelo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.espera = d
+	return m
+}
+
 // Generar cumple ia.Modelo.
 func (m *Modelo) Generar(ctx context.Context, pet ia.Peticion) (ia.Respuesta, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.peticiones = append(m.peticiones, pet)
+	espera := m.espera
+	m.mu.Unlock()
+	if espera > 0 {
+		t := time.NewTimer(espera)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return ia.Respuesta{}, fmt.Errorf("%w: %w", ia.ErrTiempo, ctx.Err())
+		case <-t.C:
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return ia.Respuesta{}, err
 	}

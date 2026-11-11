@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
@@ -41,22 +42,23 @@ const Password = "Prueba_1234"
 
 // Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
 type Env struct {
-	Cfg      config.Config
-	Mongo    *platformmongo.Client
-	Redis    *goredis.Client
-	Users    *usuarios.Repository
-	Service  *auth.Service
-	Account  *account.Service
-	Cities   *ciudades.Service
-	Negocios *negocios.Service
-	Planes   *planes.Service
-	Exports  *privacidad.Exports
-	Job      *privacidad.Job
-	IA       *iatest.Modelo // doble del proveedor de IA (nv-31)
-	Mail     *mailer.Memory
-	Log      *slog.Logger
-	Logs     *testutil.LogBuffer
-	modules  []httpapi.Module
+	Cfg             config.Config
+	Mongo           *platformmongo.Client
+	Redis           *goredis.Client
+	Users           *usuarios.Repository
+	Service         *auth.Service
+	Account         *account.Service
+	Cities          *ciudades.Service
+	Negocios        *negocios.Service
+	Planes          *planes.Service
+	Recomendaciones *recomendaciones.Service
+	Exports         *privacidad.Exports
+	Job             *privacidad.Job
+	IA              *iatest.Modelo // doble del proveedor de IA (nv-31)
+	Mail            *mailer.Memory
+	Log             *slog.Logger
+	Logs            *testutil.LogBuffer
+	modules         []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -113,29 +115,37 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	businessRepo := negocios.NewRepository(client.DB())
 	businesses := negocios.NewService(businessRepo, users, log)
 	modelo := iatest.Nuevo()
+	iaUses := ia.NewRegistroMongo(client.DB())
+	// El doble va detrás de la guardia real (tope, caché y límites contra Redis y usos_ia).
+	guardia, err := ia.NewGuardia(modelo, ia.NewContadorRedis(rdb), iaUses, ia.NewCacheRedis(rdb), guardiaConfig(cfg.IA, rdb), log)
+	require.NoError(t, err)
 	pesos, err := recomendador.PesosPorDefecto()
 	require.NoError(t, err)
-	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.NewDescartes(client.DB()), asistente.Config{Pesos: pesos}, log)
+	assistant, err := asistente.NewService(guardia, businessRepo, users, asistente.NewDescartes(client.DB()),
+		asistente.Config{Pesos: pesos, PlazoIA: PlazoIA}, log)
 	require.NoError(t, err)
+	recoRepo := recomendaciones.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
-	iaUses := ia.NewRegistroMongo(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
+	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
+	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
+	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports, IA: modelo,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, IA: modelo,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -144,7 +154,33 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
+			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
+	}
+}
+
+// PlazoIA acorta el plazo del asistente (7 s en producción) para probar el respaldo sin
+// esperar: un doble con Tardar mayor a esto termina en el motor de reglas.
+const PlazoIA = 2 * time.Second
+
+// guardiaConfig toma el tope y los límites de cfg; los que vienen en cero (testutil.Config no
+// los fija) usan los valores por defecto de producción.
+func guardiaConfig(c config.IA, rdb *goredis.Client) ia.GuardiaConfig {
+	pick := func(v, def int) int {
+		if v > 0 {
+			return v
+		}
+		return def
+	}
+	tope := c.TopeUSDMes
+	if tope <= 0 {
+		tope = 5
+	}
+	return ia.GuardiaConfig{
+		TopeUSDMes: tope,
+		Precios:    ia.Precios{EntradaUSDMTok: c.PrecioEntradaUSDMTok, SalidaUSDMTok: c.PrecioSalidaUSDMTok},
+		Limites:    ia.Limites{PorHora: pick(c.LimiteHora, 10), PorMinuto: pick(c.LimiteMin, 12), PorDia: pick(c.LimiteDia, 400)},
+		Limitador:  ia.NewLimitadorRedis(rdb),
 	}
 }
 

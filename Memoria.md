@@ -296,6 +296,15 @@
 - Configuración: `IA_TOPE_USD_MES` (5, máximo 50), `IA_PRECIO_ENTRADA_USD_MTOK` e `IA_PRECIO_SALIDA_USD_MTOK` (0 en la capa gratuita). Con costo cero el gasto cuesta un solo `GET` por llamada.
 - A evitar: escribir en los logs campos `dependencia` o `evento` fuera de su uso: alimentan alarmas de CloudWatch. La guardia usa `parte`.
 
+## NV-28 — Límites y protección de datos en la IA (en curso)
+- Estado (2026-11-11): rama `nv-28` desde `nv-27`, PR contra `nv-27`. Límite por usuario y global dentro de `ia.Guardia` (`internal/ia/limite.go`), `ia.SoloDeLaLista` para los ids y `IA_LIMITE_HORA/MIN/DIA`. Build, vet, Unit, lint, critic, SDD y endpoints en verde; Integration (`ia_limite_test.go`) y Security (`ia_security_test.go`) en el CI del PR. Falta la firma. Sin cableado: lo arma nv-31/nv-33.
+- Corrección de drift: la spec decía `ia_uso` (es `usos_ia`) y la tarea 10 por hora (son 5 generaciones, hasta 10 llamadas); los límites no eran una pieza aparte sino parte de la guardia.
+- Decisión: el global va en `Guardia.Generar` (cuenta cada llamada, también el reintento) y el del usuario en `GenerarValidado` después de la caché (cuenta generaciones; un acierto no cuenta). Sin usuario en el contexto se usa la cubeta `rate:ia_usuario:sin_usuario`: olvidar `ia.ConUsuario` no quita el límite.
+- Decisión: ventanas fijas con `SET NX` + `INCR` + `PTTL` en un Pipeline (3 comandos por ventana, `TestPresupuestoRedis_LimitesIA`). La hora del usuario empieza con su primera generación y `Regreso` sale del TTL real. Las llamadas rechazadas también cuentan. Sin Redis se cierra (`ErrLimiteDesconocido`).
+- Decisión: el día global es el de `America/Los_Angeles`, como la cuota del proveedor; `cmd/api` ya importa `time/tzdata`. Los máximos de configuración (15 por minuto, 500 por día) son los de la capa gratuita.
+- Privacidad: `Security/IA` prueba con el adaptador real contra un servidor local que la frase solo va en el turno de usuario, que un id ajeno se descarta, que ni correo, teléfono, coordenadas, enlaces ni el id del usuario viajan, y que ni `usos_ia` ni la caché guardan la frase.
+- A evitar: `resultadoDe` con un `switch` por error superaba el gocyclo de 10; ahora es una tabla. Agregar un error nuevo de la guardia es una fila.
+
 ## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
 - Estado: spec revisada y completa, en la ola 4 (después de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
 - Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.
@@ -379,6 +388,24 @@
 - Decisión: `ia_descartes` (`motivo`, `negocio_id`, `modelo`, `creado_en`, `expira_en`), TTL con `expira_en` y `ExpireAfterSeconds(0)` como el resto del proyecto (la prueba de índices lo exige). Sin id ni texto de la persona: fuera de ARCO. Si falla la escritura, el plan sale igual.
 - Privacidad: al paso 2 van nombre, giro, precio y horario del día de los candidatos, inicio y presupuesto; en el turno de usuario solo compañía, ánimo (con consentimiento) y palabras clave. Nunca la frase, ubicación ni perfil.
 - A evitar: heredocs con comillas y acentos en Bash fallan aunque el delimitador vaya entre comillas; escribir el script de Python en el scratchpad. Las pruebas de integración fijan `fecha` (ahora + 2 h) para poder escribir las horas de la IA con el reloj real.
+## Spec nv-24 — Recomendaciones y «No me interesa» (2026-11-11)
+- Estado (2026-11-11): implementada en la rama `nv-24` sobre `nv-23` (PR apilado; nv-23 aún sin fusionar). Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration, Security y Database las corre el CI. Falta la firma.
+- Corrección de drift: el plan decía «ver Diseño» sin archivos; el paquete es `internal/recomendaciones` (no `internal/inicio`). Contratos con 401/403/503 además de 200/422 y 204/404.
+- Decisión: `cmd/api` valida los pesos al arrancar (`recomendaciones.NewService`): cierra el pendiente de nv-23. `lat` y `lng` son obligatorios; `hora` HH:MM de hoy en `America/Mexico_City`; la compañía suma términos a los gustos, no filtra.
+- Decisión propuesta (privacidad): alergias solo con `datos_sensibles` (regla de nv-05) y solo como filtro duro; dietas siempre filtro duro; gustos y presupuesto guardados solo con `aprendizaje_personalizado`. El ánimo todavía no entra al motor.
+- Decisión: `descartes_usuario` con índice único `ux_usuario_negocio`; POST idempotente (404 si el negocio no es público); DELETE de un descarte inexistente o ajeno = 404. Se excluyen los 1000 más recientes en `$geoNear.query`. Entra en ARCO (exportar, borrar historial y cuenta).
+- A evitar: olvidar `scripts/routes/main.go` al agregar un módulo (`check_endpoints` no ve sus rutas); leer el cuerpo con `readAll` dentro de los argumentos de `require` y luego decodificarlo (ya se consumió).
+- Pendiente: sin prueba Contract propia (el golden se genera con `CONTRACT_CAPTURE=1` y contenedores).
+
+## NV-33 — Respaldo, cancelación y «otra idea» (2026-11-11)
+- Estado: rama `nv-33` desde `origin/nv-32` con `origin/nv-28` fusionada (trae nv-27 y nv-28); PR contra `nv-32`, se reduce al fusionar #44 y #46. Build, vet, Unit, lint y las cuatro suites con contenedor en verde en local. Falta la medición con IA real (20 frases) y la firma.
+- Decisión: toda falla de la IA (tiempo, 429, falla, inválida, bloqueada, tope, gasto o límites desconocidos, límite global o del usuario, IA apagada) responde el motor de reglas con `fuente: reglas` y aviso. Ya no hay 429 ni 503 por la IA. El respaldo no llama al modelo: no cuenta contra el tope ni los límites.
+- Decisión: plazo de 7 s para las dos llamadas + 1 s de reserva = 8 s. Respaldo secuencial, no en paralelo como decía la spec: reutiliza la interpretación si el paso 1 respondió y no duplica la consulta al catálogo. `authtest.PlazoIA` = 2 s para las pruebas.
+- Decisión: `cmd/api` y `authtest` arman `ia.Guardia` (Redis + `usos_ia`); el asistente usa `Guardia.GenerarValidado` (caché y límite del usuario) con `ia.ConUsuario`. Un plan son 2 generaciones: `IA_LIMITE_HORA` pasa de 5 a 10.
+- Decisión: `POST /planes/generar/otra-idea` = cuerpo de generar + `excluir` (1 a 30 ids) sobre `recomendador.Contexto.Excluidos`.
+- Límite: Fiber (fasthttp) no avisa cuando el cliente corta; la cancelación llega por el contexto de la petición (60 s o apagado) y el plazo de 7 s acota el gasto.
+- Corrección de la pila: `ia.Decodificar` deja el destino en cero si falla (un id inyectado quedaba en la salida; fallaba `Security/IA` de nv-28). En `asistente_test.go` `require.Equal(..., readAll(t, resp))` consumía el cuerpo antes de decodificar (fallaba en nv-32): usar `exigirEstado`.
+- A evitar: el CI solo corre en PRs a `main`; los PRs de la pila no prueban Integration. Se pueden correr en local con `docker run --network host -v //var/run/docker.sock:/var/run/docker.sock` (las suites usan `127.0.0.1` con puerto fijo). En PowerShell 5.1 las comillas dobles dentro de `sh -c` se pierden: escribir el script en el scratchpad y montarlo. `Set-Content -Encoding utf8` mete BOM: usar `UTF8Encoding $false`.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
