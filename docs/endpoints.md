@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -46,6 +46,9 @@
 | GET | `/api/v1/lugares` con `?categoria=&precio_max=&abierto_ahora=&lat=&lng=&radio_m=&orden=&cursor=&limite=` → `{items[{id,slug,nombre,categoria,nivel_precio,precio_promedio,calificacion{promedio,total_resenas},foto_portada,ubicacion{lat,lng},distancia_m?,abierto_ahora}], siguiente_cursor, limite}`; `lat` y `lng` juntos, `radio_m` 5,000 por defecto y 20,000 máx.; `orden` `distancia` (por defecto con ubicación), `calificacion` (sin ella) o `precio` | opcional | global | 200/401/422 | nv-21 (A2) |
 | GET | `/api/v1/lugares/mapa` con `?min_lat=&min_lng=&max_lat=&max_lng=&zoom=&categoria=` → `{agrupado, pines[{id,nombre,categoria,calificacion,ubicacion}], celdas[{centro{lat,lng},conteo}]}`; hasta 100 pines; si hay más, celdas de `360/2^zoom/4` grados (máx. 400); `zoom` 3–20, ancho < 180° | no | global | 200/422 | nv-21 (A2) |
 | GET | `/api/v1/lugares/{id}` → ficha pública con `abierto_ahora` (hora de `America/Mexico_City`); sin dueño, QR, plan, revisión ni versión; no aprobado, eliminado o id mal formado = 404 | no | global | 200/404 | nv-21 (A2) |
+| GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |
+| POST | `/api/v1/recomendaciones/{negocio_id}/no-me-interesa` → sin cuerpo; idempotente; negocio no aprobado, eliminado o id mal formado = 404 | JWT | global | 204/401/403/404 | nv-24 (A2) |
+| DELETE | `/api/v1/recomendaciones/{negocio_id}/no-me-interesa` → deshace el descarte; si el usuario no lo tenía = 404 (incluye el de otro usuario) | JWT | global | 204/401/403/404 | nv-24 (A2) |
 | POST | `/api/v1/admin/negocios/importar` → multipart `archivo` `.csv` o `.json` o arreglo JSON de 1–100; idempotente por `slug`; responde `{creados, actualizados, errores[{fila,campo,mensaje}]}` y los válidos quedan `aprobado` | JWT administrador | admin 200/min | 200/400/401/403/413/422/503 | nv-20 (A2/A5) |
 
 Convención JSON: `snake_case`. `PageResult{items, siguiente_cursor, limite}` (desde nv-02). Errores `{codigo, mensaje, campos[], detalle?, traza_id}`.
