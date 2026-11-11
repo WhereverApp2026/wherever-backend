@@ -22,6 +22,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
@@ -130,17 +131,22 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
-	businessSvc := negocios.NewService(negocios.NewRepository(db), users, log)
+	businessRepo := negocios.NewRepository(db)
+	businessSvc := negocios.NewService(businessRepo, users, log)
 	exports := privacidad.NewExports(db)
 	iaUses := ia.NewRegistroMongo(db)
 
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
+	planRepo := planes.NewRepository(db)
+	planPrivacy := planes.NewPrivacy(planRepo)
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
+	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
 
 	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
@@ -155,6 +161,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
 		negocios.NewHandler(businessSvc, validator),
+		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
