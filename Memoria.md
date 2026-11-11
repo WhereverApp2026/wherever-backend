@@ -287,6 +287,15 @@
 - Red: sin cambios; las instancias ya salen por 443 a cualquier destino.
 - A evitar: en Windows, Control de aplicaciones bloquea `gofmt`, `vet` y los `*.test.exe`; correr todo en `golang:1.27.3` con Docker.
 
+## NV-27 — Tope de gasto y caché de la IA (en curso)
+- Estado (2026-11-11): rama `nv-27` desde `main`. `ia.Guardia` envuelve el modelo con el tope mensual y la caché; `usos_ia` registra cada llamada. Unit, lint, critic, SDD y endpoints en verde; Integration en el CI del PR. Falta la firma. Sin cableado: lo arma quien llame a la IA (nv-31, nv-33).
+- Decisión: la guardia es a su vez un `ia.Modelo`, así el reintento de `ia.GenerarValidado` también pasa por el tope. La caché va en `Guardia.GenerarValidado` y solo guarda salidas ya validadas; si guardara antes de validar, el reintento leería la misma salida inválida.
+- Decisión: colección `usos_ia` (la spec decía `ia_uso`; la regla pide plural en español). Llaves `cuota:ia_gasto:{AAAA-MM}` (micro-USD, mes en UTC) y `cache:ia:{huella}` (1 h).
+- Decisión: sin la llave del mes se reconstruye desde `usos_ia` con `SET NX`; con Redis caído se lee `usos_ia`; sin los dos se cierra (`ErrGastoDesconocido`). La caché no cierra.
+- Privacidad: ARCO quita `usuario_id` de `usos_ia` en lugar de borrar, para no bajar el gasto del mes; la exportación lista los usos sin ids. TTL de 400 días.
+- Configuración: `IA_TOPE_USD_MES` (5, máximo 50), `IA_PRECIO_ENTRADA_USD_MTOK` e `IA_PRECIO_SALIDA_USD_MTOK` (0 en la capa gratuita). Con costo cero el gasto cuesta un solo `GET` por llamada.
+- A evitar: escribir en los logs campos `dependencia` o `evento` fuera de su uso: alimentan alarmas de CloudWatch. La guardia usa `parte`.
+
 ## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
 - Estado: spec revisada y completa, en la ola 4 (después de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
 - Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.

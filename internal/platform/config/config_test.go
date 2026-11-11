@@ -135,6 +135,20 @@ func TestLoad_IAApagadaSinLlave(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, cfg.IA.Enabled(), "sin GEMINI_API_KEY responde el motor de reglas")
 	assert.Equal(t, 25*time.Second, cfg.IA.Timeout)
+	assert.InDelta(t, 5.0, cfg.IA.TopeUSDMes, 1e-9, "nv-27: tope de 5 USD al mes por defecto")
+	assert.Zero(t, cfg.IA.PrecioEntradaUSDMTok, "capa gratuita: costo cero")
+	assert.Zero(t, cfg.IA.PrecioSalidaUSDMTok)
+}
+
+func TestLoad_IATopeYPrecios(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(map[string]string{
+		config.KeyIATopeUSDMes: "12.5", config.KeyIAPrecioEntrada: "0.1", config.KeyIAPrecioSalida: "0.4",
+	}))
+
+	require.NoError(t, err)
+	assert.InDelta(t, 12.5, cfg.IA.TopeUSDMes, 1e-9)
+	assert.InDelta(t, 0.1, cfg.IA.PrecioEntradaUSDMTok, 1e-9)
+	assert.InDelta(t, 0.4, cfg.IA.PrecioSalidaUSDMTok, 1e-9)
 }
 
 func TestLoad_IAEncendidaConLlaveYModelo(t *testing.T) {
@@ -153,6 +167,12 @@ func TestLoad_IARechazaValoresInvalidos(t *testing.T) {
 		"llave marcador":        {config.KeyGeminiAPIKey: "PLACEHOLDER_GEMINI"},
 		"modelo con models/":    {config.KeyIAModeloID: "models/gemini-3.5-flash-lite"},
 		"modelo con parámetros": {config.KeyIAModeloID: "gemini?key=x"},
+		"tope cero":             {config.KeyIATopeUSDMes: "0"},
+		"tope sobre 50":         {config.KeyIATopeUSDMes: "51"},
+		"tope NaN":              {config.KeyIATopeUSDMes: "NaN"},
+		"tope no numérico":      {config.KeyIATopeUSDMes: "cinco"},
+		"precio negativo":       {config.KeyIAPrecioEntrada: "-1"},
+		"precio infinito":       {config.KeyIAPrecioSalida: "Inf"},
 	}
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {
