@@ -344,6 +344,15 @@
 - Decisión: ARCO registra `planes.Privacy` antes de `usuarios` (el usuario se borra al final). «Borrar mi historial» no borra planes (contenido, no historial).
 - A evitar: guardar un plan sin pasar por `Recalcular`; `type assertion` sin comprobar en pruebas (errcheck de golangci-lint): decodificar a un struct.
 
+## Spec nv-31 — Interpretar la frase y armar candidatos (2026-11-11)
+- Estado: implementada en la rama `nv-31` sobre `nv-29` (PR contra `nv-29`); falta la firma y el CI del PR. Paquete `internal/asistente` con `POST /api/v1/planes/generar`; doble de IA en `internal/testutil/iatest` y en `authtest.Env.IA`.
+- Corrección de drift: el flujo de la spec incluía `armarItinerario` con IA y verificar, que son de nv-32; nv-31 arma por reglas (hasta 3 paradas de los 15 candidatos, giros distintos primero, abierta al llegar y al salir, dentro del presupuesto) y `Recalcular`. No existe `docs/ia.md` y `Recomendar` ya era pública. Sin colección ni índices nuevos.
+- Decisión: depende solo de `ia.Modelo`; sin llave la IA queda apagada y la ruta da 503 hasta el respaldo de nv-33. Proveedor sin cupo = 429 con `Retry-After`; lento, bloqueado o inválido tras el reintento = 503; sin candidatos = 422.
+- Decisión: al modelo van las instrucciones fijas (`prompts/interpretar.txt`, embebido), el día y la hora y la frase anonimizada (el asistente también llama `ia.Anonimizar`, no solo el adaptador). Nada del perfil, ni ids ni ubicación. Alergias y dieta del perfil son filtro duro siempre; el ánimo se devuelve solo con `privacidad.estado_animo`.
+- Decisión propuesta: estancias por giro (restaurante 90, cafetería 60, bar 90, entretenimiento 120, servicios 60, comercio 45); `presupuesto` del plan = por persona × personas; `pareja` = 2 personas.
+- Riesgo: la ruta no tiene límite propio (los de IA viven en `ia.Guardia`, nv-28). No fusionar a `main` sin nv-33 o un límite equivalente.
+- A evitar: el anonimizador también tapa cifras largas (un ObjectId en la frase sale como `[teléfono]`); en pruebas comparar contra `ia.Anonimizar(frase)`. `staticcheck` S1016 pide convertir structs con los mismos campos (`Parametros(in)`).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
