@@ -113,7 +113,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	modelo := iatest.Nuevo()
 	pesos, err := recomendador.PesosPorDefecto()
 	require.NoError(t, err)
-	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.Config{Pesos: pesos}, log)
+	assistant, err := asistente.NewService(modelo, businessRepo, users, asistente.NewDescartes(client.DB()), asistente.Config{Pesos: pesos}, log)
 	require.NoError(t, err)
 	exports := privacidad.NewExports(client.DB())
 	planPrivacy := planes.NewPrivacy(planes.NewRepository(client.DB()))
