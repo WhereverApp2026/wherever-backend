@@ -45,6 +45,7 @@ type Env struct {
 	Account  *account.Service
 	Cities   *ciudades.Service
 	Negocios *negocios.Service
+	Planes   *planes.Service
 	Exports  *privacidad.Exports
 	Job      *privacidad.Job
 	Mail     *mailer.Memory
@@ -104,9 +105,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 
 	authRepo := auth.NewRepository(client.DB())
 	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
-	businesses := negocios.NewService(negocios.NewRepository(client.DB()), users, log)
+	businessRepo := negocios.NewRepository(client.DB())
+	businesses := negocios.NewService(businessRepo, users, log)
 	exports := privacidad.NewExports(client.DB())
-	planPrivacy := planes.NewPrivacy(planes.NewRepository(client.DB()))
+	planRepo := planes.NewRepository(client.DB())
+	planPrivacy := planes.NewPrivacy(planRepo)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	registry := privacidad.NewRegistry()
 	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, planPrivacy, account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
@@ -119,13 +123,14 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Exports: exports,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Exports: exports,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
 			negocios.NewHandler(businesses, v),
+			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
 }

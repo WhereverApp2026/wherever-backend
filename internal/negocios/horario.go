@@ -22,6 +22,9 @@ var mexicoCity = func() *time.Location {
 	return loc
 }()
 
+// MexicoCity es la zona de los horarios; planes (nv-30) la usa para la fecha del plan.
+func MexicoCity() *time.Location { return mexicoCity }
+
 // localMinute devuelve el día (0 = domingo) y el minuto desde las 00:00 en la hora de México.
 func localMinute(now time.Time) (int, int) {
 	local := now.In(mexicoCity)

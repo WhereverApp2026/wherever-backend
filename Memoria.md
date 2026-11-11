@@ -344,6 +344,15 @@
 - Decisión: ARCO registra `planes.Privacy` antes de `usuarios` (el usuario se borra al final). «Borrar mi historial» no borra planes (contenido, no historial).
 - A evitar: guardar un plan sin pasar por `Recalcular`; `type assertion` sin comprobar en pruebas (errcheck de golangci-lint): decodificar a un struct.
 
+## Spec nv-30 — Guardar, leer, editar y repetir planes (2026-11-11)
+- Estado: implementada en la rama `nv-30` sobre `nv-29` (PR contra `nv-29`); falta el CI del PR y la firma. DTO, service y handler en `internal/planes`, 10 rutas bajo `/api/v1/planes`, todas con JWT.
+- Corrección de drift: la tabla decía 412/428 y 403; se usa 400 sin `If-Match`, 409 con versión vieja y 404 para plan ajeno (no revela que existe), como nv-05. `If-Match` también en las rutas de paradas: cada una cambia la versión del plan.
+- Decisión: toda edición pasa por `Service.edit` (carga del dueño, compara versión, cambia, `Calculadora.Aplicar`, `UpdateIfVersion`). «Reordenar» reparte las mismas horas de llegada en el orden pedido, porque el plan siempre va en orden de llegada (nv-29).
+- Decisión: `fecha` es un día de `America/Mexico_City` (00:00 local guardado en UTC, `negocios.MexicoCity()`); cambiarla o clonar mueve cada parada los mismos días. Clonar crea ids de parada nuevos y no copia reservas ni integrantes.
+- Decisión: pestañas `proximos` (desde hoy, ascendente, por defecto), `pasados` (antes de hoy, descendente) y `guardados` (todos los activos, descendente) con cursor `pestana:fecha` + id; cursor de otra pestaña = 422. Sin firma hasta nv-17.
+- Decisión: las escrituras pasan por `usuarios.RequireActive` (cuenta en eliminación pendiente = 403); los errores de MongoDB salen como 503 sin texto (podría repetir nombre o notas).
+- A evitar: devolver 403 para un plan ajeno; usar `apperr` como variable de paquete (se crea en cada llamada).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
