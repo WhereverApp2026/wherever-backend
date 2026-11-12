@@ -77,6 +77,10 @@ indexes:
 siembra:
 	go run ./scripts/siembra
 
+# Rehace AMIGO_DE y FUE_A de Neo4j desde MongoDB (nv-52). Idempotente.
+reconstruir-grafo:
+	go run ./scripts/reconstruir-grafo
+
 # Vectores de significado de los negocios (nv-50): solo los desactualizados; TODOS=1 rehace todos.
 embeddings:
 	go run ./scripts/recalcular-embeddings $(if $(TODOS),-todos,)

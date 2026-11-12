@@ -7,6 +7,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -19,7 +20,7 @@ import (
 // All son los índices de todos los módulos; cada módulo nuevo agrega aquí los suyos.
 func All() []mongo.IndexSet {
 	var all []mongo.IndexSet
-	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), amistades.Indexes()} {
+	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), amistades.Indexes(), grafo.Indexes()} {
 		all = append(all, sets...)
 	}
 	return all

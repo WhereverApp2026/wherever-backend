@@ -437,6 +437,14 @@
 - Decisión: `personas.NewService(users, blocks, llave, log)` recibe `personas.Blocks` (lo cumple `amistades.Repository`); las consultas de `usuarios/search.go` reciben `exclude []bson.ObjectID` con `$nin`. El bloqueo oculta en ambos sentidos.
 - A evitar: en `cmd/api/main.go` `buildModules` está al límite de gocyclo (10): los módulos nuevos se arman en una función aparte (`buildSocial`).
 
+## NV-52 — Proyección de amistades y planes a Neo4j (2026-11-12)
+- Estado: rama desde `main`, PR contra `main`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration (`grafo_test.go`), Security, Database (`grafo_pendiente`) y Contract las corre el CI.
+- Decisión: la cola `grafo_pendiente` guarda a quién recalcular (un documento por usuario), no eventos; el trabajador lee Mongo y deja `AMIGO_DE`/`FUE_A` iguales. Porqué: idempotente, sin problemas de orden ni eventos perdidos; recalcular a quien actuó basta porque `AMIGO_DE` es una por par (se consulta sin dirección).
+- Decisión: el trabajador corre dentro de la API (`startGraph` en `cmd/api/main.go`), no en `cmd/worker`, porque no hay hosting de trabajadores. La cola reparte entre instancias con `lease` de 1 min.
+- Decisión: `make reconstruir-grafo` va en `scripts/`, como `make siembra`. Tras fusionar, correr `make siembra` o `make reconstruir-grafo` contra Aura para crear la restricción `negocio_id`.
+- Para nv-53: `(:Usuario {id})-[:AMIGO_DE]-(:Usuario)` sin dirección y `(:Usuario)-[:FUE_A]->(:Negocio {id})`, ids en hex. Los nodos de demostración de nv-11 (`Lugar`, `Categoria`, ids `demo-*`) siguen ahí.
+- A evitar: `Touch` nunca cambia la respuesta (`_ =`); las operaciones de la cola no usan el plazo de Neo4j, o un reintento vencido no se reagenda.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

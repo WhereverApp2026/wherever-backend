@@ -19,6 +19,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
@@ -55,6 +56,7 @@ type Env struct {
 	Planes          *planes.Service
 	Recomendaciones *recomendaciones.Service
 	Exports         *privacidad.Exports
+	Grafo           *grafo.Queue // cola de nv-52; las pruebas la aplican con grafo.Worker
 	Job             *privacidad.Job
 	IA              *iatest.Modelo // doble del proveedor de IA (nv-31)
 	Mail            *mailer.Memory
@@ -131,9 +133,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
-	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
+	graph := grafo.NewQueue(client.DB(), log)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -149,11 +152,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	friends, err := amistades.NewService(friendRepo, users, log)
 	require.NoError(t, err)
+	friends.WithGraph(graph)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, IA: modelo,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, Grafo: graph, IA: modelo,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
