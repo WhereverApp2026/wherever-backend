@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	mongodrv "go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
@@ -22,7 +23,7 @@ import (
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
-// `exportaciones` (colección nueva de nv-05) y el único de `descartes_usuario` (nv-24).
+// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) y los de `amistades` (nv-36).
 var expected = map[string][]string{
 	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
 	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
@@ -33,6 +34,7 @@ var expected = map[string][]string{
 	planes.Collection:             {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
 	asistente.DescartesCollection: {"_id_", "ttl_descarte", "ix_motivo_fecha"},
 	recomendaciones.Collection:    {"_id_", "ux_usuario_negocio"},
+	amistades.Collection:          {"_id_", "ux_par", "ix_de_estado", "ix_para_estado"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {

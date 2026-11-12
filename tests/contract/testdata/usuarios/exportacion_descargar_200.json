@@ -1,6 +1,7 @@
 {
   "status": 200,
   "body": {
+    "amistades": [],
     "descartes_usuario": [],
     "planes": [],
     "sesiones": [

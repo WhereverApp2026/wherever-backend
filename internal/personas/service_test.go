@@ -46,31 +46,42 @@ func TestParseQuery_Invalid422(t *testing.T) {
 // fakeUsers registra qué consulta hizo el service; no simula la base (eso es Integration).
 type fakeUsers struct {
 	prefix, hash string
-	exclude      bson.ObjectID
+	exclude      []bson.ObjectID
 	err          error
 }
 
-func (f *fakeUsers) SearchByUsernamePrefix(_ context.Context, prefix string, exclude bson.ObjectID, _ int64) ([]usuarios.User, error) {
+// fakeBlocks devuelve bloqueos fijos o un error.
+type fakeBlocks struct {
+	ids []bson.ObjectID
+	err error
+}
+
+func (f fakeBlocks) BlockedWith(context.Context, bson.ObjectID) ([]bson.ObjectID, error) {
+	return f.ids, f.err
+}
+
+func (f *fakeUsers) SearchByUsernamePrefix(_ context.Context, prefix string, exclude []bson.ObjectID, _ int64) ([]usuarios.User, error) {
 	f.prefix, f.exclude = prefix, exclude
 	return nil, f.err
 }
 
-func (f *fakeUsers) FindByPhoneSearchable(_ context.Context, hash string, exclude bson.ObjectID) (usuarios.User, bool, error) {
+func (f *fakeUsers) FindByPhoneSearchable(_ context.Context, hash string, exclude []bson.ObjectID) (usuarios.User, bool, error) {
 	f.hash, f.exclude = hash, exclude
 	return usuarios.User{}, false, f.err
 }
 
-func TestSearch_UsaHMACYExcluyeAQuienBusca(t *testing.T) {
+func TestSearch_UsaHMACYExcluyeAQuienBuscaYBloqueados(t *testing.T) {
 	key := []byte("llave-de-prueba")
 	f := &fakeUsers{}
-	svc, err := NewService(f, key, nil)
+	blocked := bson.NewObjectID()
+	svc, err := NewService(f, fakeBlocks{ids: []bson.ObjectID{blocked}}, key, nil)
 	require.NoError(t, err)
 	me := bson.NewObjectID()
 
 	out, err := svc.Search(context.Background(), me.Hex(), "55 1234 5678")
 	require.NoError(t, err)
 	assert.Equal(t, usuarios.HashPhone(key, "+525512345678"), f.hash)
-	assert.Equal(t, me, f.exclude)
+	assert.ElementsMatch(t, []bson.ObjectID{blocked, me}, f.exclude)
 	assert.NotNil(t, out.Results, "lista vacía, nunca null")
 
 	_, err = svc.Search(context.Background(), me.Hex(), "Ana")
@@ -79,12 +90,21 @@ func TestSearch_UsaHMACYExcluyeAQuienBusca(t *testing.T) {
 }
 
 func TestSearch_Errores(t *testing.T) {
-	_, err := NewService(nil, []byte("k"), nil)
+	_, err := NewService(nil, fakeBlocks{}, []byte("k"), nil)
 	require.Error(t, err)
-	_, err = NewService(&fakeUsers{}, nil, nil)
+	_, err = NewService(&fakeUsers{}, nil, []byte("k"), nil)
+	require.Error(t, err)
+	_, err = NewService(&fakeUsers{}, fakeBlocks{}, nil, nil)
 	require.Error(t, err)
 
-	svc, err := NewService(&fakeUsers{err: errors.New("mongo caído")}, []byte("k"), nil)
+	var blockErr *apperr.Error
+	blocksDown, err := NewService(&fakeUsers{}, fakeBlocks{err: errors.New("mongo caído")}, []byte("k"), nil)
+	require.NoError(t, err)
+	_, err = blocksDown.Search(context.Background(), bson.NewObjectID().Hex(), "ana")
+	require.ErrorAs(t, err, &blockErr)
+	assert.Equal(t, apperr.KindUnavailable, blockErr.Kind)
+
+	svc, err := NewService(&fakeUsers{err: errors.New("mongo caído")}, fakeBlocks{}, []byte("k"), nil)
 	require.NoError(t, err)
 	var appErr *apperr.Error
 	_, err = svc.Search(context.Background(), "no-es-id", "ana")

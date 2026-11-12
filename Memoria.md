@@ -430,6 +430,13 @@
 - Decisión: `Limiter.WindowUser` cuenta por `sub` del token (`rate:personas_buscar:{usuario}`, 30/h); va después de `RequireAuth`. nv-36 lo reutiliza para las solicitudes.
 - A evitar: escribir archivos con Python en Windows sin `newline=''` los deja en CRLF y gofmt los marca.
 
+## NV-36 — Amistades (2026-11-11)
+- Estado: rama desde `main`, PR contra `main`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration (`amistades_test.go`), Security, Database (índices) y Contract (`amistades: []` en la exportación) las corre el CI.
+- Decisión: un documento por par (`par` = ids ordenados, `ux_par`); la solicitud cruzada que pierde la carrera relee y acepta. En `bloqueada`, `de` es quien bloqueó. Rechazar borra el documento sin avisar.
+- Decisión: quien fue bloqueado ve 404 en todo (como si no existiera); quien envió recibe 404 al intentar aceptar su propia solicitud. Orden de la lista por `actualizada_en` de la relación: no hay campo de actividad del usuario.
+- Decisión: `personas.NewService(users, blocks, llave, log)` recibe `personas.Blocks` (lo cumple `amistades.Repository`); las consultas de `usuarios/search.go` reciben `exclude []bson.ObjectID` con `$nin`. El bloqueo oculta en ambos sentidos.
+- A evitar: en `cmd/api/main.go` `buildModules` está al límite de gocyclo (10): los módulos nuevos se arman en una función aparte (`buildSocial`).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

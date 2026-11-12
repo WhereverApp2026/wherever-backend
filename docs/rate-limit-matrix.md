@@ -13,7 +13,8 @@
 | Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar` por IP (`rate:admin:{ip}`) | nv-20 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |
-| Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija); las solicitudes de amistad (20 por hora) llegan con nv-36 | nv-35 |
+| Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |
+| Solicitudes de amistad | 20 | 1 h | `POST /api/v1/amistades` por usuario (`rate:amistades_solicitud:{usuario}`, ventana fija); cuenta toda solicitud, también las rechazadas con 404, 409 o 422 | nv-36 |
 | IA global | 12 llamadas / 400 llamadas | 1 min / 1 día (hora del Pacífico) | llamadas a Gemini de toda la app (`rate:ia_min`, `rate:ia_dia`); al llegar, responde el motor de reglas sin 429. 80 % de lo que AI Studio da al proyecto con `gemini-3.5-flash-lite` (15 por minuto, 500 por día); sin Redis no se llama al proveedor | nv-28 |
 | Embeddings global | 80 textos / 800 textos | 1 min / 1 día (hora del Pacífico) | textos vectorizados con `gemini-embedding-2` de toda la app (`rate:ia_emb_min`, `rate:ia_emb_dia`); cada texto de un lote cuenta uno. Cuota aparte de la del modelo de texto. AI Studio no publica la gratuita de este modelo: 80 % de la de `gemini-embedding-001` (100 por minuto, 1000 por día), a confirmar en AI Studio. Al llegar o sin Redis no se vectoriza y responde el motor de reglas | nv-50 |
 
