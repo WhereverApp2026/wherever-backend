@@ -3,8 +3,10 @@ package integration
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,18 @@ import (
 )
 
 const autocompletarGuada = "/api/v1/ciudades/autocompletar?q=guada"
+
+// conditionalGet es un GET anónimo con If-None-Match: sin cabecera Authorization, porque un
+// Bearer vacío es 401 aun en una ruta pública.
+func conditionalGet(t *testing.T, app *fiber.App, path, tag string) *http.Response {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set(fiber.HeaderIfNoneMatch, tag)
+	resp, err := app.Test(req, int((20 * time.Second).Milliseconds()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	return resp
+}
 
 // nv-17: el catálogo público responde ETag débil y frescura de 60 s.
 func TestETag_AutocompletarConETag(t *testing.T) {
@@ -33,7 +47,7 @@ func TestETag_AutocompletarSinCambios304(t *testing.T) {
 	tag := sendJSON(t, app, http.MethodGet, autocompletarGuada, nil, "").Header.Get(fiber.HeaderETag)
 	require.NotEmpty(t, tag)
 
-	resp := sendWithHeaders(t, app, http.MethodGet, autocompletarGuada, nil, "", map[string]string{fiber.HeaderIfNoneMatch: tag})
+	resp := conditionalGet(t, app, autocompletarGuada, tag)
 
 	require.Equal(t, http.StatusNotModified, resp.StatusCode)
 	assert.Empty(t, readAll(t, resp), "el 304 no lleva cuerpo")
@@ -50,7 +64,7 @@ func TestETag_AutocompletarCambiaConElCatalogo(t *testing.T) {
 		"Guadalupe,Nuevo León,25.6775,-100.2597,true\n"), "csv")
 	require.NoError(t, err)
 
-	resp := sendWithHeaders(t, app, http.MethodGet, autocompletarGuada, nil, "", map[string]string{fiber.HeaderIfNoneMatch: tag})
+	resp := conditionalGet(t, app, autocompletarGuada, tag)
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.NotEqual(t, tag, resp.Header.Get(fiber.HeaderETag))

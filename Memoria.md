@@ -335,7 +335,7 @@
 - Decisión: cursor `base64url(JSON{_id,orden,ambito}).base64url(HMAC-SHA-256)`; `hmac.Equal` antes de leer el JSON. `Signer.Scope(nombre, partes…)` usa un HMAC truncado con llave, así el ámbito no deja leer la ubicación ni el id. Lugares: orden, categoría, precio, abierto, radio y lat/lng. Planes: dueño y pestaña.
 - Decisión: un solo `Signer` en `buildBusinesses` (`cmd/api`), inyectado con `WithCursor` en negocios y planes; un service sin `Signer` falla cerrado. `validation.Position(signer, scope, raw)` es el único camino a una posición y da 422 `cursor`; la regla `cursor` del validador solo mira la forma (`pagination.Valid`).
 - Decisión: ETag/304 en `GET /ciudades/autocompletar` con `public, max-age=60` (una sola serialización con el `JSONEncoder` de Fiber); `no-store` en `/usuarios/yo` y `/auth/sesiones`, sin 304.
-- A evitar: `max=200` en el `cursor` de un DTO (el firmado mide ~220; se subió a 300); poner datos legibles en el ámbito; agregar otro `if err` en `buildModules` (gocyclo 10) o un tercer chequeo de llave en `Config.validate` (se movieron a `validateKeys`).
+- A evitar: probar una ruta pública con `sendWithHeaders` (manda `Bearer` vacío = 401); `max=200` en el `cursor` de un DTO (el firmado mide ~220; se subió a 300); poner datos legibles en el ámbito; agregar otro `if err` en `buildModules` (gocyclo 10) o un tercer chequeo de llave en `Config.validate` (se movieron a `validateKeys`).
 - Efecto: los cursores de `/lugares` y `/planes` emitidos antes del despliegue dan 422; la app reinicia en la primera página. Rotar la llave hace lo mismo.
 
 ## Spec nv-21 — Lista, ficha y mapa de lugares (2026-11-10)
