@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 )
@@ -18,7 +19,7 @@ func pesosTest(t *testing.T) Pesos {
 
 func TestPesos_VersionadosSumanUno(t *testing.T) {
 	p := pesosTest(t)
-	assert.InDelta(t, 1.0, p[FactorPresupuesto]+p[FactorDistancia]+p[FactorHorario]+p[FactorClima]+p[FactorGustos]+p[FactorCalificacion], 1e-9)
+	assert.InDelta(t, 1.0, p[FactorPresupuesto]+p[FactorDistancia]+p[FactorHorario]+p[FactorClima]+p[FactorGustos]+p[FactorCalificacion]+p[FactorAfinidad], 1e-9)
 }
 
 func TestPesos_Invalidos(t *testing.T) {
@@ -87,6 +88,25 @@ func TestPuntaje_Gustos(t *testing.T) {
 	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Gustos(b))
 }
 
+func TestPuntaje_AfinidadNeutraSinSemantica(t *testing.T) {
+	b := negocioBase()
+	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Afinidad(b.ID), "sin búsqueda semántica")
+	c := ctxBase()
+	c.Afinidad = map[bson.ObjectID]float64{b.ID: 0.9}
+	assert.Equal(t, 0.9, NewPuntaje(c).Afinidad(b.ID))
+	assert.Equal(t, neutro, NewPuntaje(c).Afinidad(bson.NewObjectID()), "negocio sin vector")
+}
+
+// Sin semántica el factor vale 0,5 para todos y los demás pesos son los de nv-23 por 0,8:
+// el orden es el mismo de antes.
+func TestPesos_SinSemanticaConservaElOrden(t *testing.T) {
+	p := pesosTest(t)
+	viejos := map[string]float64{FactorPresupuesto: 0.20, FactorDistancia: 0.20, FactorHorario: 0.10, FactorClima: 0.10, FactorGustos: 0.25, FactorCalificacion: 0.15}
+	for f, w := range viejos {
+		assert.InDelta(t, w*(1-p[FactorAfinidad]), p[f], 1e-9, f)
+	}
+}
+
 func TestPuntaje_Calificacion(t *testing.T) {
 	p := NewPuntaje(ctxBase())
 	assert.InDelta(t, 0.9, p.Calificacion(negocios.Calificacion{Promedio: 4.5, TotalResenas: 10}), 1e-9)
@@ -97,10 +117,10 @@ func TestPuntaje_TotalFijo(t *testing.T) {
 	pesos := pesosTest(t)
 	f := map[string]float64{
 		FactorPresupuesto: 1, FactorDistancia: 0.5, FactorHorario: 1,
-		FactorClima: 0.5, FactorGustos: 1, FactorCalificacion: 0.9,
+		FactorClima: 0.5, FactorGustos: 1, FactorCalificacion: 0.9, FactorAfinidad: 0.5,
 	}
-	// 0.20 + 0.10 + 0.10 + 0.05 + 0.25 + 0.135 = 0.835
-	assert.Equal(t, 83.5, Total(f, pesos))
+	// 0.16 + 0.08 + 0.08 + 0.04 + 0.20 + 0.108 + 0.10 = 0.768
+	assert.Equal(t, 76.8, Total(f, pesos))
 	all := map[string]float64{}
 	for _, k := range Factores {
 		all[k] = 1

@@ -85,7 +85,7 @@ func TestRecomendador_OrdenEsperadoConDiezNegocios(t *testing.T) {
 	recs, err := recomendador.Recomendar(context.Background(), repo, pesos, recoCtx(), 10)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"cafe-ideal", "cafe-caro", "cafe-cierra-pronto", "rest-cerca", "bar-lejos"}, recoSlugs(recs))
-	assert.Equal(t, []float64{91.5, 81.5, 80, 67, 66.5}, []float64{recs[0].Puntaje, recs[1].Puntaje, recs[2].Puntaje, recs[3].Puntaje, recs[4].Puntaje})
+	assert.Equal(t, []float64{83.2, 75.2, 74, 63.6, 63.2}, []float64{recs[0].Puntaje, recs[1].Puntaje, recs[2].Puntaje, recs[3].Puntaje, recs[4].Puntaje})
 	assert.Equal(t, []string{"gustos", "presupuesto", "distancia"}, recs[0].Razones)
 	assert.Equal(t, "Te lo recomendamos porque coincide con tus gustos, entra en tu presupuesto y está cerca de ti.", recs[0].PorQue)
 

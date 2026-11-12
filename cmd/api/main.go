@@ -38,6 +38,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
@@ -190,7 +191,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friends.WithGraph(graph)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	assistant, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses}, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -198,6 +199,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
+		semantica.NewHandler(sem, validator), // antes que negocios: /lugares/:id
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
@@ -223,25 +225,37 @@ func withEmbeddings(svc *negocios.Service, cfg config.IA, rdb *goredis.Client, d
 	return nil
 }
 
+// buildSemantica arma la búsqueda por significado (nv-51) con el mismo vectorizador limitado
+// del recálculo. Sin IA de embeddings, GET /lugares/semantica responde el motor de reglas.
+func buildSemantica(cfg config.IA, rdb *goredis.Client, db *mongodriver.Database, pesos recomendador.Pesos, log *slog.Logger) (*semantica.Service, error) {
+	vect, err := embeddings.Vectorizador(cfg, rdb, "")
+	if err != nil {
+		return nil, err
+	}
+	repo := semantica.NewRepository(db)
+	return semantica.NewService(vect, semantica.NewProductoPunto(repo), repo, ia.NewCacheRedis(rdb), semantica.Config{Pesos: pesos}, log)
+}
+
 // iaDeps son las bases que usa ia.Guardia: Redis (gasto, caché y límites) y usos_ia.
 type iaDeps struct {
 	redis *goredis.Client
 	usos  *ia.RegistroMongo
+	db    *mongodriver.Database
 }
 
 // buildAsistente arma el asistente de planes (nv-31) con Gemini detrás de ia.Guardia (tope,
 // caché y límites de nv-27/nv-28). Sin GEMINI_API_KEY o IA_MODELO_ID la IA queda apagada y
 // POST /planes/generar responde con el motor de reglas (nv-33).
-func buildAsistente(cfg config.IA, deps iaDeps, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, error) {
+func buildAsistente(cfg config.IA, deps iaDeps, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, *semantica.Service, error) {
 	pesos, err := recomendador.PesosPorDefecto()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var modelo ia.Modelo
 	if cfg.Enabled() {
 		g, err := ia.NewGemini(ia.GeminiConfig{APIKey: cfg.GeminiAPIKey, ModeloID: cfg.ModeloID, Timeout: cfg.Timeout})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		guardia, err := ia.NewGuardia(g, ia.NewContadorRedis(deps.redis), deps.usos, ia.NewCacheRedis(deps.redis), ia.GuardiaConfig{
 			TopeUSDMes: cfg.TopeUSDMes,
@@ -250,13 +264,21 @@ func buildAsistente(cfg config.IA, deps iaDeps, fuente recomendador.Fuente, user
 			Limitador:  ia.NewLimitadorRedis(deps.redis),
 		}, log)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		modelo = guardia
 	} else {
 		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes responde solo con el motor de reglas")
 	}
-	return asistente.NewService(modelo, fuente, users, descartes, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
+	sem, err := buildSemantica(cfg, deps.redis, deps.db, pesos, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("semantica: %w", err)
+	}
+	assistant, err := asistente.NewService(modelo, fuente, users, descartes, asistente.Config{Pesos: pesos, Velocidades: planes.DefaultVelocidades()}, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	return assistant.WithSemantica(sem), sem, nil
 }
 
 // mailers son los dos caminos del correo (nv-06): las peticiones encolan y nunca esperan al

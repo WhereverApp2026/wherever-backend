@@ -55,3 +55,9 @@ func ItemOf(c Candidate, now time.Time) PlaceItem {
 	distance := c.DistanceM
 	return toItem(placeRow{Business: c.Business, DistanceM: &distance}, now)
 }
+
+// CardOf es la tarjeta de GET /lugares sin distancia, para listas que no parten de un punto
+// (búsqueda semántica, nv-51).
+func CardOf(b Business, now time.Time) PlaceItem {
+	return toItem(placeRow{Business: b}, now)
+}

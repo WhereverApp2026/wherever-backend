@@ -40,6 +40,10 @@ type Contexto struct {
 
 	// Excluidos son los negocios marcados con «No me interesa».
 	Excluidos []bson.ObjectID
+
+	// Afinidad es la cercanía en significado de cada negocio con la frase, de 0 a 1 (nv-51).
+	// nil = sin búsqueda semántica; el factor queda neutro.
+	Afinidad map[bson.ObjectID]float64
 }
 
 // radio devuelve el radio efectivo.

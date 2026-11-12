@@ -416,6 +416,17 @@
 - Decisión: la importación llama `Refrescar` con plazo propio de 30 s y sin la cancelación de la petición; si falla solo se registra. `IA_EMBEDDINGS_ID` sin valor por defecto: sin él no hay vectores.
 - Operación pendiente: crear `/wherever/dev/IA_EMBEDDINGS_ID` (`gemini-embedding-2`) en SSM antes de usarlo en AWS.
 - A evitar: asignar un `*Recalculador` nil a la interfaz `negocios.Embeddings` (queda no nil): `cmd/api` lo revisa antes. `ia.Normalizar` ya existía (texto): el de vectores es `ia.NormalizarVector`.
+
+## NV-51 — Búsqueda semántica y evaluación (2026-11-11)
+- Estado: rama `nv-51` desde `main` (ya trae nv-50, #53), PR contra `main`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde. Integration (`semantica_test.go` y los puntajes nuevos de `recomendador_test.go`) en el CI. Falta la medición con IA real y la firma.
+- Corrección de drift: el plan decía «ver Diseño» y el Diseño solo hablaba de la caché. La consulta no cuenta contra el tope de gasto de nv-27 (ese es del modelo de texto), sino contra `IA_EMB_LIMITE_MIN/DIA` de nv-50.
+- Decisión: `internal/semantica`, producto punto en la API detrás de `semantica.Indice` (el MongoDB local no tiene `$vectorSearch`). La afinidad va de 0 a 1 entre el menos y el más parecido (mín–máx), porque los cosenos caen en una franja angosta. El vector de la frase se guarda 24 h en `cache:ia:emb_{huella}` (reusa `ia.CacheRedis`; la huella no lleva usuario ni frase).
+- Decisión: `afinidad_semantica` pesa 0,20 y los seis pesos de nv-23 se multiplicaron por 0,8. Sin semántica el factor es 0,5 para todos y el orden queda igual. Los puntajes absolutos bajan: `0,8 × antes + 10`.
+- Decisión: el respaldo de la búsqueda puntúa con los factores del motor sin sus filtros duros y sin ubicación, con las palabras de la frase como gustos. `recomendador.Ordenar` filtra los cerrados: de noche la lista quedaba vacía.
+- Decisión: el asistente pide la afinidad con `WithSemantica` dentro del plazo de la IA. Por defecto usa un `sinSemantica` (no nil), así `generar` no suma ramas (gocyclo). `embeddings.Vectorizador` arma el vectorizador limitado para el recálculo y la búsqueda (mismos contadores).
+- Ruta: `semantica.NewHandler` va antes que `negocios` en `cmd/api`, `authtest` y `scripts/routes`. Si va después, `/lugares/:id` atiende «semantica» con 404.
+- Evaluación: `scripts/evaluar-semantica` con 30 negocios ficticios y 30 frases (el CSV del piloto aún no existe). Mide top-5 y top-1 de reglas, semántica y reglas + afinidad. Pendiente: el perfil `wherever-dev` no tiene `ssm:GetParameter` sobre la llave. Hay que correrlo con un perfil que sí lo tenga (comando en `docs/ml-evaluacion.md`).
+- A evitar: heredocs de Bash con acentos y comillas fallan; usar Write o un script de Python en `$TEMP`. Docker Desktop está en `%LOCALAPPDATA%\Programs\DockerDesktop`.
 ## NV-34 — Nombre de usuario y privacidad de búsqueda (2026-11-11)
 - Estado: implementada desde `main`; local build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde. Las suites con contenedor las corre el CI del PR. Falta la firma.
 - Drift corregido: el plan creaba `internal/amistades` y `internal/personas` (son de nv-35/36) y tocaba el purger y la matriz de límites (no hay colección nueva).
