@@ -10,6 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
@@ -198,14 +199,30 @@ func (s *Service) Detail(ctx context.Context, rawID string) (PlaceDetail, error)
 	if err != nil {
 		return PlaceDetail{}, notFound
 	}
-	b, ok, err := s.repo.FindVisible(ctx, id)
+	f, err := cache.Obtener(ctx, s.cache, claveFicha(id.Hex()), VidaFicha, func(ctx context.Context) (fichaGuardada, error) {
+		b, ok, err := s.repo.FindVisible(ctx, id)
+		if err != nil {
+			return fichaGuardada{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+		}
+		if !ok {
+			return fichaGuardada{}, notFound
+		}
+		return fichaGuardada{Detalle: toDetail(b, s.now()), Ventanas: b.ScheduleMin}, nil
+	})
 	if err != nil {
-		return PlaceDetail{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+		return PlaceDetail{}, err
 	}
-	if !ok {
-		return PlaceDetail{}, notFound
-	}
-	return toDetail(b, s.now()), nil
+	// «Abierto ahora» se calcula en cada petición, no al guardar.
+	detalle := f.Detalle
+	detalle.OpenNow = OpenAt(f.Ventanas, s.now())
+	return detalle, nil
+}
+
+// fichaGuardada es lo que vive en `cache:negocio:{id}`: la ficha y las ventanas de horario
+// para recalcular «abierto ahora».
+type fichaGuardada struct {
+	Detalle  PlaceDetail  `json:"detalle"`
+	Ventanas []VentanaMin `json:"ventanas"`
 }
 
 // CellDegrees es el lado de la celda para un zoom: un mosaico de 256 px cubre 360/2^zoom

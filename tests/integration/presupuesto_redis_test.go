@@ -88,3 +88,20 @@ func TestPresupuestoRedis_HealthNoTieneLimite(t *testing.T) {
 	assert.NotEqual(t, http.StatusTooManyRequests, get(t, app, "/ready").StatusCode, "/health no consumió la ventana")
 	assert.Equal(t, http.StatusTooManyRequests, get(t, app, "/ready").StatusCode, "el resto sí sigue limitado")
 }
+
+// La caché de nv-18 suma, sobre el limitador, un GET al acertar y GET + SET al fallar.
+func TestPresupuestoRedis_CacheDeFicha(t *testing.T) {
+	env, app := lugaresEnv(t)
+	placed := insertPlaces(t, env, []placeSpec{{slug: "presupuesto"}})
+	ficha := "/api/v1/lugares/" + placed[0].ID.Hex()
+
+	base := commandsOf(t, func() { get(t, app, "/ready") })
+	fallo := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, get(t, app, ficha).StatusCode)
+	})
+	acierto := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, get(t, app, ficha).StatusCode)
+	})
+	assert.Equal(t, 2, fallo-base, "fallo: GET + SET")
+	assert.Equal(t, 1, acierto-base, "acierto: GET")
+}

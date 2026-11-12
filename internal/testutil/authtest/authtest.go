@@ -31,6 +31,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
@@ -133,7 +134,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	businessRepo := negocios.NewRepository(client.DB())
 	cursor, err := pagination.NewSigner(cfg.CursorHMACKey)
 	require.NoError(t, err)
-	businesses := negocios.NewService(businessRepo, users, log).WithCursor(cursor)
+	businesses := negocios.NewService(businessRepo, users, log).WithCursor(cursor).WithCache(cache.New(rdb, log))
 	modelo := iatest.Nuevo()
 	iaUses := ia.NewRegistroMongo(client.DB())
 	// El doble va detrás de la guardia real (tope, caché y límites contra Redis y usos_ia).

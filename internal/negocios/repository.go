@@ -2,6 +2,7 @@ package negocios
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -129,11 +130,21 @@ func (r *Repository) Upsert(ctx context.Context, b *Business) (bool, error) {
 		{Key: "$setOnInsert", Value: setOnInsert},
 		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}},
 	}
-	res, err := r.col.UpdateOne(ctx, bson.D{{Key: "slug", Value: b.Slug}}, update, options.UpdateOne().SetUpsert(true))
+	// El documento anterior da el _id real al actualizar, para invalidar su ficha (nv-18).
+	var antes struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	err := r.col.FindOneAndUpdate(ctx, bson.D{{Key: "slug", Value: b.Slug}}, update,
+		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.Before).
+			SetProjection(bson.D{{Key: "_id", Value: 1}})).Decode(&antes)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return true, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	return res.UpsertedID != nil, nil
+	b.ID = antes.ID
+	return false, nil
 }
 
 // FacetCount es un conteo agrupado por un valor.
