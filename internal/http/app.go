@@ -11,6 +11,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/versionado"
 )
 
 const (
@@ -63,6 +64,7 @@ func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage
 		stage("compress", middleware.Compress()),
 		stage("rate_limit_global", exceptPath(healthPath, limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow))),
 		stage("rate_limit_writes", limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites)),
+		stage("version", middleware.Version(versionado.NuevaPolitica(cfg.VersionApp.Minima, cfg.VersionApp.Mantenimiento))),
 		stage("jwt", middleware.JWT(jwtCfg, deps.Redis)),
 	}
 }
