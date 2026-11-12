@@ -3,6 +3,7 @@
   "body": {
     "amistades": [],
     "busquedas_recientes": [],
+    "consentimientos": [],
     "descartes_usuario": [],
     "planes": [],
     "sesiones": [
@@ -71,6 +72,7 @@
         "fecha_aceptacion": "string",
         "promociones_correo": "bool",
         "ubicacion": "bool",
+        "version_aviso_privacidad": "string",
         "version_terminos": "string"
       },
       "puntos": "number",

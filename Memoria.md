@@ -481,6 +481,15 @@
 - Decisión: Neo4j caído o lento (3 s) responde 200 con `degradado: true` en las dos rutas. El módulo va antes que amistades: el grupo `/amistades` ya pide JWT.
 - A evitar: `buildModules` sigue en el límite de gocyclo; lo social se arma en `buildSocial(socialDeps)` y devuelve sus módulos.
 
+## Spec nv-19 — Aceptación de términos y aviso (2026-11-12)
+- Estado (2026-11-12): implementada, pendiente de la firma del revisor. Local verde (build, vet, Unit, lint, critic, sdd, endpoints); Integration, Security, Database y Contract en el CI del PR.
+- Decisión: se aplica el hallazgo de la revisión. `version_terminos`, `fecha_aceptacion` y `promociones_correo` ya vivían en `usuarios.privacidad` (nv-05); solo se agrega `privacidad.version_aviso` y el historial va aparte en `consentimientos` (solo agregar, `ix_usuario_fecha`). Repositorio y ARCO en `internal/usuarios/consentimientos.go`; service y handler en `internal/usuarios/account/consents.go`.
+- Decisión: `POST /usuarios/yo/consentimientos` solo acepta las versiones vigentes de `config.VersionApp` (las mismas de `GET /configuracion`); otra da 422. `privacidad.consentimiento_vigente` sale en el perfil y en `PATCH /privacidad`, no en la exportación.
+- Decisión: "Borrar mi historial" conserva los consentimientos (prueba del consentimiento); el borrado de la cuenta los elimina.
+- Efecto: las cuentas previas y las nuevas nacen sin `version_aviso` y con `consentimiento_vigente` falso: la app debe pedir la aceptación en el primer inicio tras el despliegue. El registro y `PATCH /privacidad` siguen aceptando `version_terminos` sin dejar fila en el historial.
+- Sin Redis: no cambia `TestPresupuestoRedis_*`. La dependencia con nv-18 no era real.
+- A evitar: correr `gofmt -w` sobre todo `internal/` con Go 1.27.3 reformatea `internal/shared/apperr/apperr.go` (alineación de un mapa); limitarlo a los archivos tocados.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

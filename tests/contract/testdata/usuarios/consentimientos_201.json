@@ -1,0 +1,10 @@
+{
+  "status": 201,
+  "body": {
+    "consentimiento_vigente": "bool",
+    "fecha_aceptacion": "string",
+    "promociones_correo": "bool",
+    "version_aviso_privacidad": "string",
+    "version_terminos": "string"
+  }
+}

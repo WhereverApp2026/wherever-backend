@@ -44,6 +44,8 @@ type Service struct {
 	phoneKey  []byte
 	graceDays int
 	log       *slog.Logger
+	consents  *usuarios.ConsentRepository
+	versions  Versions
 }
 
 // NewService arma el servicio; falla solo si no puede preparar el hasher.
@@ -113,7 +115,7 @@ func (s *Service) Profile(ctx context.Context, claims *middleware.Claims) (Profi
 	if err != nil {
 		return ProfileResponse{}, err
 	}
-	return profileResponse(user), nil
+	return s.profileOf(user), nil
 }
 
 // PatchProfile edita nombre, nombre de usuario, foto o ciudad solo si `version` sigue vigente (If-Match).
@@ -130,7 +132,7 @@ func (s *Service) PatchProfile(ctx context.Context, claims *middleware.Claims, v
 	if err != nil {
 		return ProfileResponse{}, s.userError(err)
 	}
-	return profileResponse(user), nil
+	return s.profileOf(user), nil
 }
 
 func (s *Service) profileChanges(ctx context.Context, req PatchProfileRequest) (bson.D, error) {
@@ -182,7 +184,7 @@ func (s *Service) ChangeEmail(ctx context.Context, claims *middleware.Claims, re
 	if err := s.sessions.SendVerification(ctx, updated); err != nil {
 		s.log.ErrorContext(ctx, "cambio de correo: no se pudo enviar la verificación", "error", err.Error())
 	}
-	return profileResponse(updated), nil
+	return s.profileOf(updated), nil
 }
 
 // SetTastes guarda los gustos (solo consumidor). Los 50 puntos de bienvenida se dan al
@@ -291,7 +293,7 @@ func (s *Service) PatchPrivacy(ctx context.Context, claims *middleware.Claims, r
 	if err != nil {
 		return PrivacyResponse{}, s.userError(err)
 	}
-	return privacyResponse(user.Privacy), nil
+	return s.privacyOf(user.Privacy), nil
 }
 
 // SetPhone guarda el teléfono como HMAC-SHA-256 (nunca en claro); repetido entre cuentas = 409.
@@ -405,7 +407,7 @@ func (s *Service) CancelDeletion(ctx context.Context, claims *middleware.Claims)
 	if err != nil {
 		return ProfileResponse{}, dbError(err)
 	}
-	return profileResponse(user), nil
+	return s.profileOf(user), nil
 }
 
 func (s *Service) current(ctx context.Context, claims *middleware.Claims) (usuarios.User, error) {

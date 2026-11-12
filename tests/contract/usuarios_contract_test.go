@@ -88,6 +88,12 @@ func TestContract_Usuarios(t *testing.T) {
 	status, body = call(t, app, http.MethodPost, "/api/v1/usuarios/exportaciones/descargar", map[string]string{"token": link.Token}, "")
 	check(t, "usuarios/exportacion_descargar_400", status, body)
 
+	// Aceptación de términos y aviso (nv-19), después de exportar para no cambiar la forma de la exportación.
+	status, body = call(t, app, http.MethodPost, "/api/v1/usuarios/yo/consentimientos", map[string]any{
+		"version_terminos": env.Cfg.VersionApp.Terminos, "version_aviso_privacidad": env.Cfg.VersionApp.Aviso, "promociones_correo": false,
+	}, access)
+	check(t, "usuarios/consentimientos_201", status, body)
+
 	status, body = call(t, app, http.MethodDelete, "/api/v1/usuarios/yo/historial", nil, access)
 	check(t, "usuarios/historial_204", status, body)
 	status, body = call(t, app, http.MethodDelete, "/api/v1/usuarios/yo", map[string]string{"confirmacion": "ELIMINAR"}, access)

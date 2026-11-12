@@ -1,6 +1,6 @@
 # Aviso de privacidad — terceros que tratan datos (vivo)
 
-> Texto canónico de la sección de proveedores externos del aviso de privacidad. La app lo muestra; la aceptación versionada llega con nv-19. Cambiar esta sección cambia la versión del aviso.
+> Texto canónico de la sección de proveedores externos del aviso de privacidad. La app lo muestra y la persona lo acepta con `POST /api/v1/usuarios/yo/consentimientos` (nv-19). Cambiar esta sección obliga a subir `AVISO_VERSION`: con eso `privacidad.consentimiento_vigente` pasa a falso y la app vuelve a pedir la aceptación.
 
 ## Proveedor externo de inteligencia artificial
 Para generar planes a partir de lo que escribes y para relacionar negocios por su descripción, Wherever usa un servicio de inteligencia artificial de un tercero: la API de Gemini de Google LLC (nv-26, nv-50).

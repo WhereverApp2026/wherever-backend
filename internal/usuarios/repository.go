@@ -105,10 +105,12 @@ type Privacy struct {
 	PhoneSearchable bool `bson:"buscable_por_telefono"`
 	// UsernameSearchable nace encendido (nv-34): ausente (cuentas previas) cuenta como true.
 	// Para filtrar en Mongo usa `privacidad.buscable_por_usuario: {$ne: false}`.
-	UsernameSearchable *bool     `bson:"buscable_por_usuario,omitempty"`
-	TermsVersion       string    `bson:"version_terminos"`
-	AcceptedAt         time.Time `bson:"fecha_aceptacion"`
-	PromoEmail         bool      `bson:"promociones_correo"`
+	UsernameSearchable *bool  `bson:"buscable_por_usuario,omitempty"`
+	TermsVersion       string `bson:"version_terminos"`
+	// NoticeVersion es la versión del aviso de privacidad aceptada (nv-19); vacía en cuentas previas.
+	NoticeVersion string    `bson:"version_aviso,omitempty"`
+	AcceptedAt    time.Time `bson:"fecha_aceptacion"`
+	PromoEmail    bool      `bson:"promociones_correo"`
 }
 
 // DefaultPreferences son los ajustes con los que nace una cuenta.
