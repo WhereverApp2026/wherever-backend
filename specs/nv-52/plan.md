@@ -1,8 +1,8 @@
 # plan.md — NV-52 Proyección de amistades a Neo4j
 
 1. Mapeo
-- Crear: `internal/grafo/*`, `cmd/reconstruir-grafo`, pruebas en `tests/`.
-- Modificar: `internal/amistades` y `internal/planes` (emitir eventos), `internal/platform/neo4j`, `docs/endpoints.md`, `Memoria.md`.
+- Crear: `internal/grafo/*` (cola, trabajador, reconstrucción, ARCO), `internal/platform/neo4j/proyeccion.go`, `scripts/reconstruir-grafo` (`make reconstruir-grafo`), `tests/integration/grafo_test.go`.
+- Modificar: `internal/amistades` y `internal/planes` (`WithGraph`: encolan al usuario), `internal/platform/neo4j/grafo.go` (restricción `negocio_id`), `internal/indexes`, `cmd/api/main.go` (`startGraph`), `internal/testutil/authtest`, `tests/database/indexes_test.go`, `Memoria.md`. `docs/endpoints.md` sin cambios: no hay rutas nuevas.
 - Sin cambios: lo que esta spec no nombra.
 
 2. Guardarraíles

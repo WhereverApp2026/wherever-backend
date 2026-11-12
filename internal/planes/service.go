@@ -16,14 +16,31 @@ import (
 // Service resuelve los endpoints de planes (nv-30). Solo el dueño ve y edita su plan: toda
 // lectura pasa por FindOwned y un plan ajeno responde 404, igual que uno que no existe.
 type Service struct {
-	repo *Repository
-	calc *Calculadora
-	now  func() time.Time
+	repo  *Repository
+	calc  *Calculadora
+	graph Graph
+	now   func() time.Time
 }
+
+// Graph recibe al dueño de un plan que cambió para reflejarlo en Neo4j (nv-52). Es
+// eventual: un fallo no cambia la respuesta.
+type Graph interface {
+	Touch(ctx context.Context, userID bson.ObjectID) error
+}
+
+type noGraph struct{}
+
+func (noGraph) Touch(context.Context, bson.ObjectID) error { return nil }
 
 // NewService recibe el repositorio y la calculadora por constructor.
 func NewService(repo *Repository, calc *Calculadora) *Service {
-	return &Service{repo: repo, calc: calc, now: time.Now}
+	return &Service{repo: repo, calc: calc, graph: noGraph{}, now: time.Now}
+}
+
+// WithGraph refleja los planes guardados en el grafo (nv-52).
+func (s *Service) WithGraph(g Graph) *Service {
+	s.graph = g
+	return s
 }
 
 // Errores públicos: se crean en cada llamada porque la etapa de errores puede anotarlos.
@@ -93,6 +110,7 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 	if err := s.repo.Create(ctx, p); err != nil {
 		return Plan{}, errStore()
 	}
+	_ = s.graph.Touch(ctx, p.OwnerID)
 	return *p, nil
 }
 
@@ -132,6 +150,7 @@ func (s *Service) edit(ctx context.Context, subject, rawID string, version int, 
 	if err := s.repo.UpdateIfVersion(ctx, &p, version); err != nil {
 		return Plan{}, storeError(err)
 	}
+	_ = s.graph.Touch(ctx, p.OwnerID)
 	return p, nil
 }
 
@@ -200,6 +219,7 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string, version int
 	if err := s.repo.DeleteIfVersion(ctx, p.OwnerID, p.ID, version); err != nil {
 		return storeError(err)
 	}
+	_ = s.graph.Touch(ctx, p.OwnerID)
 	return nil
 }
 

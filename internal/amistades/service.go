@@ -26,8 +26,26 @@ type Users interface {
 type Service struct {
 	repo  *Repository
 	users Users
+	graph Graph
 	log   *slog.Logger
 	now   func() time.Time
+}
+
+// Graph recibe a quien aceptó, eliminó o bloqueó una amistad para reflejarlo en Neo4j
+// (nv-52). Recalcular a esa persona basta: la relación AMIGO_DE es una por par. Es
+// eventual: un fallo no cambia la respuesta.
+type Graph interface {
+	Touch(ctx context.Context, userID bson.ObjectID) error
+}
+
+type noGraph struct{}
+
+func (noGraph) Touch(context.Context, bson.ObjectID) error { return nil }
+
+// WithGraph refleja las amistades aceptadas en el grafo (nv-52).
+func (s *Service) WithGraph(g Graph) *Service {
+	s.graph = g
+	return s
 }
 
 // NewService recibe los repositorios por constructor.
@@ -35,7 +53,7 @@ func NewService(repo *Repository, users Users, log *slog.Logger) (*Service, erro
 	if repo == nil || users == nil {
 		return nil, errors.New("amistades: faltan los repositorios")
 	}
-	return &Service{repo: repo, users: users, log: log, now: func() time.Time { return time.Now().UTC() }}, nil
+	return &Service{repo: repo, users: users, graph: noGraph{}, log: log, now: func() time.Time { return time.Now().UTC() }}, nil
 }
 
 func unavailable(err error) error {
@@ -127,6 +145,7 @@ func (s *Service) resolveExisting(ctx context.Context, me bson.ObjectID, f Frien
 		if !ok {
 			return Item{}, apperr.Conflict("la solicitud cambió; inténtalo de nuevo")
 		}
+		_ = s.graph.Touch(ctx, me)
 		return newItem(accepted, me, person), nil
 	case f.Status == StatusBlocked && f.From != me:
 		return Item{}, notFound()
@@ -234,6 +253,7 @@ func (s *Service) Respond(ctx context.Context, subject, rawID string, req Respon
 	if !ok {
 		return Item{}, answered
 	}
+	_ = s.graph.Touch(ctx, me)
 	return newItem(accepted, me, person), nil
 }
 
@@ -286,6 +306,7 @@ func (s *Service) Remove(ctx context.Context, subject, rawID string) error {
 	if !removed {
 		return notFound()
 	}
+	_ = s.graph.Touch(ctx, me)
 	return nil
 }
 
@@ -317,5 +338,6 @@ func (s *Service) Block(ctx context.Context, subject, rawID string) error {
 	if !ok {
 		return apperr.Conflict("la relación cambió; inténtalo de nuevo")
 	}
+	_ = s.graph.Touch(ctx, me)
 	return nil
 }

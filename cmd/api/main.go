@@ -21,6 +21,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
+	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
@@ -79,7 +80,8 @@ func run() error {
 	}
 
 	mail := buildMail(cfg.Mail, log)
-	modules, job, err := buildModules(cfg, log, mongoClient, redisClient, mail)
+	graphQueue := grafo.NewQueue(mongoClient.DB(), log)
+	modules, job, err := buildModules(cfg, log, mongoClient, redisClient, mail, graphQueue)
 	if err != nil {
 		return err
 	}
@@ -102,6 +104,7 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -114,6 +117,8 @@ func run() error {
 		err = app.ShutdownWithTimeout(shutdownTimeout)
 	}
 
+	stop()
+	waitGraph()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -121,7 +126,7 @@ func run() error {
 }
 
 // buildModules arma los módulos de negocio y el trabajo nocturno con sus dependencias.
-func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client, mail mailers) ([]httpapi.Module, *privacidad.Job, error) {
+func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client, mail mailers, graph *grafo.Queue) ([]httpapi.Module, *privacidad.Job, error) {
 	validator, err := validation.New()
 	if err != nil {
 		return nil, nil, err
@@ -150,11 +155,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
-	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph)
 	recoRepo := recomendaciones.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -183,6 +188,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
+	friends.WithGraph(graph)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
 	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, businessRepo, users, asistente.NewDescartes(db), log)
@@ -311,4 +317,16 @@ func buildSocial(users *usuarios.Repository, friendRepo *amistades.Repository, p
 		return nil, nil, err
 	}
 	return friends, people, nil
+}
+
+// startGraph corre el trabajador que refleja amistades y planes en Neo4j (nv-52) hasta que
+// ctx termina; la función devuelta espera a que suelte las bases.
+func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, driver *neo4j.Driver, log *slog.Logger) func() {
+	worker := grafo.NewWorker(queue, amistades.NewRepository(db), planes.NewRepository(db), driver, log)
+	done := make(chan struct{})
+	go func() {
+		worker.Run(ctx)
+		close(done)
+	}()
+	return func() { <-done }
 }

@@ -11,6 +11,7 @@ var schema = []string{
 	"CREATE CONSTRAINT usuario_id IF NOT EXISTS FOR (u:Usuario) REQUIRE u.id IS UNIQUE",
 	"CREATE CONSTRAINT lugar_id IF NOT EXISTS FOR (l:Lugar) REQUIRE l.id IS UNIQUE",
 	"CREATE CONSTRAINT categoria_nombre IF NOT EXISTS FOR (c:Categoria) REQUIRE c.nombre IS UNIQUE",
+	"CREATE CONSTRAINT negocio_id IF NOT EXISTS FOR (n:Negocio) REQUIRE n.id IS UNIQUE",
 }
 
 // seedQuery deja el grafo de demostración. Con MERGE, correrla de nuevo no duplica nada.
