@@ -9,6 +9,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 )
@@ -19,6 +20,7 @@ var (
 	mongoClient *mongo.Client
 	redisClient *goredis.Client
 	mailpit     *testutil.Mailpit
+	neo4jDriver *neo4j.Driver // sugerencias y señal social (nv-53)
 )
 
 func TestMain(m *testing.M) {
@@ -31,9 +33,13 @@ func TestMain(m *testing.M) {
 		if redisClient, err = redis.New(s.RedisAddr); err != nil {
 			return nil, errors.Join(err, mongoClient.Close(context.Background()))
 		}
+		if neo4jDriver, err = neo4j.New(s.Neo4jURI); err != nil {
+			return nil, errors.Join(err, mongoClient.Close(context.Background()), redisClient.Close())
+		}
 		return func() {
 			_ = mongoClient.Close(context.Background())
 			_ = redisClient.Close()
+			_ = neo4jDriver.Close(context.Background())
 		}, nil
 	}))
 }

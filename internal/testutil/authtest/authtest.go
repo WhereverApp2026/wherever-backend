@@ -35,6 +35,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -62,6 +63,7 @@ type Env struct {
 	IA              *iatest.Modelo           // doble del proveedor de IA (nv-31)
 	Vectores        *iatest.ServidorVectores // servidor local de embeddings (nv-51)
 	Semantica       *semantica.Service
+	Sugerencias     *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
 	Mail            *mailer.Memory
 	Log             *slog.Logger
 	Logs            *testutil.LogBuffer
@@ -161,10 +163,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	friends.WithGraph(graph)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
+	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
+	require.NoError(t, err)
 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, Grafo: graph, IA: modelo,
-		Vectores: vectores, Semantica: sem,
+		Vectores: vectores, Semantica: sem, Sugerencias: suggestions,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -176,6 +180,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
+			sugerencias.NewHandler(suggestions).WithActiveGuard(usuarios.RequireActive(users)), // antes que amistades
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}

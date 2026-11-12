@@ -456,6 +456,13 @@
 - Para nv-53: `(:Usuario {id})-[:AMIGO_DE]-(:Usuario)` sin dirección y `(:Usuario)-[:FUE_A]->(:Negocio {id})`, ids en hex. Los nodos de demostración de nv-11 (`Lugar`, `Categoria`, ids `demo-*`) siguen ahí.
 - A evitar: `Touch` nunca cambia la respuesta (`_ =`); las operaciones de la cola no usan el plazo de Neo4j, o un reintento vencido no se reagenda.
 
+## NV-53 — Sugerencias y señal social (2026-11-12)
+- Estado: rama desde `main`, PR contra `main`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration (`sugerencias_test.go`), Security (`sugerencias_security_test.go`, ahora con Neo4j) y Contract las corre el CI.
+- Decisión: `internal/sugerencias` (service + handler) lee Neo4j; Mongo manda en relaciones (`ListByUser`: toda relación se excluye de sugerencias; solo `aceptada` cuenta como amigo en la señal social) y en `buscable_por_usuario` (`usuarios.FindSuggestableByIDs`). El grafo da hasta 100 candidatos y Mongo filtra hasta 20.
+- Decisión: sin la caché de 10 min de la spec. Porqué: nv-18 es de la ola 4 y la caché mostraría hasta 10 min a alguien recién bloqueado; además añadiría una clave de Redis fuera de la constitución §6.
+- Decisión: Neo4j caído o lento (3 s) responde 200 con `degradado: true` en las dos rutas. El módulo va antes que amistades: el grupo `/amistades` ya pide JWT.
+- A evitar: `buildModules` sigue en el límite de gocyclo; lo social se arma en `buildSocial(socialDeps)` y devuelve sus módulos.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

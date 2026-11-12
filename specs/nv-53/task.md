@@ -1,12 +1,12 @@
 # task.md — NV-53 Sugerencias y señal social
 
 ## Fase 0 — Preparación
-- [ ] T01 Aprobar la spec; rama `nv-53`.
+- [x] T01 Spec revisada y drift corregido; rama desde `main`.
 
 ## Fase 1 — Implementación
-- [ ] T02 GET /amistades/sugerencias devuelve personas con amigos en común, ordenadas por…
-- [ ] T03 GET /lugares/{id}/amigos devuelve cuántos amigos del usuario han estado y los avatares…
+- [x] T02 GET /amistades/sugerencias: amigos de amigos en Neo4j, filtrados en Mongo, hasta 20.
+- [x] T03 GET /lugares/{id}/amigos: total y hasta 3 avatares de amigos con plan activo.
 
 ## Fase 2 — Cierre
-- [ ] T04 Pruebas, documentos y `Memoria.md`.
-- [ ] T05 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [x] T04 Pruebas, documentos y `Memoria.md`.
+- [ ] T05 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md` (local en verde; falta el CI).
