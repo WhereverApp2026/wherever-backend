@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
@@ -126,12 +127,13 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 		asistente.Config{Pesos: pesos, PlazoIA: PlazoIA}, log)
 	require.NoError(t, err)
 	recoRepo := recomendaciones.NewRepository(client.DB())
+	friendRepo := amistades.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -139,12 +141,15 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
-	people, err := personas.NewService(users, cfg.PhoneHMACKey, log)
+	friends, err := amistades.NewService(friendRepo, users, log)
+	require.NoError(t, err)
+	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
 
 	return &Env{
@@ -159,6 +164,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
+			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
 }

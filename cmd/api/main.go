@@ -16,6 +16,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
@@ -150,8 +151,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planPrivacy := planes.NewPrivacy(planRepo)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades()))
 	recoRepo := recomendaciones.NewRepository(db)
+	friendRepo := amistades.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -159,6 +161,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
 	pesos, err := recomendador.PesosPorDefecto()
@@ -175,7 +178,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("usuarios: %w", err)
 	}
-	people, err := personas.NewService(users, cfg.PhoneHMACKey, log)
+	friends, people, err := buildSocial(users, friendRepo, cfg.PhoneHMACKey, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -194,6 +197,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		personas.NewHandler(people).WithActiveGuard(active),
+		amistades.NewHandler(friends, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
@@ -271,4 +275,18 @@ func buildMail(cfg config.Mail, log *slog.Logger) mailers {
 	direct := mailer.NewRetrying(smtpMailer, mailer.DefaultAttempts, mailer.DefaultRetryWait, cfg.Timeout)
 	queue := mailer.NewAsync(direct, cfg.Workers, cfg.QueueSize, log)
 	return mailers{requests: queue, sync: direct, shutdown: queue.Shutdown}
+}
+
+// buildSocial arma amistades (nv-36) y la búsqueda de personas (nv-35), que oculta a quien
+// tenga una relación bloqueada.
+func buildSocial(users *usuarios.Repository, friendRepo *amistades.Repository, phoneKey []byte, log *slog.Logger) (*amistades.Service, *personas.Service, error) {
+	friends, err := amistades.NewService(friendRepo, users, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("amistades: %w", err)
+	}
+	people, err := personas.NewService(users, friendRepo, phoneKey, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	return friends, people, nil
 }

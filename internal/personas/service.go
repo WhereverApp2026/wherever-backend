@@ -96,27 +96,35 @@ func invalid(msg string) error {
 
 // Users es lo que la búsqueda necesita del repositorio de usuarios.
 type Users interface {
-	SearchByUsernamePrefix(ctx context.Context, prefix string, exclude bson.ObjectID, limit int64) ([]usuarios.User, error)
-	FindByPhoneSearchable(ctx context.Context, phoneHash string, exclude bson.ObjectID) (usuarios.User, bool, error)
+	SearchByUsernamePrefix(ctx context.Context, prefix string, exclude []bson.ObjectID, limit int64) ([]usuarios.User, error)
+	FindByPhoneSearchable(ctx context.Context, phoneHash string, exclude []bson.ObjectID) (usuarios.User, bool, error)
+}
+
+// Blocks da las personas con relación `bloqueada` con el usuario, en cualquier sentido
+// (amistades, nv-36): no aparecen en su búsqueda.
+type Blocks interface {
+	BlockedWith(ctx context.Context, userID bson.ObjectID) ([]bson.ObjectID, error)
 }
 
 // Service busca personas.
 type Service struct {
 	users    Users
+	blocks   Blocks
 	phoneKey []byte
 	log      *slog.Logger
 }
 
-// NewService recibe el repositorio y la llave HMAC del teléfono (la misma de nv-05).
-func NewService(users Users, phoneKey []byte, log *slog.Logger) (*Service, error) {
-	if users == nil || len(phoneKey) == 0 {
-		return nil, errors.New("personas: faltan el repositorio o PHONE_HMAC_KEY")
+// NewService recibe los repositorios y la llave HMAC del teléfono (la misma de nv-05).
+func NewService(users Users, blocks Blocks, phoneKey []byte, log *slog.Logger) (*Service, error) {
+	if users == nil || blocks == nil || len(phoneKey) == 0 {
+		return nil, errors.New("personas: faltan los repositorios o PHONE_HMAC_KEY")
 	}
-	return &Service{users: users, phoneKey: phoneKey, log: log}, nil
+	return &Service{users: users, blocks: blocks, phoneKey: phoneKey, log: log}, nil
 }
 
 // Search busca por prefijo de nombre de usuario o por teléfono exacto, sin incluir a quien
-// busca. Un teléfono no registrado y uno registrado pero no buscable dan la misma respuesta.
+// busca ni a quien tenga una relación bloqueada con él (nv-36). Un teléfono no registrado y
+// uno registrado pero no buscable dan la misma respuesta.
 func (s *Service) Search(ctx context.Context, subject, raw string) (SearchResponse, error) {
 	self, err := bson.ObjectIDFromHex(subject)
 	if err != nil {
@@ -126,16 +134,21 @@ func (s *Service) Search(ctx context.Context, subject, raw string) (SearchRespon
 	if err != nil {
 		return SearchResponse{}, err
 	}
+	exclude, err := s.blocks.BlockedWith(ctx, self)
+	if err != nil {
+		return SearchResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+	}
+	exclude = append(exclude, self)
 	var found []usuarios.User
 	switch q.Kind {
 	case KindPhone:
-		u, ok, ferr := s.users.FindByPhoneSearchable(ctx, usuarios.HashPhone(s.phoneKey, q.Value), self)
+		u, ok, ferr := s.users.FindByPhoneSearchable(ctx, usuarios.HashPhone(s.phoneKey, q.Value), exclude)
 		err = ferr
 		if ok {
 			found = []usuarios.User{u}
 		}
 	default:
-		found, err = s.users.SearchByUsernamePrefix(ctx, q.Value, self, MaxResults)
+		found, err = s.users.SearchByUsernamePrefix(ctx, q.Value, exclude, MaxResults)
 	}
 	if err != nil {
 		return SearchResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
