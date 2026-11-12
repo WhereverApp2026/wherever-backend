@@ -69,7 +69,8 @@ func boolRank(first bool) int {
 }
 
 // Buscar usa primero el índice de texto en español; si no llena la página, completa con los
-// negocios que coinciden con errores menores (Aproximados). Con sesión, guarda la búsqueda.
+// negocios que coinciden por palabra, prefijo o errores menores (Aproximados); `aproximada`
+// solo cuando alguno necesitó un error. Con sesión, guarda la búsqueda.
 func (s *Service) Buscar(ctx context.Context, userID, q string, limite int) (BuscarRespuesta, error) {
 	words := Palabras(q)
 	if len([]rune(strings.Join(words, ""))) < minLetras {
@@ -89,8 +90,8 @@ func (s *Service) Buscar(ctx context.Context, userID, q string, limite int) (Bus
 		for _, b := range found {
 			ya[b.ID] = true
 		}
-		extra := Aproximados(words, visibles, ya, limite-len(found))
-		aproximada = len(extra) > 0
+		extra, conErrores := Aproximados(words, visibles, ya, limite-len(found))
+		aproximada = conErrores
 		found = append(found, extra...)
 	}
 	s.guardar(ctx, userID, q, words)

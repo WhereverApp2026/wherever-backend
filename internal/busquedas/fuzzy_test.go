@@ -40,6 +40,11 @@ func biz(name string, rating float64, tags ...string) negocios.Business {
 	return negocios.Business{ID: bson.NewObjectID(), Name: name, Category: "restaurante", Tags: tags, Rating: negocios.Calificacion{Promedio: rating}}
 }
 
+func found(words []string, visibles []negocios.Business, excluir map[bson.ObjectID]bool, limite int) []negocios.Business {
+	out, _ := Aproximados(words, visibles, excluir, limite)
+	return out
+}
+
 func names(bs []negocios.Business) []string {
 	out := make([]string, 0, len(bs))
 	for _, b := range bs {
@@ -56,18 +61,23 @@ func TestAproximados_TyposPrefixesAndAllWords(t *testing.T) {
 		biz("Bar La Esquina", 3.0),
 	}
 	// Un error de una letra («pizeria») y un prefijo con error («taqeria»).
-	assert.Equal(t, []string{"Pizzería Napoli"}, names(Aproximados([]string{"pizeria"}, visibles, nil, 10)))
-	assert.Equal(t, []string{"Taquería El Pastor"}, names(Aproximados([]string{"taqeria"}, visibles, nil, 10)))
+	assert.Equal(t, []string{"Pizzería Napoli"}, names(found([]string{"pizeria"}, visibles, nil, 10)))
+	assert.Equal(t, []string{"Taquería El Pastor"}, names(found([]string{"taqeria"}, visibles, nil, 10)))
 	// Todas las palabras deben coincidir.
-	assert.Equal(t, []string{"Taquería El Pastor"}, names(Aproximados([]string{"taco", "pastr"}, visibles, nil, 10)))
+	assert.Equal(t, []string{"Taquería El Pastor"}, names(found([]string{"taco", "pastr"}, visibles, nil, 10)))
 	// «tacuba» no se parece lo bastante a «tacos».
-	assert.Equal(t, []string{"Café Tacuba"}, names(Aproximados([]string{"tacuba"}, visibles, nil, 10)))
+	assert.Equal(t, []string{"Café Tacuba"}, names(found([]string{"tacuba"}, visibles, nil, 10)))
 	// Palabras cortas no aceptan errores.
-	assert.Empty(t, Aproximados([]string{"baz"}, visibles, nil, 10))
+	assert.Empty(t, found([]string{"baz"}, visibles, nil, 10))
 	// El giro también cuenta, y los excluidos y el límite se respetan.
-	all := Aproximados([]string{"restaurant"}, visibles, nil, 10)
+	all := found([]string{"restaurant"}, visibles, nil, 10)
 	assert.Len(t, all, 4)
 	assert.Equal(t, "Café Tacuba", all[0].Name)
-	assert.Len(t, Aproximados([]string{"restaurant"}, visibles, map[bson.ObjectID]bool{visibles[1].ID: true}, 2), 2)
-	assert.NotContains(t, names(Aproximados([]string{"restaurant"}, visibles, map[bson.ObjectID]bool{visibles[1].ID: true}, 10)), "Café Tacuba")
+	assert.Len(t, found([]string{"restaurant"}, visibles, map[bson.ObjectID]bool{visibles[1].ID: true}, 2), 2)
+	// Solo es aproximado si alguna palabra necesitó un error.
+	_, conErrores := Aproximados([]string{"pizzeria"}, visibles, nil, 10)
+	assert.False(t, conErrores)
+	_, conErrores = Aproximados([]string{"pizeria"}, visibles, nil, 10)
+	assert.True(t, conErrores)
+	assert.NotContains(t, names(found([]string{"restaurant"}, visibles, map[bson.ObjectID]bool{visibles[1].ID: true}, 10)), "Café Tacuba")
 }

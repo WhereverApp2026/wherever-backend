@@ -107,8 +107,10 @@ func tokens(b negocios.Business) []string {
 
 // Aproximados ordena los negocios en los que cada palabra de la consulta coincide igual, por
 // prefijo o con errores menores; los que no cumplen todas quedan fuera. Primero los de más
-// coincidencias exactas, luego por calificación e id.
-func Aproximados(words []string, visibles []negocios.Business, excluir map[bson.ObjectID]bool, limite int) []negocios.Business {
+// coincidencias exactas, luego por calificación e id. `conErrores` dice si alguno de los
+// devueltos necesitó un error menor: si todas sus palabras coinciden exactas no es aproximado
+// (el índice de texto no siempre las encuentra: «pizzeria» no da con «Pizzería»).
+func Aproximados(words []string, visibles []negocios.Business, excluir map[bson.ObjectID]bool, limite int) (out []negocios.Business, conErrores bool) {
 	type scored struct {
 		b     negocios.Business
 		score int
@@ -139,9 +141,11 @@ func Aproximados(words []string, visibles []negocios.Business, excluir map[bson.
 			strings.Compare(x.b.ID.Hex(), y.b.ID.Hex()),
 		)
 	})
-	out := make([]negocios.Business, 0, min(len(hits), limite))
+	exacto := len(words) * puntosExacta
+	out = make([]negocios.Business, 0, min(len(hits), limite))
 	for _, h := range hits[:min(len(hits), limite)] {
 		out = append(out, h.b)
+		conErrores = conErrores || h.score < exacto
 	}
-	return out
+	return out, conErrores
 }

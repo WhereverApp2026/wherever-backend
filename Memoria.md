@@ -402,6 +402,7 @@
 - Corrección del hallazgo: el índice de texto de MongoDB no tolera errores y Atlas Search no corre en Testcontainers. Primero `$text` en español; si no llena la página, se compara en Go contra nombre, etiquetas y giro de hasta 1000 aprobados (Damerau: 1 letra de 4 a 7, 2 de 8 o más; prefijos con error; todas las palabras) y se marca `aproximada: true`. Con mucho más catálogo: trigramas o Atlas Search.
 - Decisión: `q` se reduce a letras y dígitos (`busquedas.Palabras`) antes de `$text`; el autocompletar escapa con `regexp.QuoteMeta`. Así ningún operador ni comodín llega a MongoDB.
 - Decisión propuesta (privacidad): `busquedas_recientes` se guarda al buscar con sesión sin pedir `aprendizaje_personalizado` (historial visible y borrable); 10 por usuario, 90 días (TTL), en ARCO. Sin comandos nuevos de Redis.
+- Lección (CI del PR 60): `$text` en español no encontró «pizzeria» en «Pizzería Nápoles» (la raíz se calcula con el acento). La comparación en Go lo encuentra, así que `aproximada` solo es `true` si alguna palabra necesitó un error, no por venir de Go.
 - A evitar: registrar `busquedas` después de `negocios` (`/lugares/:id` atiende «buscar»); devolver o registrar el error de MongoDB (puede repetir lo escrito).
 
 ## NV-33 — Respaldo, cancelación y «otra idea» (2026-11-11)
