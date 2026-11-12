@@ -52,6 +52,7 @@ var (
 	ErrNotFound        = errors.New("usuario no encontrado")
 	ErrEmailTaken      = errors.New("el correo ya está registrado")
 	ErrPhoneTaken      = errors.New("el teléfono ya está registrado")
+	ErrUsernameTaken   = errors.New("el nombre de usuario ya está en uso")
 	ErrVersionConflict = errors.New("la versión no coincide")
 )
 
@@ -96,15 +97,18 @@ type Preferences struct {
 
 // Privacy son los interruptores de P-62 y la aceptación de términos (LFPDPPP).
 type Privacy struct {
-	Location        bool      `bson:"ubicacion"`
-	Learning        bool      `bson:"aprendizaje_personalizado"`
-	Mood            bool      `bson:"estado_animo"`
-	SensitiveData   bool      `bson:"datos_sensibles"`
-	UsageData       bool      `bson:"datos_uso"`
-	PhoneSearchable bool      `bson:"buscable_por_telefono"`
-	TermsVersion    string    `bson:"version_terminos"`
-	AcceptedAt      time.Time `bson:"fecha_aceptacion"`
-	PromoEmail      bool      `bson:"promociones_correo"`
+	Location        bool `bson:"ubicacion"`
+	Learning        bool `bson:"aprendizaje_personalizado"`
+	Mood            bool `bson:"estado_animo"`
+	SensitiveData   bool `bson:"datos_sensibles"`
+	UsageData       bool `bson:"datos_uso"`
+	PhoneSearchable bool `bson:"buscable_por_telefono"`
+	// UsernameSearchable nace encendido (nv-34): ausente (cuentas previas) cuenta como true.
+	// Para filtrar en Mongo usa `privacidad.buscable_por_usuario: {$ne: false}`.
+	UsernameSearchable *bool     `bson:"buscable_por_usuario,omitempty"`
+	TermsVersion       string    `bson:"version_terminos"`
+	AcceptedAt         time.Time `bson:"fecha_aceptacion"`
+	PromoEmail         bool      `bson:"promociones_correo"`
 }
 
 // DefaultPreferences son los ajustes con los que nace una cuenta.
@@ -119,6 +123,7 @@ func DefaultPreferences() Preferences {
 type User struct {
 	ID             bson.ObjectID   `bson:"_id"`
 	Name           string          `bson:"nombre"`
+	Username       string          `bson:"nombre_usuario,omitempty"`
 	NormalizedName string          `bson:"nombre_normalizado"`
 	Email          string          `bson:"correo"`
 	EmailVerified  bool            `bson:"correo_verificado"`
@@ -143,6 +148,11 @@ type User struct {
 	Version        int             `bson:"version"`
 	CreatedAt      time.Time       `bson:"creado_en"`
 	UpdatedAt      time.Time       `bson:"actualizado_en"`
+}
+
+// SearchableByUsername dice si la persona aparece al buscarla por nombre de usuario.
+func (p Privacy) SearchableByUsername() bool {
+	return p.UsernameSearchable == nil || *p.UsernameSearchable
 }
 
 // CanSignIn indica si la cuenta puede iniciar sesión. Una cuenta en eliminación pendiente sí
@@ -187,6 +197,7 @@ func Indexes() []platformmongo.IndexSet {
 			{Keys: bson.D{{Key: "ubicacion", Value: "2dsphere"}}, Options: options.Index().SetName("ix_ubicacion")},
 			{Keys: bson.D{{Key: "estado", Value: 1}, {Key: "eliminar_en", Value: 1}}, Options: options.Index().SetName("ix_eliminacion")},
 			{Keys: bson.D{{Key: "telefono_hash", Value: 1}}, Options: options.Index().SetName("ux_telefono_hash").SetUnique(true).SetPartialFilterExpression(exists("telefono_hash"))},
+			{Keys: bson.D{{Key: "nombre_usuario", Value: 1}}, Options: options.Index().SetName("ux_nombre_usuario").SetUnique(true).SetPartialFilterExpression(exists("nombre_usuario"))},
 		},
 	}}
 }
@@ -342,6 +353,8 @@ func mapDuplicate(err error) error {
 		return ErrEmailTaken
 	case isDuplicate(err, "ux_telefono_hash"):
 		return ErrPhoneTaken
+	case isDuplicate(err, "ux_nombre_usuario"):
+		return ErrUsernameTaken
 	default:
 		return err
 	}

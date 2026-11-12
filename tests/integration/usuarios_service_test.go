@@ -361,3 +361,27 @@ func TestPrivacidad_ExportIsOncePerDayAndDownloadsOnce(t *testing.T) {
 	assert.NotNil(t, doc.DownloadedAt)
 	assert.Equal(t, apperr.KindRateLimited, kindOf(t, env.Account.RequestExport(context.Background(), claims)), "sigue contando para el límite diario")
 }
+
+// nv-34: el nombre de usuario es único (409 al repetirlo) y buscable_por_usuario nace encendido
+// y se apaga al instante con PATCH /usuarios/yo/privacidad.
+func TestUsuariosService_UsernameUniqueAndSearchableToggle(t *testing.T) {
+	env := authEnv(t)
+	_, claims := register(t, env, lu)
+	_, other := register(t, env, "otra@wherever.test")
+	username := "lucia_23"
+
+	p, err := env.Account.PatchProfile(context.Background(), claims, 1, account.PatchProfileRequest{Username: &username})
+	require.NoError(t, err)
+	require.NotNil(t, p.Username)
+	assert.Equal(t, username, *p.Username)
+	assert.True(t, p.Privacy.UsernameSearchable)
+
+	_, err = env.Account.PatchProfile(context.Background(), other, 1, account.PatchProfileRequest{Username: &username})
+	assert.Equal(t, apperr.KindConflict, kindOf(t, err))
+
+	off := false
+	priv, err := env.Account.PatchPrivacy(context.Background(), claims, account.PrivacyRequest{UsernameSearchable: &off})
+	require.NoError(t, err)
+	assert.False(t, priv.UsernameSearchable)
+	assert.False(t, stored(t, env, claims).Privacy.SearchableByUsername())
+}

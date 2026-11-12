@@ -119,7 +119,7 @@ func (s *Service) Profile(ctx context.Context, claims *middleware.Claims) (Profi
 	return profileResponse(user), nil
 }
 
-// PatchProfile edita nombre, foto o ciudad solo si `version` sigue vigente (If-Match).
+// PatchProfile edita nombre, nombre de usuario, foto o ciudad solo si `version` sigue vigente (If-Match).
 func (s *Service) PatchProfile(ctx context.Context, claims *middleware.Claims, version int, req PatchProfileRequest) (ProfileResponse, error) {
 	userID, err := userIDOf(claims)
 	if err != nil {
@@ -140,6 +140,9 @@ func (s *Service) profileChanges(ctx context.Context, req PatchProfileRequest) (
 	var set bson.D
 	if req.Name != nil {
 		set = append(set, bson.E{Key: "nombre", Value: strings.TrimSpace(*req.Name)}, bson.E{Key: "nombre_normalizado", Value: text.Normalize(*req.Name)})
+	}
+	if req.Username != nil {
+		set = append(set, bson.E{Key: "nombre_usuario", Value: *req.Username})
 	}
 	if req.PhotoURL != nil {
 		set = append(set, bson.E{Key: "foto_url", Value: *req.PhotoURL})
@@ -282,6 +285,7 @@ func (s *Service) PatchPrivacy(ctx context.Context, claims *middleware.Claims, r
 	}
 	setIf(&set, "privacidad.datos_uso", req.UsageData)
 	setIf(&set, "privacidad.buscable_por_telefono", req.PhoneSearchable)
+	setIf(&set, "privacidad.buscable_por_usuario", req.UsernameSearchable)
 	setIf(&set, "privacidad.promociones_correo", req.PromoEmail)
 	if req.TermsVersion != nil {
 		set = append(set, bson.E{Key: "privacidad.version_terminos", Value: *req.TermsVersion}, bson.E{Key: "privacidad.fecha_aceptacion", Value: time.Now().UTC()})
@@ -434,6 +438,8 @@ func (s *Service) userError(err error) error {
 		return apperr.Conflict("el correo ya está registrado")
 	case errors.Is(err, usuarios.ErrPhoneTaken):
 		return apperr.Conflict("el teléfono ya está registrado en otra cuenta")
+	case errors.Is(err, usuarios.ErrUsernameTaken):
+		return apperr.Conflict("el nombre de usuario ya está en uso")
 	case errors.Is(err, usuarios.ErrVersionConflict):
 		return apperr.Conflict("el perfil cambió en otro dispositivo; vuelve a cargarlo")
 	default:

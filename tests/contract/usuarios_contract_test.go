@@ -51,7 +51,7 @@ func TestContract_Usuarios(t *testing.T) {
 
 	status, body = call(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]string{"nombre": "Usu"}, access)
 	check(t, "usuarios/yo_patch_400", status, body)
-	status, body = callWith(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]string{"nombre": "Usu"}, access, `"1"`)
+	status, body = callWith(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]string{"nombre": "Usu", "nombre_usuario": "usu_contrato"}, access, `"1"`)
 	check(t, "usuarios/yo_patch_200", status, body)
 	status, body = callWith(t, app, http.MethodPatch, "/api/v1/usuarios/yo", map[string]string{"nombre": "Otra"}, access, `"1"`)
 	check(t, "usuarios/yo_patch_409", status, body)
