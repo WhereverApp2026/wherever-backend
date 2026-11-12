@@ -58,8 +58,28 @@ type Service struct {
 	fuente    recomendador.Fuente
 	users     Usuarios
 	descartes Descartes
+	semantica Semantica
 	cfg       Config
 	log       *slog.Logger
+}
+
+// Semantica da la afinidad de cada negocio con la frase (nv-51); la implementa
+// *semantica.Service. nil o un mapa nil dejan el factor neutro.
+type Semantica interface {
+	Afinidad(ctx context.Context, frase string) map[bson.ObjectID]float64
+}
+
+// sinSemantica deja el factor neutro (sin búsqueda semántica configurada).
+type sinSemantica struct{}
+
+func (sinSemantica) Afinidad(context.Context, string) map[bson.ObjectID]float64 { return nil }
+
+// WithSemantica hace que los candidatos se elijan también por significado (nv-51).
+func (s *Service) WithSemantica(sem Semantica) *Service {
+	if sem != nil {
+		s.semantica = sem
+	}
+	return s
 }
 
 // NewService valida los pesos al arrancar. modelo puede ser nil.
@@ -76,7 +96,7 @@ func NewService(modelo ia.Modelo, fuente recomendador.Fuente, users Usuarios, de
 	if cfg.PlazoIA <= 0 {
 		cfg.PlazoIA = PlazoTotal - reservaRespaldo
 	}
-	return &Service{modelo: modelo, fuente: fuente, users: users, descartes: descartes, cfg: cfg, log: log}, nil
+	return &Service{modelo: modelo, fuente: fuente, users: users, descartes: descartes, semantica: sinSemantica{}, cfg: cfg, log: log}, nil
 }
 
 // Generar: frase → Interpretar (IA) → Recomendar (15 candidatos) → itinerario (IA) →
@@ -116,6 +136,7 @@ func (s *Service) generar(ctx context.Context, subject string, req GenerarReques
 	cctx := contexto(*req.Lat, *req.Lng, inicio, in, user.Tastes)
 	pedido.PresupuestoMax = cctx.PresupuestoMax
 	cctx.Excluidos = excluir
+	cctx.Afinidad = s.semantica.Afinidad(ictx, req.Frase)
 	recs, err := recomendador.Recomendar(ctx, s.fuente, s.cfg.Pesos, cctx, MaxCandidatos)
 	if err != nil {
 		s.log.ErrorContext(ctx, "asistente: candidatos no disponibles")

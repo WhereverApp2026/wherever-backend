@@ -19,6 +19,7 @@ var frases = map[string]string{
 	FactorClima:        "va con el clima",
 	FactorGustos:       "coincide con tus gustos",
 	FactorCalificacion: "tiene muy buena calificación",
+	FactorAfinidad:     "se parece a lo que buscas",
 }
 
 // porQueBase es la línea cuando ningún factor destaca: pasó los filtros y nada más.

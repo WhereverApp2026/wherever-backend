@@ -12,6 +12,17 @@ import (
 // GEMINI_API_KEY o IA_EMBEDDINGS_ID devuelve nil: no hay vectores y responde el motor de reglas.
 // urlBase vacía usa la API pública; las pruebas pasan un servidor local.
 func Armar(cfg config.IA, rdb *goredis.Client, db *mongo.Database, urlBase string) (*Recalculador, error) {
+	v, err := Vectorizador(cfg, rdb, urlBase)
+	if err != nil || v == nil {
+		return nil, err
+	}
+	return NewRecalculador(NewRepository(db), v, cfg.EmbLimiteMin)
+}
+
+// Vectorizador arma Gemini detrás de los límites de embeddings (IA_EMB_LIMITE_MIN/DIA). nil
+// (interfaz nil, no un puntero nil) si la IA de embeddings está apagada. Lo comparten el
+// recálculo y la búsqueda semántica (nv-51): mismos contadores en Redis.
+func Vectorizador(cfg config.IA, rdb *goredis.Client, urlBase string) (ia.Vectorizador, error) {
 	if !cfg.EmbeddingsEnabled() {
 		return nil, nil
 	}
@@ -23,5 +34,5 @@ func Armar(cfg config.IA, rdb *goredis.Client, db *mongo.Database, urlBase strin
 	if err != nil {
 		return nil, err
 	}
-	return NewRecalculador(NewRepository(db), limitado, cfg.EmbLimiteMin)
+	return limitado, nil
 }

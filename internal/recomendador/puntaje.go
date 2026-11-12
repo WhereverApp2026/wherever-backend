@@ -9,6 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
 )
@@ -21,10 +23,11 @@ const (
 	FactorClima        = "clima"
 	FactorGustos       = "gustos"
 	FactorCalificacion = "calificacion"
+	FactorAfinidad     = "afinidad_semantica"
 )
 
 // Factores es el orden canónico.
-var Factores = []string{FactorPresupuesto, FactorDistancia, FactorHorario, FactorClima, FactorGustos, FactorCalificacion}
+var Factores = []string{FactorPresupuesto, FactorDistancia, FactorHorario, FactorClima, FactorGustos, FactorCalificacion, FactorAfinidad}
 
 // neutro es el valor de un factor sin dato: ni suma ni resta frente a los demás.
 const neutro = 0.5
@@ -41,7 +44,7 @@ var pesosJSON []byte
 // PesosPorDefecto lee y valida los pesos versionados junto al paquete.
 func PesosPorDefecto() (Pesos, error) { return ParsePesos(pesosJSON) }
 
-// ParsePesos lee un JSON de pesos y lo valida: los seis factores, ninguno extra, cada uno
+// ParsePesos lee un JSON de pesos y lo valida: los siete factores, ninguno extra, cada uno
 // entre 0 y 1 y la suma igual a 1 (±0,001).
 func ParsePesos(raw []byte) (Pesos, error) {
 	var p Pesos
@@ -54,7 +57,7 @@ func ParsePesos(raw []byte) (Pesos, error) {
 // Validate revisa los pesos; el motor no se arma con pesos inválidos.
 func (p Pesos) Validate() error {
 	if len(p) != len(Factores) {
-		return errors.New("pesos del recomendador: deben ser exactamente los seis factores")
+		return errors.New("pesos del recomendador: deben ser exactamente los siete factores")
 	}
 	sum := 0.0
 	for _, f := range Factores {
@@ -88,6 +91,7 @@ func (p Puntaje) Factores(cand negocios.Candidate) map[string]float64 {
 		FactorClima:        p.Clima(),
 		FactorGustos:       p.Gustos(cand.Business),
 		FactorCalificacion: p.Calificacion(cand.Rating),
+		FactorAfinidad:     p.Afinidad(cand.ID),
 	}
 }
 
@@ -156,6 +160,17 @@ func (p Puntaje) Calificacion(r negocios.Calificacion) float64 {
 		return neutro
 	}
 	return clamp01(r.Promedio / 5)
+}
+
+// Afinidad es la cercanía en significado con la frase (nv-51), ya llevada a 0–1 por quien
+// la calculó. Sin búsqueda semántica o sin vector del negocio, neutro: así, sin IA, el orden
+// es el mismo que con los seis factores de nv-23.
+func (p Puntaje) Afinidad(id bson.ObjectID) float64 {
+	v, ok := p.c.Afinidad[id]
+	if !ok {
+		return neutro
+	}
+	return clamp01(v)
 }
 
 func clamp01(v float64) float64 { return math.Max(0, math.Min(1, v)) }

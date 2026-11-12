@@ -32,6 +32,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
@@ -56,7 +57,9 @@ type Env struct {
 	Recomendaciones *recomendaciones.Service
 	Exports         *privacidad.Exports
 	Job             *privacidad.Job
-	IA              *iatest.Modelo // doble del proveedor de IA (nv-31)
+	IA              *iatest.Modelo           // doble del proveedor de IA (nv-31)
+	Vectores        *iatest.ServidorVectores // servidor local de embeddings (nv-51)
+	Semantica       *semantica.Service
 	Mail            *mailer.Memory
 	Log             *slog.Logger
 	Logs            *testutil.LogBuffer
@@ -126,6 +129,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	assistant, err := asistente.NewService(guardia, businessRepo, users, asistente.NewDescartes(client.DB()),
 		asistente.Config{Pesos: pesos, PlazoIA: PlazoIA}, log)
 	require.NoError(t, err)
+	vectores := iatest.NuevoServidorVectores(t)
+	sem := semanticaDe(t, client, rdb, vectores.URL, pesos, log)
+	assistant.WithSemantica(sem)
 	recoRepo := recomendaciones.NewRepository(client.DB())
 	friendRepo := amistades.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
@@ -154,11 +160,13 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, IA: modelo,
+		Vectores: vectores, Semantica: sem,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
+			semantica.NewHandler(sem, v), // antes que negocios: /lugares/:id
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -167,6 +175,20 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},
 	}
+}
+
+// semanticaDe arma la búsqueda por significado (nv-51) con el adaptador real de embeddings
+// contra el servidor local, detrás de los límites reales en Redis.
+func semanticaDe(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, url string, pesos recomendador.Pesos, log *slog.Logger) *semantica.Service {
+	t.Helper()
+	g, err := ia.NewGeminiVectores(ia.GeminiVectoresConfig{APIKey: iatest.LlaveFalsa, ModeloID: "gemini-embedding-2", Timeout: PlazoIA, URLBase: url})
+	require.NoError(t, err)
+	lim, err := ia.NewVectoresLimitados(g, ia.NewLimitadorRedis(rdb), ia.LimitesVectores{PorMinuto: 80, PorDia: 800})
+	require.NoError(t, err)
+	repo := semantica.NewRepository(client.DB())
+	sem, err := semantica.NewService(lim, semantica.NewProductoPunto(repo), repo, ia.NewCacheRedis(rdb), semantica.Config{Pesos: pesos}, log)
+	require.NoError(t, err)
+	return sem
 }
 
 // PlazoIA acorta el plazo del asistente (7 s en producción) para probar el respaldo sin

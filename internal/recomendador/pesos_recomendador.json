@@ -1,8 +1,9 @@
 {
-  "presupuesto": 0.20,
-  "distancia": 0.20,
-  "horario": 0.10,
-  "clima": 0.10,
-  "gustos": 0.25,
-  "calificacion": 0.15
+  "presupuesto": 0.16,
+  "distancia": 0.16,
+  "horario": 0.08,
+  "clima": 0.08,
+  "gustos": 0.20,
+  "calificacion": 0.12,
+  "afinidad_semantica": 0.20
 }
