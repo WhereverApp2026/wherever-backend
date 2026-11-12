@@ -1,8 +1,8 @@
 # plan.md — NV-22 Búsqueda y autocompletar
 
 1. Mapeo
-- Crear: Ver Diseño de esta spec.
-- Modificar: Ver Diseño de esta spec.
+- Crear: `internal/busquedas/{repository,service,handler,dto,privacy,fuzzy}.go`, `internal/busquedas/fuzzy_test.go`, `tests/integration/busqueda_test.go`.
+- Modificar: `cmd/api/main.go` (módulo y ARCO), `internal/testutil/authtest/authtest.go`, `internal/indexes/indexes.go`, `scripts/routes/main.go`, `docs/endpoints.md`, `tests/database/indexes_test.go`, `tests/contract/testdata/usuarios/exportacion_descargar_200.json`.
 - Sin cambios: lo que esta spec no nombra.
 
 2. Guardarraíles
