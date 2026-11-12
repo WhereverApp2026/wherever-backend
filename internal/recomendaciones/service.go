@@ -84,8 +84,49 @@ func (s *Service) Recommend(ctx context.Context, subject string, q Query) (Respo
 	if err != nil {
 		return Response{}, err
 	}
-	now := s.now()
-	c := Contexto(user, q, now, excluded)
+	return s.recommend(ctx, Contexto(user, q, s.now(), excluded), q)
+}
+
+// ForHome arma las recomendaciones de Inicio (nv-25). La sesión es opcional: sin ella, o
+// con una cuenta que no está activa, son las generales (sin gustos, alergias ni descartes).
+// `adverso` es el clima de la ubicación; nil = sin clima y el factor queda neutro.
+func (s *Service) ForHome(ctx context.Context, subject string, q Query, adverso *bool) (Response, error) {
+	user, excluded, err := s.homeUser(ctx, subject)
+	if err != nil {
+		return Response{}, err
+	}
+	c := Contexto(user, q, s.now(), excluded)
+	c.ClimaAdverso = adverso
+	return s.recommend(ctx, c, q)
+}
+
+// homeUser lee al usuario de la sesión si la hay y está activo.
+func (s *Service) homeUser(ctx context.Context, subject string) (usuarios.User, []bson.ObjectID, error) {
+	if subject == "" {
+		return usuarios.User{}, nil, nil
+	}
+	uid, err := userID(subject)
+	if err != nil {
+		return usuarios.User{}, nil, err
+	}
+	user, err := s.users.FindByID(ctx, uid)
+	if errors.Is(err, usuarios.ErrNotFound) {
+		return usuarios.User{}, nil, apperr.Unauthorized("sesión inválida")
+	}
+	if err != nil {
+		return usuarios.User{}, nil, apperr.Unavailable("servicio no disponible")
+	}
+	if user.Status != usuarios.StatusActive {
+		return usuarios.User{}, nil, nil
+	}
+	excluded, err := s.repo.Excluded(ctx, uid)
+	if err != nil {
+		return usuarios.User{}, nil, apperr.Unavailable("servicio no disponible")
+	}
+	return user, excluded, nil
+}
+
+func (s *Service) recommend(ctx context.Context, c recomendador.Contexto, q Query) (Response, error) {
 	recs, err := recomendador.Recomendar(ctx, s.places, s.pesos, c, q.Limit)
 	if err != nil {
 		// Sin el texto de MongoDB: podría repetir la ubicación o las alergias.

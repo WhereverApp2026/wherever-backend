@@ -88,7 +88,7 @@ func (p Puntaje) Factores(cand negocios.Candidate) map[string]float64 {
 		FactorPresupuesto:  p.Presupuesto(cand.AveragePrice),
 		FactorDistancia:    p.Distancia(cand.DistanceM),
 		FactorHorario:      p.Horario(cand.ScheduleMin),
-		FactorClima:        p.Clima(),
+		FactorClima:        p.Clima(cand.Business),
 		FactorGustos:       p.Gustos(cand.Business),
 		FactorCalificacion: p.Calificacion(cand.Rating),
 		FactorAfinidad:     p.Afinidad(cand.ID),
@@ -131,8 +131,35 @@ func (p Puntaje) Horario(ventanas []negocios.VentanaMin) float64 {
 	return 0
 }
 
-// Clima es neutro para todos hasta que nv-25 traiga el clima; así no cambia el orden.
-func (p Puntaje) Clima() float64 { return neutro }
+// aireLibre son servicios o etiquetas (ya normalizados) de un negocio al aire libre.
+var aireLibre = []string{"terraza", "jardin", "patio", "aire libre", "aire_libre"}
+
+// Clima (nv-25): con mal clima (lluvia, tormenta, nieve, mucho calor o frío) el aire libre
+// vale 0 y bajo techo 1; con buen clima el aire libre vale 1 y el resto queda neutro. Sin
+// clima (servicio caído o lento), neutro para todos: el orden es el de antes de nv-25.
+func (p Puntaje) Clima(b negocios.Business) float64 {
+	if p.c.ClimaAdverso == nil {
+		return neutro
+	}
+	libre := alAireLibre(b)
+	switch {
+	case *p.c.ClimaAdverso && libre:
+		return 0
+	case *p.c.ClimaAdverso, libre:
+		return 1
+	default:
+		return neutro
+	}
+}
+
+func alAireLibre(b negocios.Business) bool {
+	for _, s := range append(slices.Clone(b.Services), b.Tags...) {
+		if slices.Contains(aireLibre, text.Normalize(s)) {
+			return true
+		}
+	}
+	return false
+}
 
 // Gustos cuenta cuántos gustos del usuario coinciden con el giro, su nombre o una
 // etiqueta; dos o más coincidencias valen 1. Sin gustos, neutro.

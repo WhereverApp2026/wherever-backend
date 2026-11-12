@@ -1,18 +1,19 @@
 # plan.md — NV-25 Clima e Inicio
 
 1. Mapeo
-- Crear: Ver Diseño de esta spec.
-- Modificar: Ver Diseño de esta spec.
-- Sin cambios: lo que esta spec no nombra.
+- Crear: `internal/clima` (`clima.go`, `openmeteo.go`, `servicio.go`, `ubicacion.go`, `handler.go`), `internal/inicio` (`inicio.go`, `handler.go`), `internal/testutil/climatest`, `tests/integration/inicio_test.go`.
+- Modificar: `internal/recomendador` (`Contexto.ClimaAdverso`, `Puntaje.Clima`), `internal/recomendaciones/service.go` (`ForHome`), `cmd/api/main.go`, `internal/testutil/authtest`, `scripts/routes/main.go`, `docs/endpoints.md`.
+- Sin cambios: colecciones, índices, ARCO, Redis, configuración y `.env.example` (la URL de Open-Meteo es pública y fija en `clima.OpenMeteoURL`).
 
 2. Guardarraíles
-- Servicios reales en las pruebas, sin secretos en Git, sin datos personales en logs, roles validados en cada endpoint y cada ruta nueva en `docs/endpoints.md`.
-- Los filtros duros se aplican en la consulta, no después de puntuar.
+- Open-Meteo es la única interfaz simulada (`climatest`); bases reales en las pruebas, sin secretos, sin coordenadas en logs, cada ruta nueva en `docs/endpoints.md` y `scripts/routes`.
+- Los filtros duros se aplican en la consulta, no después de puntuar (sin cambios de nv-23).
 
 3. Secuencia
-1. Preparación
-2. Implementación
-3. Cierre
+1. Factor clima en el recomendador.
+2. Paquete `clima` y su ruta.
+3. `ForHome` e Inicio; cableado.
+4. Pruebas, documentos y `Memoria.md`.
 
 4. Verificación
-- `go build`, `go vet`, cinco suites, `critic`, `check_endpoints`, `check_sdd`, cobertura ≥ 45 %, Semgrep en 0.
+- Local (`AGENTS.md` §4): `go build`, `go vet`, Unit, `golangci-lint`, `critic`, `check_endpoints`, `check_sdd`. Integration, Security, Database y Contract en el CI del PR.

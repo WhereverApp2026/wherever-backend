@@ -13,7 +13,9 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
+	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -39,7 +41,7 @@ func main() {
 		panic(err)
 	}
 	// Los módulos se registran sin service: aquí solo importan sus rutas, nunca se atienden.
-	modules := []httpapi.Module{auth.NewHandler(nil, nil), account.NewHandler(nil, nil), ciudades.NewHandler(nil, nil), semantica.NewHandler(nil, nil), negocios.NewHandler(nil, nil), planes.NewHandler(nil, nil), asistente.NewHandler(nil, nil), recomendaciones.NewHandler(nil, nil), personas.NewHandler(nil), sugerencias.NewHandler(nil), amistades.NewHandler(nil, nil)}
+	modules := []httpapi.Module{auth.NewHandler(nil, nil), account.NewHandler(nil, nil), ciudades.NewHandler(nil, nil), semantica.NewHandler(nil, nil), negocios.NewHandler(nil, nil), planes.NewHandler(nil, nil), asistente.NewHandler(nil, nil), recomendaciones.NewHandler(nil, nil), clima.NewHandler(nil, nil, nil), inicio.NewHandler(nil, nil), personas.NewHandler(nil), sugerencias.NewHandler(nil), amistades.NewHandler(nil, nil)}
 	app := httpapi.NewApp(cfg, httpapi.Deps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Redis: rdb, Modules: modules})
 
 	var lines []string
