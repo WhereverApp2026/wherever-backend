@@ -34,6 +34,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
@@ -236,7 +237,7 @@ func buildBusinesses(cfg config.Config, repo *negocios.Repository, users *usuari
 	if err != nil {
 		return nil, nil, fmt.Errorf("cursor: %w", err)
 	}
-	svc := negocios.NewService(repo, users, log).WithCursor(cursor)
+	svc := negocios.NewService(repo, users, log).WithCursor(cursor).WithCache(cache.New(rdb, log))
 	rec, err := embeddings.Armar(cfg.IA, rdb, db, "")
 	if err != nil {
 		return nil, nil, fmt.Errorf("embeddings: %w", err)

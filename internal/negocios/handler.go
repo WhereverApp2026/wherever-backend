@@ -53,7 +53,8 @@ func (h *Handler) categories(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	// Sin ETag ni 304 hasta NV-18: los conteos no se cachean.
+	// Los conteos viven 1 h en Redis (nv-18), pero el cliente no los guarda: un negocio
+	// importado se ve en la siguiente lectura.
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.JSON(out)
 }

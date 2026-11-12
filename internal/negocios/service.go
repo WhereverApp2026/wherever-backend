@@ -12,6 +12,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
@@ -28,6 +29,25 @@ type Service struct {
 	emb   Embeddings
 	// cursor firma la paginación de GET /lugares (nv-17).
 	cursor *pagination.Signer
+	// cache guarda categorías y fichas en Redis (nv-18); nil = sin caché.
+	cache *cache.Cache
+}
+
+// Vida en la caché (nv-18). Las fichas se invalidan al importar; las categorías también.
+const (
+	VidaCategorias = time.Hour
+	VidaFicha      = 5 * time.Minute
+)
+
+// Llaves de la caché: `cache:categorias:todas` y `cache:negocio:{id}`.
+var claveCategorias = cache.Clave("categorias", "todas")
+
+func claveFicha(id string) string { return cache.Clave("negocio", id) }
+
+// WithCache activa la caché de categorías y fichas; sin llamarla se consulta MongoDB siempre.
+func (s *Service) WithCache(c *cache.Cache) *Service {
+	s.cache = c
+	return s
 }
 
 // Embeddings rehace los vectores de significado desactualizados (nv-50). Si falla, la
@@ -67,6 +87,8 @@ func (s *Service) Import(ctx context.Context, adminSubject string, r io.Reader, 
 	if err != nil {
 		return ImportReport{}, err
 	}
+	tocadas := []string{claveCategorias}
+	defer func() { s.cache.Invalidar(context.WithoutCancel(ctx), tocadas...) }()
 	for _, item := range valid {
 		ownerID, rowErr, err := s.owner(ctx, item, admin.ID)
 		if err != nil {
@@ -85,6 +107,7 @@ func (s *Service) Import(ctx context.Context, adminSubject string, r io.Reader, 
 		if err != nil {
 			return report, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
 		}
+		tocadas = append(tocadas, claveFicha(business.ID.Hex()))
 		if created {
 			report.Created++
 		} else {
@@ -166,11 +189,13 @@ func newBusiness(row ImportRow, ownerID, reviewerID bson.ObjectID, qr string, no
 
 // Facets devuelve el catálogo público de categorías, etiquetas, servicios y filtros.
 func (s *Service) Facets(ctx context.Context) (FacetsResponse, error) {
-	counts, err := s.repo.Facets(ctx)
-	if err != nil {
-		return FacetsResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
-	}
-	return facetsResponse(counts), nil
+	return cache.Obtener(ctx, s.cache, claveCategorias, VidaCategorias, func(ctx context.Context) (FacetsResponse, error) {
+		counts, err := s.repo.Facets(ctx)
+		if err != nil {
+			return FacetsResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+		}
+		return facetsResponse(counts), nil
+	})
 }
 
 // facetsResponse completa los 6 giros con cero y mapea los conteos crudos.

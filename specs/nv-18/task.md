@@ -1,12 +1,13 @@
 # task.md — NV-18 Caché en Redis
 
 ## Fase 0 — Preparación
-- [ ] T01 Aprobar la spec; rama `nv-18`.
+- [x] T01 Corregir el desfase de la spec (paquete, llaves, alcance sin configuración); rama `claude/nice-almeida-3fcaaa` desde `main`. Firma del revisor pendiente.
 
 ## Fase 1 — Implementación
-- [ ] T02 Caché en Redis con un ayudante cache.Obtener(clave, ttl, fn) que evita avalanchas…
-- [ ] T03 La compresión ya está en producción (nv-12) y no se toca.
+- [x] T02 `internal/platform/cache`: `Obtener` con `singleflight`, `Invalidar` con un `DEL`, pausa de 30 s ante errores de Redis; pruebas Unit.
+- [x] T03 `internal/negocios`: categorías (1 h) y fichas (5 min) en caché, «abierto ahora» recalculado, invalidación al importar con el `_id` real; armado en `cmd/api` y `authtest`.
+- [x] T04 La compresión (nv-12) no se toca.
 
 ## Fase 2 — Cierre
-- [ ] T04 Pruebas, documentos y `Memoria.md`.
-- [ ] T05 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [x] T05 `tests/integration/cache_test.go` (Caché 6) y `TestPresupuestoRedis_CacheDeFicha`; estimación de Redis en `Memoria.md`.
+- [ ] T06 (local verde: build, vet, Unit, lint, critic, sdd, endpoints; Integration/Security/Database/Contract en el CI del PR) cinco suites, cobertura, Semgrep; evidencia en `gates.md`.
