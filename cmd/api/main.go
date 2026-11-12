@@ -22,6 +22,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -203,6 +204,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
+		configuracion.NewHandler(configuracion.NewService(cfg.VersionApp)),
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),

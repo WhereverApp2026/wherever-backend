@@ -2,12 +2,14 @@
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
+> Desde nv-16, toda ruta bajo `/api/v1/` puede responder además **426** (`X-App-Version` válida y menor a la mínima) o **503** con `Retry-After: 60` (modo mantenimiento). Exentas: `/api/v1/ping`, `/api/v1/configuracion` y `/api/v1/auth/*`; `/health`, `/ready`, `/docs` y `/openapi.json` quedan fuera de `/api/v1/`. No se repite en cada fila.
 
 | Método | Ruta | Auth | Rate | Códigos | Spec |
 |---|---|---|---|---|---|
 | GET | `/health` → `{estado:"ok", version}` | no | — | 200 | nv-01, nv-11 |
 | GET | `/ready` → `{estado, dependencias}` (MongoDB, Redis, Neo4j e `indices_mongodb`; 1 s c/u; Redis caído = 200 `degraded`; falta un índice declarado = 503 hasta correr `scripts/indexes`) | no; también público en staging, sin direcciones | global | 200/503 | nv-01, nv-04 |
 | GET | `/api/v1/ping` | no | global | 200 | nv-01 |
+| GET | `/api/v1/configuracion` → `{version_minima_app, version_actual_app, version_terminos, version_aviso_privacidad, mantenimiento}`; ETag débil, `Cache-Control: no-cache`, 304 con `If-None-Match` vigente; exenta del 426 y del 503 | no | global | 200/304 | nv-16 |
 | GET | `/api/v1/probe/timeout` (no-prod) | no | global | 408/404 | nv-01 |
 | GET | `/api/v1/probe/error` (no-prod) | no | global | 500/404 | nv-01 |
 | GET | `/api/v1/probe/forbidden` (no-prod) | no | global | 403/404 | nv-01 |

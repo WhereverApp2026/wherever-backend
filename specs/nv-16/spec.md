@@ -12,10 +12,10 @@ La app instalada debe saber si sigue vigente y la API debe poder pedir una actua
 
 ## Diseño
 - **Paquetes:**
-  - `internal/platform/versionado`: tipo `Version` (`Parse`, `String`, `MenorQue`) y `Politica` (mínima, mantenimiento y lista de rutas exentas) con `Decidir(ruta, cabecera)`; sin dependencias internas.
+  - `internal/platform/versionado`: tipo `Version` (`Parse`, `String`, `MenorQue`) y `Politica` (`NuevaPolitica(minima, mantenimiento)`, rutas exentas) con `Decidir(ruta, cabecera)`; sin dependencias internas.
   - `internal/http/middleware/version.go`: etapa `version`; traduce la decisión a `426` o `503` sin conocer Fiber en el paquete de dominio.
   - `internal/shared/etag`: `De(bytes)` (ETag débil) y `Coincide(ifNoneMatch, etag)`; sin Fiber para poder probarlo aparte y reutilizarlo en nv-17.
-  - `internal/configuracion`: `handler.go`, `service.go` y `dto.go`. No tiene repositorio: el service recibe `config.VersionApp` por constructor y devuelve una copia inmutable.
+  - `internal/configuracion`: `handler.go`, `service.go` y `dto.go`. No tiene repositorio: el service recibe `config.VersionApp` por constructor, serializa una vez y devuelve una copia del cuerpo y su ETag. Las claves viven en `internal/platform/config/version_app.go`.
 - **Pipeline:** la etapa `version` entra **después de `rate_limit_writes` y antes de `jwt`**. Solo actúa sobre rutas bajo `/api/v1/` no exentas: corre antes del enrutador y, si actuara sobre todo, una ruta inexistente daría 426 en vez de 404. Ya corrieron headers de seguridad, CORS y el límite; no se consulta Redis de revocación ni se valida un token para responder 426/503. Una app vieja consume cuota, pero la petición es barata y el limitador evita el abuso. Si hay mantenimiento, el 503 manda sobre el 426 (la app ya ve ambos valores en la configuración).
 - **Enmienda de la constitución:** agregar la etapa a §4, el código `426` a la lista de §4 y `UpgradeRequired→426` a §5, y dejar la lista del pipeline igual al código real (hoy omite `request_timeout` y la separación de los dos límites). Sube a la versión 1.7.0 (la 1.6.0 ya la usó nv-12). En el mismo PR se actualizan `scripts/critic-guardrails.sh` (B3) y `TestPipeline_ConstitutionalOrder`; sin la enmienda aprobada, nv-16 no se fusiona.
 - **Configuración:** claves nuevas en `internal/platform/config`, todas opcionales con defecto y validadas al arrancar:
@@ -41,7 +41,7 @@ La app instalada debe saber si sigue vigente y la API debe poder pedir una actua
   }
   ```
   `version_actual_app` es la última versión publicada en las tiendas y es informativa; la versión de la API sigue saliendo en `/health`.
-- **Errores:** se agrega `apperr.KindUpgradeRequired` (426, código `actualizacion_requerida`, mensaje «actualiza la app a la versión X o superior») al final de la lista de tipos para no mover los valores existentes. El 503 de mantenimiento reutiliza `apperr.Unavailable("en mantenimiento")` con `RetryAfter: 60`; no se crea otro tipo con estado 503 porque `KindFromStatus` recorre un mapa y el resultado no sería determinista.
+- **Errores:** se agrega `apperr.KindUpgradeRequired` (constructor `apperr.UpgradeRequired(minima)`) (426, código `actualizacion_requerida`, mensaje «actualiza la app a la versión X o superior») al final de la lista de tipos para no mover los valores existentes. El 503 de mantenimiento reutiliza `KindUnavailable` con `RetryAfter: 60` (`apperr.Maintenance(60)`); no se crea otro tipo con estado 503 porque `KindFromStatus` recorre un mapa y el resultado no sería determinista.
 - **ETag:** una sola serialización a JSON; el ETag se calcula sobre esos mismos bytes (`W/"` + primeros 32 hex de SHA-256 + `"`). Es débil porque la etapa `compress` puede mandar el cuerpo en gzip y un ETag fuerte debe cambiar con la codificación (RFC 9110); para el 304 basta la comparación débil. `If-None-Match` acepta el valor con o sin `W/`, una lista o `*`. La respuesta no varía por `X-App-Version`; el único `Vary` es el `Accept-Encoding` que ya pone la compresión.
 - **CORS:** `X-App-Version` e `If-None-Match` se agregan a los encabezados permitidos, y `ETag` a los expuestos. Sin eso, un cliente de navegador no puede mandar la versión ni aprovechar el 304 Hoy tampoco se expone el `ETag` del perfil de nv-05, que se usa con `If-Match` (ese sí está permitido).
 - **Datos:** sin colecciones ni índices nuevos. `usuarios.privacidad.version_terminos` no cambia en esta spec.
@@ -63,13 +63,13 @@ Desde nv-16 toda ruta no exenta puede responder además **426** (cabecera válid
 ```
 
 ## Tests
-- `Unit/Versionado 12`: `1.2.3` válido, `v1.2.3` válido, `1.2`, `1.2.3.4`, `1.2.x` y vacío inválidos; `1.10.0` mayor que `1.9.0`; iguales; menor; basura ignorada; rutas exentas; el mantenimiento manda sobre el 426.
-- `Unit/Configuración 6`: defectos, valores explícitos, semver inválido falla el arranque, mínima mayor que actual falla, `MODO_MANTENIMIENTO` inválido falla, versión de términos vacía usa el defecto.
-- `Unit/ConfiguraciónHTTP 4`: 200 con los cinco campos y sus tipos, ETag estable, 304 con `If-None-Match` y `mantenimiento: true` en la respuesta.
-- `Unit/MiddlewareVersión 9` con `app.Test`: versión vieja → 426 en una ruta de negocio, igual y nueva → 200, ausente → 200, ilegible → 200, `/api/v1/auth/login` exenta → 200, mantenimiento → 503 con `Retry-After: 60`, configuración en mantenimiento → 200, ruta fuera de `/api/v1` con versión vieja → 404.
+- `Unit/Versionado 5` (`internal/platform/versionado/version_test.go`, 22 casos): `1.2.3` válido, `v1.2.3` válido, `1.2`, `1.2.3.4`, `1.2.x` y vacío inválidos; `1.10.0` mayor que `1.9.0`; iguales; menor; basura ignorada; rutas exentas; el mantenimiento manda sobre el 426.
+- `Unit/Configuración 6` (`internal/platform/config/version_app_test.go`): defectos, valores explícitos, semver inválido falla el arranque, mínima mayor que actual falla, `MODO_MANTENIMIENTO` inválido falla, versión de términos vacía usa el defecto.
+- `Unit/ConfiguraciónHTTP 4` (`internal/configuracion/handler_test.go`): 200 con los cinco campos y sus tipos, ETag estable y distinto al cambiar un valor, 304 con `If-None-Match` y `mantenimiento: true` en la respuesta.
+- `Unit/MiddlewareVersión 8` con `app.Test` (`internal/http/middleware/version_test.go`): versión vieja → 426 en una ruta de negocio, igual y nueva → 200, ausente → 200, ilegible → 200, `/api/v1/auth/login` exenta → 200, mantenimiento → 503 con `Retry-After: 60`, configuración en mantenimiento → 200, ruta fuera de `/api/v1` con versión vieja → 404.
 - `Unit/ETag 5`: ETag débil y estable para el mismo cuerpo, distinto al cambiar un valor, `If-None-Match` con lista, con `*` y sin el prefijo `W/`.
 - `Unit/CORS 2`: el preflight permite `X-App-Version` e `If-None-Match` y la respuesta expone `ETag`.
-- `Contract/Configuración 2`: forma exacta de la respuesta y variante con `mantenimiento: true` (`tests/contract/testdata/configuracion/`).
+- `Contract/Configuración 2` (`tests/contract/configuracion_contract_test.go`): forma exacta de la respuesta y variante con `mantenimiento: true` (`tests/contract/testdata/configuracion/`).
 
 ## Criterios
 - Una app vieja recibe 426 en las rutas de negocio y sigue pudiendo leer la configuración, cerrar sesión, refrescar y recuperar la cuenta.
@@ -91,10 +91,10 @@ Desde nv-16 toda ruta no exenta puede responder además **426** (cabecera válid
 - No hay entorno de staging: las pruebas finales se hacen en el servidor de desarrollo, y el modo mantenimiento corta a quien lo esté usando en ese momento.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-09); ola 4: plataforma y catálogo completo, después de la ruta prioritaria (ver `Memoria.md`)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
-- **Decisiones para el revisor antes de ejecutar:**
+- **Estado:** ✅ Aprobada e implementada (2026-11-12); Integration, Security, Database y Contract en el CI del PR; la prueba en el servidor de desarrollo queda para después de fusionar.
+- **Revisores:** Osmar Reséndiz (aprobó la spec, la enmienda 1.7.0 y las seis decisiones el 2026-11-12)
+- **Fecha:** 2026-11-12
+- **Decisiones aprobadas:**
   1. Enmienda de la constitución §4/§5 (1.7.0) para agregar la etapa `version` (entre los límites y JWT, solo sobre `/api/v1/`) y el código `426`; en el mismo PR se actualizan `critic B3` y `TestPipeline`. La lista de §4 se deja igual al pipeline real, incluido `request_timeout`.
   2. `X-App-Version` ausente o inválida no bloquea; solo un semver válido y menor da 426. Es aviso de compatibilidad, no autorización.
   3. Rutas exentas: `/health`, `/ready`, `/api/v1/ping`, `/api/v1/configuracion`, `/api/v1/auth/*` y, en dev, `/docs` y `/openapi.json`.

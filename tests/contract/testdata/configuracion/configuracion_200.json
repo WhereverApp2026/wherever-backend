@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "body": {
+    "mantenimiento": "bool",
+    "version_actual_app": "string",
+    "version_aviso_privacidad": "string",
+    "version_minima_app": "string",
+    "version_terminos": "string"
+  }
+}

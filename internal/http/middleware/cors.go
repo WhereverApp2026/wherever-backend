@@ -8,8 +8,8 @@ import (
 
 const (
 	corsMethods = "GET, POST, PUT, PATCH, DELETE"
-	corsHeaders = "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID"
-	corsExpose  = "X-Request-ID, Retry-After"
+	corsHeaders = "Authorization, Content-Type, If-Match, If-None-Match, Idempotency-Key, X-App-Version, X-Request-ID"
+	corsExpose  = "X-Request-ID, Retry-After, ETag"
 	corsMaxAge  = "600"
 )
 

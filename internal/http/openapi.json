@@ -67,6 +67,43 @@
         }
       }
     },
+    "/api/v1/configuracion": {
+      "get": {
+        "summary": "Versiones vigentes de la app y modo mantenimiento (nv-16)",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "configuración pública con ETag débil y Cache-Control no-cache",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Configuracion"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "If-None-Match vigente, sin cuerpo"
+          }
+        }
+      }
+    },
     "/api/v1/probe/timeout": {
       "get": {
         "summary": "Sonda 408 (no-prod)",
@@ -2197,6 +2234,37 @@
           "propietario_correo": {
             "type": "string",
             "format": "email"
+          }
+        }
+      },
+      "Configuracion": {
+        "type": "object",
+        "required": [
+          "version_minima_app",
+          "version_actual_app",
+          "version_terminos",
+          "version_aviso_privacidad",
+          "mantenimiento"
+        ],
+        "properties": {
+          "version_minima_app": {
+            "type": "string",
+            "example": "1.4.0"
+          },
+          "version_actual_app": {
+            "type": "string",
+            "example": "1.6.2"
+          },
+          "version_terminos": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "version_aviso_privacidad": {
+            "type": "string",
+            "example": "2026-11"
+          },
+          "mantenimiento": {
+            "type": "boolean"
           }
         }
       }

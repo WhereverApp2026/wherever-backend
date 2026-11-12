@@ -15,6 +15,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	platformredis "github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/versionado"
 )
 
 // Valores fijos de prueba; no son secretos de ningún entorno.
@@ -48,6 +49,9 @@ func Config(env string) config.Config {
 		RequestTimeout:   config.MaxRequestTimeout,
 		RateLimitGlobal:  config.DefaultRateGlobal,
 		RateLimitWrites:  config.DefaultRateWrites,
+		VersionApp: config.VersionApp{
+			Actual: versionado.Version{Mayor: 1}, Terminos: config.DefaultTerminosVersion, Aviso: config.DefaultAvisoVersion,
+		},
 	}
 }
 
