@@ -70,8 +70,21 @@ func TestPuntaje_HorarioMargenDeCierre(t *testing.T) {
 	assert.Equal(t, 0.0, p.Horario([]negocios.VentanaMin{{Dia: 1, Desde: 9 * 60, Hasta: 12*60 + 20}}), "cierra en 20 min")
 }
 
-func TestPuntaje_ClimaNeutroHastaNV25(t *testing.T) {
-	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Clima())
+func TestPuntaje_Clima(t *testing.T) {
+	techo := negocioBase()
+	techo.Services, techo.Tags = []string{"wifi"}, nil
+	libre := negocioBase()
+	libre.Services = []string{"Terraza"}
+	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Clima(libre), "sin clima, neutro")
+
+	c := ctxBase()
+	malo, bueno := true, false
+	c.ClimaAdverso = &malo
+	assert.Equal(t, 0.0, NewPuntaje(c).Clima(libre), "lluvia: aire libre abajo")
+	assert.Equal(t, 1.0, NewPuntaje(c).Clima(techo), "lluvia: bajo techo arriba")
+	c.ClimaAdverso = &bueno
+	assert.Equal(t, 1.0, NewPuntaje(c).Clima(libre), "buen clima: aire libre arriba")
+	assert.Equal(t, neutro, NewPuntaje(c).Clima(techo))
 }
 
 func TestPuntaje_Gustos(t *testing.T) {

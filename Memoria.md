@@ -407,6 +407,14 @@
 - Lección (CI del PR 60): `$text` en español no encontró «pizzeria» en «Pizzería Nápoles» (la raíz se calcula con el acento). La comparación en Go lo encuentra, así que `aproximada` solo es `true` si alguna palabra necesitó un error, no por venir de Go.
 - A evitar: registrar `busquedas` después de `negocios` (`/lugares/:id` atiende «buscar»); devolver o registrar el error de MongoDB (puede repetir lo escrito).
 
+## Spec nv-25 — Clima e Inicio (2026-11-12)
+- Estado: implementada desde `main`, PR contra `main`. Local: build, vet, Unit, `golangci-lint`, critic, `check_sdd` y `check_endpoints` en verde; Integration (`tests/integration/inicio_test.go`) en el CI. Falta la firma.
+- Corrección de drift: el plan decía «ver Diseño» sin archivos; ahora nombra `internal/clima`, `internal/inicio` y lo que cambia en `internal/recomendador` y `internal/recomendaciones`. Contratos con 401/422/503 en Inicio y `ciudad_id` en clima.
+- Decisión: caché del clima **en memoria por instancia** (30 min por celda de 0,01°, fallo recordado 1 min), no en Redis: el clima no depende del usuario y así no suma comandos de Upstash (`TestPresupuestoRedis_*` sin cambios). A Open-Meteo solo sale la coordenada redondeada.
+- Decisión: factor clima con `Contexto.ClimaAdverso` (nil = neutro). Mal clima = lluvia, llovizna, nieve, tormenta, ≥ 0,2 mm, ≥ 32 °C o ≤ 8 °C; aire libre = servicio o etiqueta `terraza`, `jardin`, `patio`, `aire libre`. Solo Inicio pasa el clima; `GET /recomendaciones` sigue sin él.
+- Decisión: Inicio con sesión opcional; sin sesión o con cuenta no activa, recomendaciones generales (sin gustos, alergias ni descartes). La franja sale del momento de las recomendaciones (`hora` o el reloj de `recomendaciones.Service`).
+- A evitar: un handler no puede importar `bson` (test de arquitectura): la resolución de `ciudad_id` va en `internal/clima/ubicacion.go`. `gocyclo` > 10 con un `switch` de rangos WMO: usar tabla.
+
 ## NV-33 — Respaldo, cancelación y «otra idea» (2026-11-11)
 - Estado: rama `nv-33` desde `origin/nv-32` con `origin/nv-28` fusionada (trae nv-27 y nv-28); PR contra `nv-32`, se reduce al fusionar #44 y #46. Build, vet, Unit, lint y las cuatro suites con contenedor en verde en local. Falta la medición con IA real (20 frases) y la firma.
 - Decisión: toda falla de la IA (tiempo, 429, falla, inválida, bloqueada, tope, gasto o límites desconocidos, límite global o del usuario, IA apagada) responde el motor de reglas con `fuente: reglas` y aviso. Ya no hay 429 ni 503 por la IA. El respaldo no llama al modelo: no cuenta contra el tope ni los límites.

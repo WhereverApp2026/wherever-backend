@@ -20,12 +20,14 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -39,6 +41,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/climatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
@@ -59,6 +62,8 @@ type Env struct {
 	Negocios        *negocios.Service
 	Planes          *planes.Service
 	Recomendaciones *recomendaciones.Service
+	Clima           *clima.Servicio     // contra OpenMeteo, el doble de Open-Meteo (nv-25)
+	OpenMeteo       *climatest.Servidor // la prueba cambia su respuesta, demora o falla
 	Exports         *privacidad.Exports
 	Grafo           *grafo.Queue // cola de nv-52; las pruebas la aplican con grafo.Worker
 	Job             *privacidad.Job
@@ -164,6 +169,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
+	openMeteo := climatest.Nuevo(t)
+	weather := clima.NewServicio(clima.NewOpenMeteo(openMeteo.URL), log)
 	friends, err := amistades.NewService(friendRepo, users, log)
 	require.NoError(t, err)
 	friends.WithGraph(graph)
@@ -173,7 +180,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Exports: exports, Grafo: graph, IA: modelo,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
@@ -188,6 +195,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
+			clima.NewHandler(weather, cities, v),
+			inicio.NewHandler(inicio.NewService(reco, weather), v),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
 			sugerencias.NewHandler(suggestions).WithActiveGuard(usuarios.RequireActive(users)), // antes que amistades
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),

@@ -22,6 +22,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -29,6 +30,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -185,6 +187,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		return nil, nil, fmt.Errorf("recomendaciones: %w", err)
 	}
 
+	// Clima de Open-Meteo (nv-25): sin llave, caché en memoria por instancia, sin Redis.
+	weather := clima.NewServicio(clima.NewOpenMeteo(clima.OpenMeteoURL), log)
+
 	accountSvc, err := account.NewService(users, authSvc, citySvc, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	if err != nil {
@@ -212,6 +217,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
+		clima.NewHandler(weather, citySvc, validator),
+		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil

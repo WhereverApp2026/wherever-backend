@@ -41,6 +41,10 @@ type Contexto struct {
 	// Excluidos son los negocios marcados con «No me interesa».
 	Excluidos []bson.ObjectID
 
+	// ClimaAdverso dice si hay mal clima en la ubicación (nv-25). nil = sin dato; el factor
+	// queda neutro.
+	ClimaAdverso *bool
+
 	// Afinidad es la cercanía en significado de cada negocio con la frase, de 0 a 1 (nv-51).
 	// nil = sin búsqueda semántica; el factor queda neutro.
 	Afinidad map[bson.ObjectID]float64
