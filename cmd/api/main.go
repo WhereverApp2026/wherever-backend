@@ -167,8 +167,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
+	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph.queue), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -178,6 +179,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
+	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
 	pesos, err := recomendador.PesosPorDefecto()
@@ -209,7 +211,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
-		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
+		// Aceptación de términos y aviso (nv-19) con las versiones que publica /configuracion.
+		account.NewHandler(accountSvc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}), validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
 		configuracion.NewHandler(configuracion.NewService(cfg.VersionApp)),
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.

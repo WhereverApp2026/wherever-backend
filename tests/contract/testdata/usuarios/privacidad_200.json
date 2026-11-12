@@ -4,12 +4,14 @@
     "aprendizaje_personalizado": "bool",
     "buscable_por_telefono": "bool",
     "buscable_por_usuario": "bool",
+    "consentimiento_vigente": "bool",
     "datos_sensibles": "bool",
     "datos_uso": "bool",
     "estado_animo": "bool",
     "fecha_aceptacion": "string",
     "promociones_correo": "bool",
     "ubicacion": "bool",
+    "version_aviso_privacidad": "string",
     "version_terminos": "string"
   }
 }

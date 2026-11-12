@@ -1,11 +1,11 @@
 # task.md — NV-19 Aceptación de términos y aviso de privacidad
 
 ## Fase 0 — Preparación
-- [ ] T01 Aprobar la spec; rama `nv-19`.
+- [x] T01 Conciliar la spec con lo que ya existe (privacidad de nv-05, versiones de nv-16); rama `claude/vibrant-chebyshev-a26616`. Firma del revisor pendiente.
 
 ## Fase 1 — Implementación
-- [ ] T02 Aceptación de términos (US-003): POST /api/v1/usuarios/yo/consentimientos guarda la…
+- [x] T02 Aceptación de términos (US-003): `POST /api/v1/usuarios/yo/consentimientos` agrega una fila a `consentimientos` y copia la aceptación a `privacidad`; `consentimiento_vigente` en el perfil; ARCO e índice `ix_usuario_fecha`.
 
 ## Fase 2 — Cierre
-- [ ] T03 Pruebas, documentos y `Memoria.md`.
-- [ ] T04 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [x] T03 Pruebas (Unit, Integration, Contract, Database), `docs/endpoints.md`, `docs/aviso-privacidad.md` y `Memoria.md`.
+- [x] T04 Local: `go build`, `go vet`, Unit, lint, `critic`, `check_sdd`, `check_endpoints`; PR contra `main`; evidencia en `gates.md`. Las suites con contenedor las corre el CI del PR.

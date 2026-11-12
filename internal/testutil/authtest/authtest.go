@@ -157,8 +157,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	planPrivacy := planes.NewPrivacy(planRepo)
 	graph := grafo.NewQueue(client.DB(), log)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor)
+	consentRepo := usuarios.NewConsentRepository(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -168,9 +169,11 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
+	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
+	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso})
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
 	openMeteo := climatest.Nuevo(t)

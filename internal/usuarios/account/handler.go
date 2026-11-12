@@ -65,6 +65,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	yo.Put("/gustos", active(h.setTastes)...)
 	yo.Patch("/preferencias", active(h.patchPreferences)...)
 	yo.Patch("/privacidad", active(h.patchPrivacy)...)
+	yo.Post("/consentimientos", active(h.acceptConsent)...)
 	yo.Put("/telefono", active(h.setPhone)...)
 	yo.Post("/modo", active(h.setMode)...)
 	yo.Post("/exportar", active(h.requestExport)...)
@@ -204,6 +205,18 @@ func (h *Handler) patchPrivacy(c *fiber.Ctx) error {
 		return err
 	}
 	return c.JSON(p)
+}
+
+func (h *Handler) acceptConsent(c *fiber.Ctx) error {
+	var req ConsentRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	out, err := h.svc.AcceptConsent(c.UserContext(), claims(c), req)
+	if err != nil {
+		return err
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
 func (h *Handler) setPhone(c *fiber.Ctx) error {
