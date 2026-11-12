@@ -13,6 +13,7 @@ import (
 	"time"
 	_ "time/tzdata" // el trabajo nocturno usa America/Mexico_City aunque la imagen no traiga zonas
 
+	"github.com/gofiber/fiber/v2"
 	goredis "github.com/redis/go-redis/v9"
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 
@@ -40,6 +41,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 )
@@ -81,7 +83,7 @@ func run() error {
 
 	mail := buildMail(cfg.Mail, log)
 	graphQueue := grafo.NewQueue(mongoClient.DB(), log)
-	modules, job, err := buildModules(cfg, log, mongoClient, redisClient, mail, graphQueue)
+	modules, job, err := buildModules(cfg, log, mongoClient, redisClient, mail, graphStores{queue: graphQueue, driver: neo4jDriver})
 	if err != nil {
 		return err
 	}
@@ -126,7 +128,7 @@ func run() error {
 }
 
 // buildModules arma los módulos de negocio y el trabajo nocturno con sus dependencias.
-func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client, mail mailers, graph *grafo.Queue) ([]httpapi.Module, *privacidad.Job, error) {
+func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client, redisClient *goredis.Client, mail mailers, graph graphStores) ([]httpapi.Module, *privacidad.Job, error) {
 	validator, err := validation.New()
 	if err != nil {
 		return nil, nil, err
@@ -155,11 +157,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
-	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph)
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue)
 	recoRepo := recomendaciones.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph.queue), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -184,13 +186,12 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("usuarios: %w", err)
 	}
-	friends, people, err := buildSocial(users, friendRepo, cfg.PhoneHMACKey, log)
+	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
+	active := usuarios.RequireActive(users)
+	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
 	if err != nil {
 		return nil, nil, err
 	}
-	friends.WithGraph(graph)
-	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
-	active := usuarios.RequireActive(users)
 	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
@@ -204,9 +205,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
-		personas.NewHandler(people).WithActiveGuard(active),
-		amistades.NewHandler(friends, validator).WithActiveGuard(active),
 	}
+	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
 
@@ -305,18 +305,46 @@ func buildMail(cfg config.Mail, log *slog.Logger) mailers {
 	return mailers{requests: queue, sync: direct, shutdown: queue.Shutdown}
 }
 
-// buildSocial arma amistades (nv-36) y la búsqueda de personas (nv-35), que oculta a quien
-// tenga una relación bloqueada.
-func buildSocial(users *usuarios.Repository, friendRepo *amistades.Repository, phoneKey []byte, log *slog.Logger) (*amistades.Service, *personas.Service, error) {
-	friends, err := amistades.NewService(friendRepo, users, log)
+// graphStores son la cola que llena Neo4j (nv-52) y el driver que lo lee (nv-53).
+type graphStores struct {
+	queue  *grafo.Queue
+	driver *neo4j.Driver
+}
+
+// socialDeps es lo que necesitan los módulos sociales.
+type socialDeps struct {
+	users     *usuarios.Repository
+	friends   *amistades.Repository
+	places    *negocios.Repository
+	graph     graphStores
+	phoneKey  []byte
+	validator *validation.Validator
+	active    fiber.Handler
+}
+
+// buildSocial arma la búsqueda de personas (nv-35), las sugerencias y la señal social del
+// grafo (nv-53) y amistades (nv-36). Sugerencias va antes que amistades: su grupo
+// /amistades ya pide JWT y la ruta no debe pasar dos veces por él.
+func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
+	friends, err := amistades.NewService(d.friends, d.users, log)
 	if err != nil {
-		return nil, nil, fmt.Errorf("amistades: %w", err)
+		return nil, fmt.Errorf("amistades: %w", err)
 	}
-	people, err := personas.NewService(users, friendRepo, phoneKey, log)
+	friends.WithGraph(d.graph.queue)
+	people, err := personas.NewService(d.users, d.friends, d.phoneKey, log)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return friends, people, nil
+	suggestions, err := sugerencias.NewService(d.friends, d.users, d.places, log)
+	if err != nil {
+		return nil, err
+	}
+	suggestions.WithGraph(d.graph.driver)
+	return []httpapi.Module{
+		personas.NewHandler(people).WithActiveGuard(d.active),
+		sugerencias.NewHandler(suggestions).WithActiveGuard(d.active),
+		amistades.NewHandler(friends, d.validator).WithActiveGuard(d.active),
+	}, nil
 }
 
 // startGraph corre el trabajador que refleja amistades y planes en Neo4j (nv-52) hasta que
