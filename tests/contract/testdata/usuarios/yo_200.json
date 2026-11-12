@@ -15,6 +15,7 @@
     "modo_actual": "string",
     "nivel": "string",
     "nombre": "string",
+    "nombre_usuario": "null",
     "preferencias": {
       "horario_silencioso": "null",
       "movilidad_default": "string",
@@ -31,6 +32,7 @@
     "privacidad": {
       "aprendizaje_personalizado": "bool",
       "buscable_por_telefono": "bool",
+      "buscable_por_usuario": "bool",
       "datos_sensibles": "bool",
       "datos_uso": "bool",
       "estado_animo": "bool",

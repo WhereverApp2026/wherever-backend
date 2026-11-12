@@ -618,6 +618,11 @@
                   "nombre": {
                     "type": "string"
                   },
+                  "nombre_usuario": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9_]{3,20}$",
+                    "description": "Único; reservados y repetidos no se aceptan (409 si ya existe)."
+                  },
                   "foto_url": {
                     "type": "string",
                     "format": "uri"
@@ -1712,6 +1717,10 @@
           "buscable_por_telefono": {
             "type": "boolean"
           },
+          "buscable_por_usuario": {
+            "type": "boolean",
+            "description": "Encendido por defecto (nv-34)."
+          },
           "promociones_correo": {
             "type": "boolean"
           },
@@ -1733,6 +1742,10 @@
           },
           "nombre": {
             "type": "string"
+          },
+          "nombre_usuario": {
+            "type": "string",
+            "nullable": true
           },
           "correo": {
             "type": "string"

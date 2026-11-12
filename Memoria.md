@@ -416,6 +416,12 @@
 - Decisión: la importación llama `Refrescar` con plazo propio de 30 s y sin la cancelación de la petición; si falla solo se registra. `IA_EMBEDDINGS_ID` sin valor por defecto: sin él no hay vectores.
 - Operación pendiente: crear `/wherever/dev/IA_EMBEDDINGS_ID` (`gemini-embedding-2`) en SSM antes de usarlo en AWS.
 - A evitar: asignar un `*Recalculador` nil a la interfaz `negocios.Embeddings` (queda no nil): `cmd/api` lo revisa antes. `ia.Normalizar` ya existía (texto): el de vectores es `ia.NormalizarVector`.
+## NV-34 — Nombre de usuario y privacidad de búsqueda (2026-11-11)
+- Estado: implementada desde `main`; local build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde. Las suites con contenedor las corre el CI del PR. Falta la firma.
+- Drift corregido: el plan creaba `internal/amistades` y `internal/personas` (son de nv-35/36) y tocaba el purger y la matriz de límites (no hay colección nueva).
+- Decisión: `nombre_usuario` solo minúsculas, números y guion bajo (3 a 20); las mayúsculas son 422, no se convierten, y así `ux_nombre_usuario` (único parcial) ya es único sin importar mayúsculas. Lista corta de reservados en la regla `username`.
+- Decisión: `privacidad.buscable_por_usuario` es `*bool` con `omitempty`; ausente = encendido (`Privacy.SearchableByUsername`). Para buscar en Mongo (nv-35) usa `{$ne: false}`, nunca `true`.
+- Contract: `nombre_usuario` y `buscable_por_usuario` entran en `yo_200`, `yo_patch_200` (el PATCH del contrato ahora manda `nombre_usuario`), `privacidad_200`, `cancelar_eliminacion_200` y `exportacion_descargar_200`.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

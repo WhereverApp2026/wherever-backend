@@ -30,6 +30,7 @@ type EmailQuery struct {
 // PatchProfileRequest es el cuerpo parcial de PATCH /usuarios/yo: solo cambia lo que llega.
 type PatchProfileRequest struct {
 	Name     *string `json:"nombre" validate:"omitempty,min=2,max=40"`
+	Username *string `json:"nombre_usuario" validate:"omitempty,username"`
 	PhotoURL *string `json:"foto_url" validate:"omitempty,url,startswith=https://,max=500"`
 	CityID   *string `json:"ciudad_id" validate:"omitempty,objectid"`
 }
@@ -76,14 +77,15 @@ type PreferencesRequest struct {
 
 // PrivacyRequest es el cuerpo parcial de PATCH /usuarios/yo/privacidad (P-62).
 type PrivacyRequest struct {
-	Location        *bool   `json:"ubicacion"`
-	Learning        *bool   `json:"aprendizaje_personalizado"`
-	Mood            *bool   `json:"estado_animo"`
-	SensitiveData   *bool   `json:"datos_sensibles"`
-	UsageData       *bool   `json:"datos_uso"`
-	PhoneSearchable *bool   `json:"buscable_por_telefono"`
-	PromoEmail      *bool   `json:"promociones_correo"`
-	TermsVersion    *string `json:"version_terminos" validate:"omitempty,max=20"`
+	Location           *bool   `json:"ubicacion"`
+	Learning           *bool   `json:"aprendizaje_personalizado"`
+	Mood               *bool   `json:"estado_animo"`
+	SensitiveData      *bool   `json:"datos_sensibles"`
+	UsageData          *bool   `json:"datos_uso"`
+	PhoneSearchable    *bool   `json:"buscable_por_telefono"`
+	UsernameSearchable *bool   `json:"buscable_por_usuario"`
+	PromoEmail         *bool   `json:"promociones_correo"`
+	TermsVersion       *string `json:"version_terminos" validate:"omitempty,max=20"`
 }
 
 // PhoneRequest es el cuerpo de PUT /usuarios/yo/telefono. Se valida ya normalizado.
@@ -158,21 +160,23 @@ type PreferencesResponse struct {
 
 // PrivacyResponse son los interruptores de privacidad y la aceptación de términos.
 type PrivacyResponse struct {
-	Location        bool      `json:"ubicacion"`
-	Learning        bool      `json:"aprendizaje_personalizado"`
-	Mood            bool      `json:"estado_animo"`
-	SensitiveData   bool      `json:"datos_sensibles"`
-	UsageData       bool      `json:"datos_uso"`
-	PhoneSearchable bool      `json:"buscable_por_telefono"`
-	TermsVersion    string    `json:"version_terminos"`
-	AcceptedAt      time.Time `json:"fecha_aceptacion"`
-	PromoEmail      bool      `json:"promociones_correo"`
+	Location           bool      `json:"ubicacion"`
+	Learning           bool      `json:"aprendizaje_personalizado"`
+	Mood               bool      `json:"estado_animo"`
+	SensitiveData      bool      `json:"datos_sensibles"`
+	UsageData          bool      `json:"datos_uso"`
+	PhoneSearchable    bool      `json:"buscable_por_telefono"`
+	UsernameSearchable bool      `json:"buscable_por_usuario"`
+	TermsVersion       string    `json:"version_terminos"`
+	AcceptedAt         time.Time `json:"fecha_aceptacion"`
+	PromoEmail         bool      `json:"promociones_correo"`
 }
 
 // ProfileResponse es el perfil propio. Nunca lleva password_hash, telefono_hash ni google_id.
 type ProfileResponse struct {
 	ID              string              `json:"id"`
 	Name            string              `json:"nombre"`
+	Username        *string             `json:"nombre_usuario"`
 	Email           string              `json:"correo"`
 	EmailVerified   bool                `json:"correo_verificado"`
 	PhotoURL        string              `json:"foto_url"`
@@ -236,7 +240,13 @@ func preferencesResponse(p usuarios.Preferences) PreferencesResponse {
 	return out
 }
 
-func privacyResponse(p usuarios.Privacy) PrivacyResponse { return PrivacyResponse(p) }
+func privacyResponse(p usuarios.Privacy) PrivacyResponse {
+	return PrivacyResponse{
+		Location: p.Location, Learning: p.Learning, Mood: p.Mood, SensitiveData: p.SensitiveData, UsageData: p.UsageData,
+		PhoneSearchable: p.PhoneSearchable, UsernameSearchable: p.SearchableByUsername(),
+		TermsVersion: p.TermsVersion, AcceptedAt: p.AcceptedAt, PromoEmail: p.PromoEmail,
+	}
+}
 
 func profileResponse(u usuarios.User) ProfileResponse {
 	roles := u.Roles
@@ -249,6 +259,9 @@ func profileResponse(u usuarios.User) ProfileResponse {
 		Preferences: preferencesResponse(u.Preferences), Privacy: privacyResponse(u.Privacy),
 		PhoneRegistered: u.PhoneHash != "", Points: u.Points, Level: u.Level, StreakWeeks: u.StreakWeeks,
 		Status: u.Status, DeleteAt: u.DeleteAt, Version: u.Version, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
+	}
+	if u.Username != "" {
+		out.Username = &u.Username
 	}
 	if u.City != nil {
 		out.City = &CityResponse{ID: u.City.ID.Hex(), Name: u.City.Name}

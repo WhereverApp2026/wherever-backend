@@ -25,6 +25,7 @@ var rules = map[string]validator.Func{
 	"e164":     validE164,
 	"hhmm":     validHHMM,
 	"objectid": validObjectID,
+	"username": validUsername,
 }
 
 // Formatos de las reglas propias (hoja A1).
@@ -38,7 +39,14 @@ var (
 	e164Pattern     = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
 	hhmmPattern     = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 	objectIDPattern = regexp.MustCompile(`^[0-9a-f]{24}$`)
+	usernamePattern = regexp.MustCompile(`^[a-z0-9_]{3,20}$`)
 )
+
+// reservedUsernames no se pueden tomar: suplantarían a la plataforma o a su personal (nv-34).
+var reservedUsernames = map[string]bool{
+	"admin": true, "administrador": true, "wherever": true, "soporte": true, "ayuda": true,
+	"root": true, "sistema": true, "moderador": true, "oficial": true, "api": true, "null": true,
+}
 
 // Política de contraseña (hojas A1 y J1): 8 caracteres o más con al menos una letra y un
 // número. El tope evita hashear entradas enormes con Argon2id.
@@ -106,6 +114,7 @@ var messages = map[string]string{ // #nosec G101 -- mensajes de validación, no 
 	"e164":       "debe estar en formato internacional, p. ej. +5215512345678",
 	"hhmm":       "debe tener el formato HH:MM",
 	"objectid":   "no es un identificador válido",
+	"username":   "debe tener de 3 a 20 caracteres: minúsculas, números o guion bajo, y no estar reservado",
 	"url":        "no es una URL válida",
 	"gtefield":   "debe ser mayor o igual que el mínimo",
 	"unique":     "tiene elementos repetidos",
@@ -156,4 +165,11 @@ func validHHMM(fl validator.FieldLevel) bool { return hhmmPattern.MatchString(fl
 
 func validObjectID(fl validator.FieldLevel) bool {
 	return objectIDPattern.MatchString(fl.Field().String())
+}
+
+// validUsername acepta 3 a 20 minúsculas, números o guion bajo que no estén reservados. Solo
+// minúsculas: así el índice único ya es único sin importar mayúsculas.
+func validUsername(fl validator.FieldLevel) bool {
+	name := fl.Field().String()
+	return usernamePattern.MatchString(name) && !reservedUsernames[name]
 }
