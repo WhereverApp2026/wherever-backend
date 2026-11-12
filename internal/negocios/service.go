@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
@@ -25,6 +26,8 @@ type Service struct {
 	newQR func() (string, error)
 	now   func() time.Time
 	emb   Embeddings
+	// cursor firma la paginación de GET /lugares (nv-17).
+	cursor *pagination.Signer
 }
 
 // Embeddings rehace los vectores de significado desactualizados (nv-50). Si falla, la

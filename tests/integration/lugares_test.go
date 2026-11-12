@@ -245,9 +245,15 @@ func TestLugares_PriceOrderWithCursor(t *testing.T) {
 }
 
 func TestLugares_ValidationErrors(t *testing.T) {
-	_, app := lugaresEnv(t)
-	status, _ := listPage(t, app, url.Values{"orden": {"calificacion"}, "limite": {"1"}})
+	env, app := lugaresEnv(t)
+	insertPlaces(t, env, []placeSpec{{slug: "uno"}, {slug: "dos"}})
+	status, first := listPage(t, app, url.Values{"orden": {"calificacion"}, "limite": {"1"}})
 	require.Equal(t, http.StatusOK, status)
+	require.NotEmpty(t, first.NextCursor)
+	other, err := pagination.NewSigner([]byte("otra_llave_de_pruebas_para_cursores_no_usar_0790"))
+	require.NoError(t, err)
+	foreign, err := other.Encode(pagination.Cursor{ID: bson.NewObjectID().Hex(), Sort: "calificacion:4.5", Scope: "lugares:x"})
+	require.NoError(t, err)
 
 	cases := map[string]url.Values{
 		"distancia sin ubicación": {"orden": {"distancia"}},
@@ -258,9 +264,11 @@ func TestLugares_ValidationErrors(t *testing.T) {
 		"latitud inválida":        {"lat": {"91"}, "lng": {"0"}},
 		"orden desconocido":       {"orden": {"popularidad"}},
 		"cursor ilegible":         {"cursor": {"no-es-cursor"}},
-		"cursor de otro orden": {"orden": {"precio"}, "cursor": {pagination.Encode(pagination.Cursor{
-			ID: bson.NewObjectID().Hex(), Sort: "calificacion:4.5",
-		})}},
+		// nv-17: el cursor firmado queda atado al orden y a los filtros de su búsqueda.
+		"cursor de otro orden":    {"orden": {"precio"}, "limite": {"1"}, "cursor": {first.NextCursor}},
+		"cursor de otra búsqueda": {"orden": {"calificacion"}, "precio_max": {"2"}, "limite": {"1"}, "cursor": {first.NextCursor}},
+		"cursor de otra llave":    {"cursor": {foreign}},
+		"cursor alterado":         {"orden": {"calificacion"}, "limite": {"1"}, "cursor": {first.NextCursor[:len(first.NextCursor)-2] + "AA"}},
 	}
 	for name, q := range cases {
 		t.Run(name, func(t *testing.T) {

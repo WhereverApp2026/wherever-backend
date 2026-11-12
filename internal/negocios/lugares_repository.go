@@ -28,6 +28,7 @@ type listParams struct {
 	Order   string
 	After   *listCursor
 	Limit   int
+	Scope   string // ámbito del cursor firmado (nv-17); no va a MongoDB
 }
 
 // sortKey es el campo de cada orden y su dirección; `_id` desempata siempre ascendente.

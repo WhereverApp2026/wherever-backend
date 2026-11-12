@@ -94,7 +94,10 @@ func ifMatch(c *fiber.Ctx) (int, error) {
 	return version, nil
 }
 
+// sendProfile: el ETag de versión es para If-Match (nv-05); datos del usuario, sin caché
+// ni 304 (nv-17).
 func sendProfile(c *fiber.Ctx, p ProfileResponse) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
 	c.Set(fiber.HeaderETag, `"`+strconv.Itoa(p.Version)+`"`)
 	return c.JSON(p)
 }

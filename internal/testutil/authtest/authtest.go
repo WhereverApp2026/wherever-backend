@@ -38,6 +38,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
@@ -130,7 +131,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	authRepo := auth.NewRepository(client.DB())
 	cities := ciudades.NewService(ciudades.NewRepository(client.DB()))
 	businessRepo := negocios.NewRepository(client.DB())
-	businesses := negocios.NewService(businessRepo, users, log)
+	cursor, err := pagination.NewSigner(cfg.CursorHMACKey)
+	require.NoError(t, err)
+	businesses := negocios.NewService(businessRepo, users, log).WithCursor(cursor)
 	modelo := iatest.Nuevo()
 	iaUses := ia.NewRegistroMongo(client.DB())
 	// El doble va detrás de la guardia real (tope, caché y límites contra Redis y usos_ia).
@@ -152,7 +155,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	planRepo := planes.NewRepository(client.DB())
 	planPrivacy := planes.NewPrivacy(planRepo)
 	graph := grafo.NewQueue(client.DB(), log)
-	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor)
 	registry := privacidad.NewRegistry()
 	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)

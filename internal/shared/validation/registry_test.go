@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 )
 
 type demoDTO struct {
@@ -66,7 +67,9 @@ func TestPaginationQuery_DefaultsAndPosition(t *testing.T) {
 	require.NoError(t, newValidator(t).Struct(q))
 	assert.Equal(t, 20, q.Limit)
 
-	_, ok, err := q.Position()
+	signer, err := pagination.NewSigner([]byte("solo_para_pruebas_cursor_no_usar_en_entornos_0789"))
+	require.NoError(t, err)
+	_, ok, err := q.Position(signer, "lista")
 	require.NoError(t, err)
 	assert.False(t, ok)
 }

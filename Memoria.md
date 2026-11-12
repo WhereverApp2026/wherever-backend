@@ -330,13 +330,13 @@
 - Proceso: PR 36 se fusionó en `specs-nv-16` después de que esa rama entró a `main`, así que su commit llega a `main` con el PR de nv-20. Revisar la base de un PR apilado antes de fusionarlo.
 
 ## Spec nv-17 — Paginación firmada y validadores HTTP (2026-11-10)
-- Estado: spec revisada y completa, va en la ola 4. Reutiliza `internal/shared/pagination` y `internal/shared/etag` (nv-16); no crea paquetes ni endpoints.
-- Decisión propuesta: firmar el cursor con HMAC-SHA-256 y una llave dedicada `CURSOR_HMAC_KEY` (32+ bytes), no con `JWT_KEY` ni `PHONE_HMAC_KEY`. La clave entra en config, `.env.example` y SSM con la primera lista posterior, no en nv-17: todavía no hay lista que la use y sería una obligatoria sin consumidor. Rotarla invalida los cursores activos; el cliente reinicia en la primera página.
-- Decisión propuesta: el JSON firmado lleva `_id`, `orden` y `ambito`; el service comprueba el ámbito con `PaginationQuery.Position(signer, scope)`. Un cursor de otra ruta, filtro o usuario da 422 `cursor`. El token es firmado, no cifrado: no lleva datos personales.
-- Decisión propuesta: `validation.New` no cambia; la regla `cursor` solo comprueba la forma con `pagination.Valid`. `Position` verifica firma y ámbito y es el único punto que convierte el cursor en posición; no hay estado global.
-- Decisión propuesta: ETag/304 solo en el catálogo público `GET /ciudades/autocompletar` (`public, max-age=60`); `/usuarios/yo` y `/auth/sesiones` llevan `no-store` y nunca 304. El ETag del perfil sigue siendo para `If-Match` (nv-05).
-- Corrección: esto sustituye la decisión de nv-02 del cursor sin firmar. Aunque el service filtre por dueño, la integridad y el ámbito evitan páginas ambiguas y preparan las listas con filtros posteriores.
-- A evitar: creer que el validador verifica la firma (no: la verifica `Position`); agregar `CURSOR_HMAC_KEY` sin consumidor; prometer que el 304 evita la consulta a Mongo (no: la caché es nv-18).
+- Estado (2026-11-12): aprobada e implementada en la rama `claude/nv-17-af35a1`. Local verde (build, vet, Unit, lint, critic, sdd, endpoints); Integration, Security, Database y Contract en el CI del PR. Pendiente del operador: cargar `/wherever/dev/CURSOR_HMAC_KEY` (SecureString, 32+ bytes) antes de desplegar y probar 200/304 y `no-store` por CloudFront.
+- Corrección de drift: la spec suponía que no había lista que migrar, pero `/lugares` (nv-21) y `/planes` (nv-30) ya paginaban sin firma. El usuario aprobó migrarlas aquí, así que `CURSOR_HMAC_KEY` entra ya como obligatoria (config, `.env.example`, `deploy-env.sh`, `nightly.yml`, `testutil.CursorKey`).
+- Decisión: cursor `base64url(JSON{_id,orden,ambito}).base64url(HMAC-SHA-256)`; `hmac.Equal` antes de leer el JSON. `Signer.Scope(nombre, partes…)` usa un HMAC truncado con llave, así el ámbito no deja leer la ubicación ni el id. Lugares: orden, categoría, precio, abierto, radio y lat/lng. Planes: dueño y pestaña.
+- Decisión: un solo `Signer` en `buildBusinesses` (`cmd/api`), inyectado con `WithCursor` en negocios y planes; un service sin `Signer` falla cerrado. `validation.Position(signer, scope, raw)` es el único camino a una posición y da 422 `cursor`; la regla `cursor` del validador solo mira la forma (`pagination.Valid`).
+- Decisión: ETag/304 en `GET /ciudades/autocompletar` con `public, max-age=60` (una sola serialización con el `JSONEncoder` de Fiber); `no-store` en `/usuarios/yo` y `/auth/sesiones`, sin 304.
+- A evitar: probar una ruta pública con `sendWithHeaders` (manda `Bearer` vacío = 401); `max=200` en el `cursor` de un DTO (el firmado mide ~220; se subió a 300); poner datos legibles en el ámbito; agregar otro `if err` en `buildModules` (gocyclo 10) o un tercer chequeo de llave en `Config.validate` (se movieron a `validateKeys`).
+- Efecto: los cursores de `/lugares` y `/planes` emitidos antes del despliegue dan 422; la app reinicia en la primera página. Rotar la llave hace lo mismo.
 
 ## Spec nv-21 — Lista, ficha y mapa de lugares (2026-11-10)
 - Estado (2026-11-10): implementada sobre `main` (ya trae nv-20); falta la firma. Crea `GET /api/v1/lugares`, `/lugares/mapa` y `/lugares/{id}` dentro de `internal/negocios` (sin paquete nuevo ni índices nuevos).
@@ -369,7 +369,7 @@
 - Corrección de drift: la tabla decía 412/428 y 403; se usa 400 sin `If-Match`, 409 con versión vieja y 404 para plan ajeno (no revela que existe), como nv-05. `If-Match` también en las rutas de paradas: cada una cambia la versión del plan.
 - Decisión: toda edición pasa por `Service.edit` (carga del dueño, compara versión, cambia, `Calculadora.Aplicar`, `UpdateIfVersion`). «Reordenar» reparte las mismas horas de llegada en el orden pedido, porque el plan siempre va en orden de llegada (nv-29).
 - Decisión: `fecha` es un día de `America/Mexico_City` (00:00 local guardado en UTC, `negocios.MexicoCity()`); cambiarla o clonar mueve cada parada los mismos días. Clonar crea ids de parada nuevos y no copia reservas ni integrantes.
-- Decisión: pestañas `proximos` (desde hoy, ascendente, por defecto), `pasados` (antes de hoy, descendente) y `guardados` (todos los activos, descendente) con cursor `pestana:fecha` + id; cursor de otra pestaña = 422. Sin firma hasta nv-17.
+- Decisión: pestañas `proximos` (desde hoy, ascendente, por defecto), `pasados` (antes de hoy, descendente) y `guardados` (todos los activos, descendente) con cursor `pestana:fecha` + id; cursor de otra pestaña = 422. Firmado desde nv-17 (ámbito: dueño y pestaña).
 - Decisión: las escrituras pasan por `usuarios.RequireActive` (cuenta en eliminación pendiente = 403); los errores de MongoDB salen como 503 sin texto (podría repetir nombre o notas).
 - A evitar: devolver 403 para un plan ajeno; usar `apperr` como variable de paquete (se crea en cada llamada).
 

@@ -32,6 +32,7 @@ const (
 	MaxAccessTTL            = 15 * time.Minute
 	MaxRefreshTTL           = 30 * 24 * time.Hour
 	MinPhoneKeyBytes        = 32
+	MinCursorKeyBytes       = 32
 	MaxArcoGraceDays        = 30
 	// DefaultJobHour es la madrugada de America/Mexico_City; un servidor que se apaga de noche la cambia.
 	DefaultJobHour     = 3
@@ -89,6 +90,7 @@ const (
 	KeyJWTAccessTTL     = "JWT_ACCESS_TTL"
 	KeyJWTRefreshTTL    = "JWT_REFRESH_TTL"
 	KeyPhoneHMACKey     = "PHONE_HMAC_KEY"
+	KeyCursorHMACKey    = "CURSOR_HMAC_KEY"
 	KeyArcoGraceDays    = "ARCO_DIAS_GRACIA"
 	KeySMTPHost         = "SMTP_HOST"
 	KeySMTPPort         = "SMTP_PORT"
@@ -130,6 +132,7 @@ const (
 
 var requiredKeys = []string{
 	KeyAppEnv, KeyMongoURI, KeyRedisAddr, KeyNeo4jURI, KeyJWTKey, KeyJWTIssuer, KeyJWTAudience, KeyPhoneHMACKey,
+	KeyCursorHMACKey,
 }
 
 var optionalKeys = []string{
@@ -161,6 +164,7 @@ type Config struct {
 	AccessTTL         time.Duration
 	RefreshTTL        time.Duration
 	PhoneHMACKey      []byte
+	CursorHMACKey     []byte
 	ArcoGraceDays     int
 	Mail              Mail
 	CORSAllowedOrigin string
@@ -247,14 +251,15 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	cfg := Config{
-		Env:          getenv(KeyAppEnv),
-		MongoURI:     getenv(KeyMongoURI),
-		RedisAddr:    getenv(KeyRedisAddr),
-		Neo4jURI:     getenv(KeyNeo4jURI),
-		JWTKey:       []byte(getenv(KeyJWTKey)),
-		JWTIssuer:    getenv(KeyJWTIssuer),
-		JWTAudience:  getenv(KeyJWTAudience),
-		PhoneHMACKey: []byte(getenv(KeyPhoneHMACKey)),
+		Env:           getenv(KeyAppEnv),
+		MongoURI:      getenv(KeyMongoURI),
+		RedisAddr:     getenv(KeyRedisAddr),
+		Neo4jURI:      getenv(KeyNeo4jURI),
+		JWTKey:        []byte(getenv(KeyJWTKey)),
+		JWTIssuer:     getenv(KeyJWTIssuer),
+		JWTAudience:   getenv(KeyJWTAudience),
+		PhoneHMACKey:  []byte(getenv(KeyPhoneHMACKey)),
+		CursorHMACKey: []byte(getenv(KeyCursorHMACKey)),
 		Mail: Mail{
 			SMTPHost:     strings.TrimSpace(getenv(KeySMTPHost)),
 			SMTPUser:     getenv(KeySMTPUser),
@@ -357,6 +362,25 @@ func (c *Config) parseFloats(getenv func(string) string) []error {
 	return errs
 }
 
+// validateKeys exige el tamaño mínimo de cada llave y que no sea el marcador de ejemplo.
+func (c Config) validateKeys() []error {
+	var errs []error
+	for _, k := range []struct {
+		name string
+		key  []byte
+		min  int
+	}{
+		{KeyJWTKey, c.JWTKey, MinJWTKeyBytes},
+		{KeyPhoneHMACKey, c.PhoneHMACKey, MinPhoneKeyBytes},
+		{KeyCursorHMACKey, c.CursorHMACKey, MinCursorKeyBytes},
+	} {
+		if len(k.key) < k.min || strings.HasPrefix(string(k.key), jwtKeyPlaceholder) {
+			errs = append(errs, fmt.Errorf("%s debe tener al menos %d bytes y no ser el marcador de ejemplo", k.name, k.min))
+		}
+	}
+	return errs
+}
+
 func (c Config) validate() []error {
 	var errs []error
 	switch c.Env {
@@ -364,12 +388,7 @@ func (c Config) validate() []error {
 	default:
 		errs = append(errs, fmt.Errorf("%s admite solo dev, staging o prod", KeyAppEnv))
 	}
-	if len(c.JWTKey) < MinJWTKeyBytes || strings.HasPrefix(string(c.JWTKey), jwtKeyPlaceholder) {
-		errs = append(errs, fmt.Errorf("%s debe tener al menos %d bytes y no ser el marcador de ejemplo", KeyJWTKey, MinJWTKeyBytes))
-	}
-	if len(c.PhoneHMACKey) < MinPhoneKeyBytes || strings.HasPrefix(string(c.PhoneHMACKey), jwtKeyPlaceholder) {
-		errs = append(errs, fmt.Errorf("%s debe tener al menos %d bytes y no ser el marcador de ejemplo", KeyPhoneHMACKey, MinPhoneKeyBytes))
-	}
+	errs = append(errs, c.validateKeys()...)
 	if err := validateOrigin(c.CORSAllowedOrigin); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", KeyCORSOrigin, err))
 	}

@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 )
 
 // at es una hora local de Ciudad de México. 2026-11-09 es lunes (dia 1).
@@ -73,26 +75,52 @@ func TestHorario_FilterMatchesRule(t *testing.T) {
 }
 
 func TestLugaresCursor_RoundTripAndOrderMismatch(t *testing.T) {
+	signer, err := pagination.NewSigner([]byte("solo_para_pruebas_cursor_no_usar_en_entornos_0789"))
+	require.NoError(t, err)
+	s := (&Service{}).WithCursor(signer)
 	id := bson.NewObjectID()
 	dist := 1234.5678901234
 	row := placeRow{Business: Business{ID: id, AveragePrice: 150, Rating: Calificacion{Promedio: 4.7}}, DistanceM: &dist}
+	enc := func(order string) string {
+		raw, err := s.encodeCursor("lugares:x", order, row)
+		require.NoError(t, err)
+		return raw
+	}
 
-	got, err := decodeCursor(encodeCursor(OrderDistance, row), OrderDistance)
+	got, err := s.decodeCursor("lugares:x", enc(OrderDistance), OrderDistance)
 	require.NoError(t, err)
 	assert.Equal(t, id, got.ID)
 	assert.Equal(t, dist, got.Value)
 
-	got, err = decodeCursor(encodeCursor(OrderPrice, row), OrderPrice)
+	got, err = s.decodeCursor("lugares:x", enc(OrderPrice), OrderPrice)
 	require.NoError(t, err)
 	assert.Equal(t, 150, got.Value)
 
-	_, err = decodeCursor(encodeCursor(OrderRating, row), OrderPrice)
+	_, err = s.decodeCursor("lugares:x", enc(OrderRating), OrderPrice)
 	require.Error(t, err)
-	_, err = decodeCursor("%%%", OrderRating)
+	_, err = s.decodeCursor("lugares:y", enc(OrderRating), OrderRating)
+	require.Error(t, err, "cursor de otra búsqueda")
+	_, err = s.decodeCursor("lugares:x", "%%%", OrderRating)
 	require.Error(t, err)
-	none, err := decodeCursor("", OrderRating)
+	none, err := s.decodeCursor("lugares:x", "", OrderRating)
 	require.NoError(t, err)
 	assert.Nil(t, none)
+}
+
+// El ámbito cambia con el orden, los filtros y la ubicación de la búsqueda.
+func TestLugaresCursor_ScopeFollowsFilters(t *testing.T) {
+	signer, err := pagination.NewSigner([]byte("solo_para_pruebas_cursor_no_usar_en_entornos_0789"))
+	require.NoError(t, err)
+	s := (&Service{}).WithCursor(signer)
+	base := listParams{Order: OrderRating, RadiusM: DefaultRadiusM}
+	a := s.listScope(ListQuery{}, base)
+	assert.Equal(t, a, s.listScope(ListQuery{}, base))
+	assert.NotEqual(t, a, s.listScope(ListQuery{MaxPrice: 2}, base))
+	assert.NotEqual(t, a, s.listScope(ListQuery{Category: "cafe"}, base))
+	near := base
+	near.Near = &geoPoint{Lat: 19.4, Lng: -99.1}
+	assert.NotEqual(t, a, s.listScope(ListQuery{}, near))
+	assert.NotContains(t, s.listScope(ListQuery{}, near), "19.4")
 }
 
 func TestLugares_CellDegreesShrinkWithZoom(t *testing.T) {

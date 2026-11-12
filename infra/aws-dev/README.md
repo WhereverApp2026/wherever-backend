@@ -30,7 +30,7 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 | `MONGO_URI` | cadena de Atlas con la base `wherever` |
 | `REDIS_ADDR` | SecureString: URL `rediss://` de Upstash, tal como la da su consola |
 | `NEO4J_URI` | SecureString: `neo4j+s://` de Aura con usuario y contraseña antes de la arroba |
-| `JWT_KEY`, `PHONE_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local (los nombres exactos: la API no lee `JWT_SECRET` ni `HMAC_SECRET`) |
+| `JWT_KEY`, `PHONE_HMAC_KEY`, `CURSOR_HMAC_KEY` | 32 bytes aleatorios o más, distintos a los de tu `.env` local (los nombres exactos: la API no lee `JWT_SECRET` ni `HMAC_SECRET`) |
 | `JWT_ISSUER`, `JWT_AUDIENCE` | `wherever-api`, `wherever-app` |
 | `TRUSTED_PROXIES` | `172.16.0.0/12` (el balanceador llega desde la VPC; solo de ahí se cree `X-Forwarded-For`) |
 | `TRUSTED_PROXY_HOPS` | `2`: CloudFront y el balanceador; sin este valor, un cliente comparte el límite con los demás (nv-12) |

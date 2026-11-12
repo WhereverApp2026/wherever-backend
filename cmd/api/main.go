@@ -44,6 +44,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -151,8 +152,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
 	businessRepo := negocios.NewRepository(db)
-	businessSvc := negocios.NewService(businessRepo, users, log)
-	if err := withEmbeddings(businessSvc, cfg.IA, redisClient, db, log); err != nil {
+	businessSvc, cursor, err := buildBusinesses(cfg, businessRepo, users, redisClient, db, log)
+	if err != nil {
 		return nil, nil, err
 	}
 	exports := privacidad.NewExports(db)
@@ -161,7 +162,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
-	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue)
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
@@ -224,19 +225,25 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }
 
-// withEmbeddings activa los vectores de negocios al importar (nv-50). Sin IA_EMBEDDINGS_ID o
-// sin llave no hay vectores y todo sigue con el motor de reglas.
-func withEmbeddings(svc *negocios.Service, cfg config.IA, rdb *goredis.Client, db *mongodriver.Database, log *slog.Logger) error {
-	rec, err := embeddings.Armar(cfg, rdb, db, "")
+// buildBusinesses arma el service de negocios con el cursor firmado (nv-17), que también usa
+// planes, y los vectores al importar (nv-50). Sin IA_EMBEDDINGS_ID o sin llave no hay
+// vectores y todo sigue con el motor de reglas.
+func buildBusinesses(cfg config.Config, repo *negocios.Repository, users *usuarios.Repository, rdb *goredis.Client, db *mongodriver.Database, log *slog.Logger) (*negocios.Service, *pagination.Signer, error) {
+	cursor, err := pagination.NewSigner(cfg.CursorHMACKey)
 	if err != nil {
-		return fmt.Errorf("embeddings: %w", err)
+		return nil, nil, fmt.Errorf("cursor: %w", err)
+	}
+	svc := negocios.NewService(repo, users, log).WithCursor(cursor)
+	rec, err := embeddings.Armar(cfg.IA, rdb, db, "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("embeddings: %w", err)
 	}
 	if rec == nil {
 		log.Warn("sin GEMINI_API_KEY o IA_EMBEDDINGS_ID: los negocios no tienen vectores de significado")
-		return nil
+		return svc, cursor, nil
 	}
 	svc.WithEmbeddings(rec)
-	return nil
+	return svc, cursor, nil
 }
 
 // buildSemantica arma la búsqueda por significado (nv-51) con el mismo vectorizador limitado

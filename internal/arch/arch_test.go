@@ -165,6 +165,39 @@ func TestPaginationQuery_InvalidCursorIsValidationError(t *testing.T) {
 	assert.Equal(t, []apperr.FieldError{{Field: "cursor", Message: "cursor inválido"}}, fields)
 }
 
+func cursorSigner(t *testing.T, key string) *pagination.Signer {
+	t.Helper()
+	s, err := pagination.NewSigner([]byte(key))
+	require.NoError(t, err)
+	return s
+}
+
+// Un cursor firmado pasa la forma; Position verifica firma y ámbito y responde 422 cursor.
+func TestPaginationQuery_PositionVerifiesSignatureAndScope(t *testing.T) {
+	v, err := validation.New()
+	require.NoError(t, err)
+	s := cursorSigner(t, "solo_para_pruebas_cursor_no_usar_en_entornos_0789")
+	token, err := s.Encode(pagination.Cursor{ID: "65a1f0c2e4b0a1b2c3d4e5f6", Sort: "a", Scope: "lista:uno"})
+	require.NoError(t, err)
+	q := validation.NewPaginationQuery()
+	q.Cursor = token
+	require.NoError(t, v.Struct(q))
+
+	c, ok, err := q.Position(s, "lista:uno")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "a", c.Sort)
+
+	want := []apperr.FieldError{{Field: "cursor", Message: "cursor inválido"}}
+	_, _, err = q.Position(s, "lista:otra")
+	assert.Equal(t, want, validationFields(t, err), "ámbito ajeno")
+	_, _, err = q.Position(cursorSigner(t, "otra_llave_de_pruebas_para_cursores_no_usar_0790"), "lista:uno")
+	assert.Equal(t, want, validationFields(t, err), "otra llave")
+	q.Cursor = token[:len(token)-2] + "AA"
+	_, _, err = q.Position(s, "lista:uno")
+	assert.Equal(t, want, validationFields(t, err), "firma alterada")
+}
+
 func TestPaginationQuery_LimitRange(t *testing.T) {
 	v, err := validation.New()
 	require.NoError(t, err)

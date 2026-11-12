@@ -22,6 +22,7 @@ import (
 const (
 	SigningKey = "solo_para_pruebas_no_usar_en_ningun_entorno_0123"
 	PhoneKey   = "solo_para_pruebas_hmac_de_telefonos_no_usar_0456"
+	CursorKey  = "solo_para_pruebas_hmac_de_cursores_no_usar_0789"
 	Issuer     = "wherever-api"
 	Audience   = "wherever-app"
 	// DeadAddr no tiene nada escuchando: simula una base caída sin reiniciar contenedores.
@@ -39,6 +40,7 @@ func Config(env string) config.Config {
 		AccessTTL:     config.MaxAccessTTL,
 		RefreshTTL:    config.MaxRefreshTTL,
 		PhoneHMACKey:  []byte(PhoneKey),
+		CursorHMACKey: []byte(CursorKey),
 		ArcoGraceDays: config.MaxArcoGraceDays,
 		Mail: config.Mail{
 			SMTPTLS: config.SMTPTLSStartTLS, SMTPPort: 587, Timeout: 5 * time.Second, Workers: 4, QueueSize: 100,
@@ -58,14 +60,15 @@ func Config(env string) config.Config {
 // Env devuelve un getenv con las claves obligatorias válidas más los cambios dados.
 func Env(overrides map[string]string) func(string) string {
 	values := map[string]string{
-		config.KeyAppEnv:       config.EnvDev,
-		config.KeyMongoURI:     "mongodb://localhost:27017/wherever",
-		config.KeyRedisAddr:    "localhost:6379",
-		config.KeyNeo4jURI:     "neo4j://localhost:7687",
-		config.KeyJWTKey:       SigningKey,
-		config.KeyJWTIssuer:    Issuer,
-		config.KeyJWTAudience:  Audience,
-		config.KeyPhoneHMACKey: PhoneKey,
+		config.KeyAppEnv:        config.EnvDev,
+		config.KeyMongoURI:      "mongodb://localhost:27017/wherever",
+		config.KeyRedisAddr:     "localhost:6379",
+		config.KeyNeo4jURI:      "neo4j://localhost:7687",
+		config.KeyJWTKey:        SigningKey,
+		config.KeyJWTIssuer:     Issuer,
+		config.KeyJWTAudience:   Audience,
+		config.KeyPhoneHMACKey:  PhoneKey,
+		config.KeyCursorHMACKey: CursorKey,
 	}
 	for k, v := range overrides {
 		values[k] = v

@@ -24,7 +24,7 @@ imds_token="$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http:
 instance_id="$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/instance-id)"
 [ -n "$instance_id" ] || { echo "deploy-env: no se pudo leer el id de la instancia" >&2; exit 1; }
 printf 'LOG_REGION=%s\nLOG_STREAM=api-%s\n' "$region" "$instance_id" >> "$tmp"
-for key in APP_ENV MONGO_URI JWT_KEY JWT_ISSUER JWT_AUDIENCE PHONE_HMAC_KEY; do
+for key in APP_ENV MONGO_URI JWT_KEY JWT_ISSUER JWT_AUDIENCE PHONE_HMAC_KEY CURSOR_HMAC_KEY; do
   grep -q "^${key}=" "$tmp" || { echo "deploy-env: falta ${key} en ${path}" >&2; exit 1; }
 done
 mv "$tmp" "$out"

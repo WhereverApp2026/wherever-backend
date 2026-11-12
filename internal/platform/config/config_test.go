@@ -48,18 +48,20 @@ func TestLoad_ShortJWTKeyFails(t *testing.T) {
 
 func TestLoad_RejectsInvalidValues(t *testing.T) {
 	cases := map[string]map[string]string{
-		"APP_ENV desconocido":     {config.KeyAppEnv: "local"},
-		"CORS con comodín":        {config.KeyCORSOrigin: "*"},
-		"CORS con dos orígenes":   {config.KeyCORSOrigin: "https://a.com,https://b.com"},
-		"cuerpo mayor a 10MB":     {config.KeyBodyLimit: "20971520"},
-		"timeout mayor a 60s":     {config.KeyRequestTimeout: "90s"},
-		"rate relajado en prod":   {config.KeyAppEnv: config.EnvProd, config.KeyRateLimitGlobal: "5000"},
-		"entero inválido":         {config.KeyPort: "ochenta"},
-		"access mayor a 15 min":   {config.KeyJWTAccessTTL: "30m"},
-		"refresh mayor a 30 d":    {config.KeyJWTRefreshTTL: "1000h"},
-		"access no positivo":      {config.KeyJWTAccessTTL: "0s"},
-		"llave de teléfono corta": {config.KeyPhoneHMACKey: "corta"},
-		"gracia mayor a 30 días":  {config.KeyArcoGraceDays: "45"},
+		"APP_ENV desconocido":      {config.KeyAppEnv: "local"},
+		"CORS con comodín":         {config.KeyCORSOrigin: "*"},
+		"CORS con dos orígenes":    {config.KeyCORSOrigin: "https://a.com,https://b.com"},
+		"cuerpo mayor a 10MB":      {config.KeyBodyLimit: "20971520"},
+		"timeout mayor a 60s":      {config.KeyRequestTimeout: "90s"},
+		"rate relajado en prod":    {config.KeyAppEnv: config.EnvProd, config.KeyRateLimitGlobal: "5000"},
+		"entero inválido":          {config.KeyPort: "ochenta"},
+		"access mayor a 15 min":    {config.KeyJWTAccessTTL: "30m"},
+		"refresh mayor a 30 d":     {config.KeyJWTRefreshTTL: "1000h"},
+		"access no positivo":       {config.KeyJWTAccessTTL: "0s"},
+		"llave de teléfono corta":  {config.KeyPhoneHMACKey: "corta"},
+		"llave de cursor corta":    {config.KeyCursorHMACKey: "corta"},
+		"llave de cursor marcador": {config.KeyCursorHMACKey: "PLACEHOLDER_MIN_32_BYTES_xxxxxxxxxxxxx"},
+		"gracia mayor a 30 días":   {config.KeyArcoGraceDays: "45"},
 	}
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {
