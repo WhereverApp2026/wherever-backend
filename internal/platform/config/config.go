@@ -114,6 +114,11 @@ const (
 	KeyIAEmbeddingsID   = "IA_EMBEDDINGS_ID"
 	KeyIAEmbLimiteMin   = "IA_EMB_LIMITE_MIN"
 	KeyIAEmbLimiteDia   = "IA_EMB_LIMITE_DIA"
+	KeyAppVersionMinima = "APP_VERSION_MINIMA"
+	KeyAppVersionActual = "APP_VERSION_ACTUAL"
+	KeyTerminosVersion  = "TERMINOS_VERSION"
+	KeyAvisoVersion     = "AVISO_VERSION"
+	KeyMantenimiento    = "MODO_MANTENIMIENTO"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -135,6 +140,7 @@ var optionalKeys = []string{
 	KeyJobHour, KeyHideInternals,
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
 	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
+	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -167,6 +173,7 @@ type Config struct {
 	JobHour           int
 	HideInternals     bool
 	IA                IA
+	VersionApp        VersionApp
 }
 
 // IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
@@ -266,6 +273,7 @@ func Load(getenv func(string) string) (Config, error) {
 		},
 	}
 	errs = append(errs, cfg.parseNumbers(getenv)...)
+	errs = append(errs, cfg.VersionApp.parse(getenv)...)
 	errs = append(errs, cfg.validate()...)
 	if len(errs) > 0 {
 		return Config{}, errors.Join(errs...)

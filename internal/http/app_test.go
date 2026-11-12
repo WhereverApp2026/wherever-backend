@@ -22,6 +22,6 @@ func TestPipeline_ConstitutionalOrder(t *testing.T) {
 
 	assert.Equal(t, []string{
 		"security_headers", "errors", "request_id", "request_timeout", "proxy_headers",
-		"cors", "compress", "rate_limit_global", "rate_limit_writes", "jwt",
+		"cors", "compress", "rate_limit_global", "rate_limit_writes", "version", "jwt",
 	}, names)
 }

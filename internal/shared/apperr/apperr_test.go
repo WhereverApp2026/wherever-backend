@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Los 11 errores tipados de la constitución §5 y su código HTTP.
+// Los 12 errores tipados de la constitución §5 y su código HTTP.
 func TestConstructors_MapToConstitutionStatus(t *testing.T) {
 	cases := map[int]*Error{
 		http.StatusBadRequest:          BadRequest("x"),
@@ -21,6 +21,7 @@ func TestConstructors_MapToConstitutionStatus(t *testing.T) {
 		http.StatusLocked:              Locked("x"),
 		http.StatusTooManyRequests:     RateLimited(30),
 		http.StatusServiceUnavailable:  Unavailable("x"),
+		http.StatusUpgradeRequired:     UpgradeRequired("1.4.0"),
 	}
 	for status, err := range cases {
 		assert.Equal(t, status, err.Kind.Status(), err.Kind.Code())
@@ -38,4 +39,13 @@ func TestUnknownKind_IsInternal(t *testing.T) {
 	assert.Equal(t, KindInternal.DefaultMessage(), unknown.DefaultMessage())
 	_, ok := KindFromStatus(http.StatusTeapot)
 	assert.False(t, ok)
+}
+
+func TestUpgradeAndMaintenance_Messages(t *testing.T) {
+	assert.Equal(t, "actualiza la app a la versión 1.4.0 o superior", UpgradeRequired("1.4.0").Message)
+	assert.Equal(t, "actualizacion_requerida", KindUpgradeRequired.Code())
+	m := Maintenance(60)
+	assert.Equal(t, KindUnavailable, m.Kind)
+	assert.Equal(t, "en mantenimiento", m.Message)
+	assert.Equal(t, 60, m.RetryAfter)
 }

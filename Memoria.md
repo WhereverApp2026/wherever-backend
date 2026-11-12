@@ -306,14 +306,16 @@
 - A evitar: `resultadoDe` con un `switch` por error superaba el gocyclo de 10; ahora es una tabla. Agregar un error nuevo de la guardia es una fila.
 
 ## Spec nv-16 — Versión de la app y mantenimiento (2026-11-09)
-- Estado: spec revisada y completa, en la ola 4 (después de la ruta prioritaria). Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
-- Decisión propuesta: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.
+- Estado (2026-11-12): aprobada por Osmar Reséndiz con la enmienda 1.7.0 e implementada. Local: build, vet, Unit, lint 0, critic, `check_endpoints` y `check_sdd`; el resto lo corre el CI del PR. Falta cargar las cinco claves en `/wherever/dev/` y probar 426, 304 y 503 por CloudFront. Define `GET /api/v1/configuracion` (cinco campos, ETag/304), `X-App-Version` con 426 y `MODO_MANTENIMIENTO` con 503.
+- Decisión: la etapa `version` entra entre `rate_limit_writes` y `jwt`, y el 426 se agrega a `apperr`. Solo actúa sobre `/api/v1/`, para que una ruta inexistente siga dando 404. Exige enmienda de la constitución §4/§5 (1.7.0; la 1.6.0 ya la usó nv-12), actualizar `critic B3` y `TestPipeline_ConstitutionalOrder`. Sin la enmienda, nv-16 no se fusiona.
 - Decisión propuesta: cabecera ausente o ilegible no bloquea; solo un semver numérico válido y menor da 426. Es aviso de compatibilidad, no control de acceso.
 - Decisión propuesta: auth queda exenta del 426 para poder cerrar sesión, refrescar y recuperar la cuenta durante la actualización; `configuracion` queda exenta para que la app sepa qué instalar. En mantenimiento, la configuración sigue en 200/304 y el resto no exento da 503 con `Retry-After: 60`.
 - Decisión propuesta: los valores viven en `APP_VERSION_MINIMA`, `APP_VERSION_ACTUAL`, `TERMINOS_VERSION`, `AVISO_VERSION` y `MODO_MANTENIMIENTO` (Parameter Store en el servidor); se leen al arrancar. El actualizador no reinicia por un cambio de parámetro: encender el mantenimiento es un paso manual por Systems Manager en cada instancia.
 - Decisión propuesta: ETag débil (`W/`), porque la compresión puede mandar el cuerpo en gzip y un ETag fuerte debería cambiar con la codificación.
 - Corrección de drift: la lista del pipeline en la constitución §4 omitía `request_timeout`; la enmienda de nv-16 la deja igual al código real.
 - A evitar: comparar versiones como texto (`1.10.0` quedaría antes que `1.9.0`); crear otro tipo de error con estado 503 para mantenimiento (`KindFromStatus` recorre un mapa y el resultado no sería determinista).
+- Lección: `configuracion.NewService` no devuelve error (la respuesta solo tiene textos y un booleano): con un `if err` más, `buildModules` pasaba el gocyclo de 10.
+- Lección: los scripts de Python en Windows escriben CRLF si no se abre con `newline=''`; un `.sh` con CRLF rompe bash en el CI. Los gates que usan `git` (`critic`, `check_sdd`) no corren dentro de Docker en un worktree: correrlos en el host y `check_endpoints` (necesita Go) en Docker.
 
 ## Spec nv-20 — Negocios aprobados, categorías y carga semilla (2026-11-10)
 - Estado (2026-11-10): implementada en la rama `nv-20`, con las cinco suites verdes, lint, gosec y Semgrep en 0. Falta la firma y cargar el CSV real de 20 a 30 negocios del piloto (T21): todavía no existe. Crea `negocios` (A2/A5), `POST /api/v1/admin/negocios/importar` y `GET /api/v1/categorias`; corre antes que nv-17 y nv-18 (ola 4).
