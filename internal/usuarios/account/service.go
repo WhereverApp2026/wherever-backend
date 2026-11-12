@@ -5,9 +5,6 @@ package account
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"math"
@@ -307,11 +304,7 @@ func (s *Service) SetPhone(ctx context.Context, claims *middleware.Claims, phone
 	return s.userError(err)
 }
 
-func (s *Service) phoneHash(phone string) string {
-	mac := hmac.New(sha256.New, s.phoneKey)
-	mac.Write([]byte(phone))
-	return hex.EncodeToString(mac.Sum(nil))
-}
+func (s *Service) phoneHash(phone string) string { return usuarios.HashPhone(s.phoneKey, phone) }
 
 // SetMode cambia el modo; `negocio` exige el rol comerciante (403).
 func (s *Service) SetMode(ctx context.Context, claims *middleware.Claims, mode string) (ModeResponse, error) {

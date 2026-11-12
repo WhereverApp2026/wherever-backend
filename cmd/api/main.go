@@ -23,6 +23,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
@@ -169,6 +170,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("usuarios: %w", err)
 	}
+	people, err := personas.NewService(users, cfg.PhoneHMACKey, log)
+	if err != nil {
+		return nil, nil, err
+	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
 	assistant, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses}, businessRepo, users, asistente.NewDescartes(db), log)
@@ -183,6 +188,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
+		personas.NewHandler(people).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
 }

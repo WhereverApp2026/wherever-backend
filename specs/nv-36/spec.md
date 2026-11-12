@@ -8,10 +8,11 @@ Enviar, aceptar, rechazar, eliminar y bloquear amistades, con la lista ordenada 
 2. `GET /amistades?estado=` lista amigos (por actividad reciente, con búsqueda por nombre), solicitudes recibidas y enviadas, con el contador de pendientes.
 3. `PATCH /amistades/{id}` acepta o rechaza; rechazar no avisa a quien envió.
 4. `DELETE /amistades/{id}` elimina al amigo o cancela una solicitud; `POST /amistades/{id}/bloquear` bloquea.
+5. Límite por usuario: 20 solicitudes por hora en `POST /amistades` (viene de nv-35; `Limiter.WindowUser`).
 
 ## Diseño
 - **Colección `amistades`:** `de`, `para`, `estado` (`pendiente`, `aceptada`, `bloqueada`), `par` (los dos ids ordenados, índice único), `creada_en`, `actualizada_en`.
-- **Bloqueo:** quien bloquea desaparece de las búsquedas y solicitudes de la otra persona; la relación queda como `bloqueada` sin avisar.
+- **Bloqueo:** quien bloquea desaparece de las búsquedas (`GET /personas/buscar` de nv-35: hay que filtrar los ids con relación `bloqueada`) y solicitudes de la otra persona; la relación queda como `bloqueada` sin avisar.
 - **Notificaciones:** los eventos `solicitud_amistad` y `amistad_aceptada` quedan definidos, pero no se guardan ni se envían mientras nv-40 y nv-41 estén pospuestas. La app ve las solicitudes con el contador de pendientes.
 - **Eliminar cuenta:** el `Purger` de `nv-05` borra las amistades del usuario.
 
@@ -27,6 +28,7 @@ Enviar, aceptar, rechazar, eliminar y bloquear amistades, con la lista ordenada 
 ## Tests
 - `Integration/Amistades 12` con MongoDB real: solicitud, solicitud cruzada, aceptar, rechazar sin aviso, repetida, a sí mismo, bloquear, eliminar, listas por estado y orden.
 - `Concurrencia 3`: dos solicitudes cruzadas simultáneas dejan un solo documento.
+- De nv-35: quien bloqueó no aparece en `GET /personas/buscar`; nadie acepta una solicitud ajena (403/404); 21.ª solicitud en la hora = 429.
 
 ## Criterios
 - La lista de amigos y las solicitudes coinciden entre ambas personas.

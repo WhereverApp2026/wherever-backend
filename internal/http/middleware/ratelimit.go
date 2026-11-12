@@ -67,6 +67,22 @@ func (l *Limiter) Window(policy string, limit int, window time.Duration) fiber.H
 	}
 }
 
+// WindowUser limita a `limit` peticiones por ventana fija y por usuario del token
+// (`rate:{politica}:{usuario}`). Va después de RequireAuth; sin claims cuenta por IP.
+func (l *Limiter) WindowUser(policy string, limit int, window time.Duration) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		subject := ClientIP(c)
+		if claims, ok := ClaimsFrom(c); ok {
+			subject = claims.Subject
+		}
+		count, resetIn := l.hit(c.UserContext(), "rate:"+policy+":"+subject, window)
+		if count > int64(limit) {
+			return apperr.RateLimited(retryAfterSeconds(resetIn))
+		}
+		return c.Next()
+	}
+}
+
 // Concurrent limita las escrituras simultáneas (POST/PUT/PATCH/DELETE) por sujeto.
 func (l *Limiter) Concurrent(policy string, limit int) fiber.Handler {
 	return func(c *fiber.Ctx) error {
