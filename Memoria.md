@@ -423,6 +423,13 @@
 - Decisión: `privacidad.buscable_por_usuario` es `*bool` con `omitempty`; ausente = encendido (`Privacy.SearchableByUsername`). Para buscar en Mongo (nv-35) usa `{$ne: false}`, nunca `true`.
 - Contract: `nombre_usuario` y `buscable_por_usuario` entran en `yo_200`, `yo_patch_200` (el PATCH del contrato ahora manda `nombre_usuario`), `privacidad_200`, `cancelar_eliminacion_200` y `exportacion_descargar_200`.
 
+## NV-35 — Buscar personas (2026-11-11)
+- Estado: rama `nv-35` desde `main`, PR contra `main`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde; Integration (`personas_test.go`) y Security (`personas_security_test.go`) las corre el CI.
+- Drift corregido: el límite de 20 solicitudes por hora, ocultar por bloqueo entre personas y "no aceptar solicitud ajena" pasan a nv-36 (no existe `amistades` todavía). nv-36 debe filtrar `GET /personas/buscar` con las relaciones `bloqueada`.
+- Decisión: `internal/personas` con consultas en `internal/usuarios/search.go`; `usuarios.HashPhone` es el único HMAC del teléfono (account lo usa también). `q` = teléfono si empieza con `+` o trae ≥10 dígitos (10 = +52); si no, prefijo de usuario (minúsculas, `@` opcional). Solo `activo`, nunca quien busca, sin correo ni teléfono en la respuesta.
+- Decisión: `Limiter.WindowUser` cuenta por `sub` del token (`rate:personas_buscar:{usuario}`, 30/h); va después de `RequireAuth`. nv-36 lo reutiliza para las solicitudes.
+- A evitar: escribir archivos con Python en Windows sin `newline=''` los deja en CRLF y gofmt los marca.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
