@@ -1,7 +1,7 @@
 ---
-version: 1.6.0
+version: 1.7.0
 ratified: 2026-10-28
-last_amended: 2026-11-05
+last_amended: 2026-11-12
 status: borrador (pendiente de firma del revisor)
 source_of_truth: .specify/memory/constitution.md
 mirror: ./constitution.md
@@ -56,10 +56,10 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 - Capas `handler → service → repository`; el handler no toca la base y el repository no conoce HTTP. Módulos por funcionalidad en `internal/<modulo>/`.
 - Rutas `/api/v1/<recurso>`, v1 estricta; sin versión → 404.
 - JSON `snake_case`. Errores `{ codigo, mensaje, campos[], detalle?, traza_id }`; `traza_id` = `request_id` (cabecera `X-Request-ID`).
-- Pipeline fijo: `SecurityHeaders outermost → Recover/ErrorHandler → RequestID → ProxyHeaders → CORS 1 origen → Compresión → RateLimiter antes de Auth → JWT → Roles → Handlers`.
+- Pipeline fijo: `SecurityHeaders outermost → Recover/ErrorHandler → RequestID → RequestTimeout → ProxyHeaders → CORS 1 origen → Compresión → RateLimiter global → RateLimiter de escrituras → Version → JWT → Roles (por ruta) → Handlers`. `Version` solo actúa sobre `/api/v1/` no exentas: `X-App-Version` válida y menor a la mínima da `426`, el modo mantenimiento da `503` con `Retry-After`; una cabecera ausente o ilegible no bloquea (nv-16).
 - Health: `/health` (liveness, siempre 200 `{estado:"ok", version}`, sin consultar bases y fuera del límite global, para que el balanceador no gaste Redis) y `/ready` (check real de MongoDB, Redis y Neo4j con 1 s máximo cada una; responde `{estado, dependencias}`; 503 si cae MongoDB o Neo4j; Redis caído = `degraded` con 200). Ambos fuera de `/api/v1`; `/ready` es para la red interna y el balanceador.
 - OpenAPI solo en desarrollo.
-- DTOs validados; códigos `200/201/202/204/400/401/403/404/408/409/410/422/423/429/500/503`. `400` = petición mal formada, `422` = falla de validación o regla de negocio, `410` = vencido, `423` = bloqueado. Paginación por cursor `?cursor=&limite=` → `PageResult{items, siguiente_cursor, limite}` (por defecto 20, máx. 50; `siguiente_cursor` vacío = no hay más).
+- DTOs validados; códigos `200/201/202/204/304/400/401/403/404/408/409/410/422/423/426/429/500/503`. `400` = petición mal formada, `422` = falla de validación o regla de negocio, `410` = vencido, `423` = bloqueado, `426` = versión de la app menor a la mínima, `304` = `If-None-Match` vigente con ETag débil. Paginación por cursor `?cursor=&limite=` → `PageResult{items, siguiente_cursor, limite}` (por defecto 20, máx. 50; `siguiente_cursor` vacío = no hay más).
 - Versionado: un cambio que rompa la app crea `/api/v2` sin retirar `/api/v1`.
 
 ## 5. Código y API
@@ -73,7 +73,7 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 - Texto para buscar en campos `*_normalizado` (minúsculas, sin acentos).
 - Índices con prefijo por tipo: `ux_` único, `ix_` normal o compuesto, `ttl_` TTL, `geo_` geoespacial, `txt_` texto.
 - Complejidad `gocyclo ≤ 10` por función. `golangci-lint` con `gosec` y `errcheck` como error.
-- Sin `recover` ad-hoc en handlers. Errores tipados en `internal/shared/apperr`: `BadRequest→400, Unauthorized→401, Forbidden→403, NotFound→404, Timeout→408, Conflict→409, Gone→410, Validation→422, Locked→423, RateLimited→429, Unavailable→503`, cualquier otro → 500.
+- Sin `recover` ad-hoc en handlers. Errores tipados en `internal/shared/apperr`: `BadRequest→400, Unauthorized→401, Forbidden→403, NotFound→404, Timeout→408, Conflict→409, Gone→410, Validation→422, Locked→423, RateLimited→429, Unavailable→503, UpgradeRequired→426`, cualquier otro → 500.
 - Índices de MongoDB solo por script idempotente (`scripts/indexes`), con nombres sin fechas.
 
 ## 6. Seguridad DevSecOps
@@ -126,3 +126,4 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 | 1.4.0 | 2026-11-06 | La infraestructura de desarrollo se crea y elimina con scripts versionados, sin claves de AWS en GitHub (nv-14) |
 | 1.5.0 | 2026-11-06 | Compresión en el pipeline, sin comprimir lo que lleva tokens (nv-12) |
 | 1.6.0 | 2026-11-06 | Dos instancias detrás de balanceador y CloudFront en desarrollo, con HTTPS del certificado de CloudFront (nv-12) |
+| 1.7.0 | 2026-11-12 | Etapa `version` entre los límites y JWT, solo sobre `/api/v1/`; códigos `426` y `304` (ETag débil); lista del pipeline igual al código, con `request_timeout` (nv-16) |

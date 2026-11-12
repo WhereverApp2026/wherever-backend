@@ -12,6 +12,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
@@ -24,7 +25,7 @@ import (
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
-// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36) y la cola `grafo_pendiente` (nv-52).
+// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52) y `busquedas_recientes` (nv-22).
 var expected = map[string][]string{
 	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
 	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
@@ -37,6 +38,7 @@ var expected = map[string][]string{
 	recomendaciones.Collection:    {"_id_", "ux_usuario_negocio"},
 	amistades.Collection:          {"_id_", "ux_par", "ix_de_estado", "ix_para_estado"},
 	grafo.Collection:              {"_id_", "ix_disponible_en"},
+	busquedas.Collection:          {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {

@@ -38,6 +38,9 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 | `JOB_HOUR` | `21`: la instancia se apaga a las 22:00; a las 03:00 el trabajo de privacidad nunca correría (nv-15) |
 | `HIDE_INTERNALS` | `true`: servidor público, sin `detalle` ni sondas (nv-15) |
 | `CORS_ALLOWED_ORIGIN`, `SMTP_*`, `MAIL_FROM`, `APP_LINK_BASE` | opcionales |
+| `APP_VERSION_MINIMA`, `APP_VERSION_ACTUAL` | String, semver `X.Y.Z`; la mínima en `0.0.0` no bloquea a nadie y nunca es mayor que la actual (nv-16) |
+| `TERMINOS_VERSION`, `AVISO_VERSION` | String; `2026-10` y `2026-11` hoy (nv-16) |
+| `MODO_MANTENIMIENTO` | String, `false`; ver [Mantenimiento](#mantenimiento-spec-nv-16) |
 
 En Git Bash (Windows) antepón `MSYS_NO_PATHCONV=1`; si no, la ruta `/wherever/dev/...` se convierte en una ruta de Windows.
 
@@ -80,6 +83,14 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw cloudfront_url)/ready"
 - **Rotar credenciales.** Cambia la clave en la consola del servicio y carga el parámetro con `--overwrite`. La API la toma al instalar la siguiente imagen; para aplicarla antes, entra por Systems Manager y corre en `/opt/wherever`, en cada instancia, `./deploy-env.sh /wherever/dev/` y `docker compose --env-file .env --env-file imagen.env up -d --no-deps api`.
 - **Diagnóstico.** Con una clave de Redis mala, la API registra `i/o timeout`, no `WRONGPASS`. Compruébala con `redis-cli --tls -u` desde un contenedor. Copia la cadena de Upstash en Connect → TCP; no la armes a mano.
 - **Esquema y datos de demostración.** `make siembra`, con `NEO4J_URI` en el entorno. Es idempotente e imprime el tamaño del grafo.
+
+## Mantenimiento (spec nv-16)
+Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: true` y toda ruta bajo `/api/v1/` que no sea ping, configuración ni auth responde 503 con `Retry-After: 60`. La API lo lee al arrancar y el actualizador no reinicia por un cambio de parámetro, así que se aplica a mano:
+
+1. `MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east-2 --name /wherever/dev/MODO_MANTENIMIENTO --type String --value true --overwrite`.
+2. Por Systems Manager, en una instancia y luego en la otra, en `/opt/wherever`: `./deploy-env.sh /wherever/dev/` y `docker compose --env-file .env --env-file imagen.env up -d --no-deps api`. Mientras tanto conviven las dos respuestas.
+3. Comprobar por CloudFront: una ruta de negocio da 503 y `/api/v1/configuracion` da 200 con `mantenimiento: true`.
+4. Para apagarlo, los mismos pasos con `false`. Igual para subir `APP_VERSION_MINIMA`.
 
 ## Observabilidad (spec nv-13)
 - **Logs:** CloudWatch, grupo `/wherever/dev/api`, 14 días. Un flujo `api-<instancia>` y otro `despliegues-<instancia>`. También siguen en `docker logs`. Detalle en `docs/observabilidad.md`.

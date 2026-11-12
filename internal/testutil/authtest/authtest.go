@@ -18,8 +18,10 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
+	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
@@ -68,6 +70,7 @@ type Env struct {
 	IA              *iatest.Modelo           // doble del proveedor de IA (nv-31)
 	Vectores        *iatest.ServidorVectores // servidor local de embeddings (nv-51)
 	Semantica       *semantica.Service
+	Busquedas       *busquedas.Service
 	Sugerencias     *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
 	Mail            *mailer.Memory
 	Log             *slog.Logger
@@ -142,6 +145,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	sem := semanticaDe(t, client, rdb, vectores.URL, pesos, log)
 	assistant.WithSemantica(sem)
 	recoRepo := recomendaciones.NewRepository(client.DB())
+	searchRepo := busquedas.NewRepository(client.DB())
+	searches := busquedas.NewService(searchRepo, log)
 	friendRepo := amistades.NewRepository(client.DB())
 	exports := privacidad.NewExports(client.DB())
 	planRepo := planes.NewRepository(client.DB())
@@ -149,7 +154,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	graph := grafo.NewQueue(client.DB(), log)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -157,6 +162,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
@@ -175,13 +181,16 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo,
-		Vectores: vectores, Semantica: sem, Sugerencias: suggestions,
+		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
-			semantica.NewHandler(sem, v), // antes que negocios: /lugares/:id
+			configuracion.NewHandler(configuracion.NewService(cfg.VersionApp)),
+			// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
+			semantica.NewHandler(sem, v),
+			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),

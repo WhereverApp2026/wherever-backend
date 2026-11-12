@@ -20,6 +20,8 @@ const (
 	KindLocked
 	KindRateLimited
 	KindUnavailable
+	// KindUpgradeRequired va al final para no mover los valores anteriores (nv-16).
+	KindUpgradeRequired
 )
 
 type kindInfo struct {
@@ -41,6 +43,7 @@ var kinds = map[Kind]kindInfo{
 	KindLocked:       {http.StatusLocked, "bloqueado", "recurso bloqueado"},
 	KindRateLimited:  {http.StatusTooManyRequests, "demasiadas_peticiones", "demasiadas peticiones, intenta más tarde"},
 	KindUnavailable:  {http.StatusServiceUnavailable, "no_disponible", "servicio no disponible"},
+	KindUpgradeRequired: {http.StatusUpgradeRequired, "actualizacion_requerida", "actualiza la app"},
 }
 
 // Status devuelve el código HTTP del tipo; un tipo desconocido es 500.
@@ -144,3 +147,15 @@ func RateLimited(retryAfter int) *Error {
 
 // Unavailable: dependencia caída, respuesta fail-closed (503).
 func Unavailable(message string) *Error { return newError(KindUnavailable, message) }
+
+// UpgradeRequired: la app es más vieja que la versión mínima (426, nv-16).
+func UpgradeRequired(minima string) *Error {
+	return newError(KindUpgradeRequired, "actualiza la app a la versión "+minima+" o superior")
+}
+
+// Maintenance: modo mantenimiento (503) con `Retry-After` en segundos (nv-16).
+func Maintenance(retryAfter int) *Error {
+	e := Unavailable("en mantenimiento")
+	e.RetryAfter = retryAfter
+	return e
+}
