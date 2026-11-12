@@ -12,6 +12,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
 // listCursor es el cursor ya decodificado: el valor del campo de orden del último elemento
@@ -21,9 +22,24 @@ type listCursor struct {
 	Value any
 }
 
-// encodeCursor guarda `orden:valor` en el campo `orden` del cursor compartido, así un
-// cursor de otro orden se rechaza.
-func encodeCursor(order string, row placeRow) string {
+// WithCursor fija la llave del cursor firmado (nv-17).
+func (s *Service) WithCursor(signer *pagination.Signer) *Service {
+	s.cursor = signer
+	return s
+}
+
+// listScope ata el cursor al orden y a los filtros de la búsqueda (nv-17): uno de otra
+// búsqueda es 422. El hash lleva llave, así la ubicación no se lee del cursor.
+func (s *Service) listScope(q ListQuery, p listParams) string {
+	parts := []string{p.Order, q.Category, strconv.Itoa(q.MaxPrice), strconv.FormatBool(q.OpenNow), strconv.FormatFloat(p.RadiusM, 'g', -1, 64)}
+	if p.Near != nil {
+		parts = append(parts, strconv.FormatFloat(p.Near.Lat, 'g', -1, 64), strconv.FormatFloat(p.Near.Lng, 'g', -1, 64))
+	}
+	return s.cursor.Scope("lugares", parts...)
+}
+
+// encodeCursor guarda `orden:valor` en el campo `orden` del cursor compartido.
+func (s *Service) encodeCursor(scope, order string, row placeRow) (string, error) {
 	var value string
 	switch order {
 	case OrderDistance:
@@ -35,14 +51,14 @@ func encodeCursor(order string, row placeRow) string {
 	default:
 		value = strconv.FormatFloat(row.Rating.Promedio, 'g', -1, 64)
 	}
-	return pagination.Encode(pagination.Cursor{ID: row.ID.Hex(), Sort: order + ":" + value})
+	return s.cursor.Encode(pagination.Cursor{ID: row.ID.Hex(), Sort: order + ":" + value, Scope: scope})
 }
 
-func decodeCursor(raw, order string) (*listCursor, error) {
+func (s *Service) decodeCursor(scope, raw, order string) (*listCursor, error) {
 	invalid := apperr.Validation("cursor inválido", apperr.FieldError{Field: "cursor", Message: "cursor inválido"})
-	c, ok, err := pagination.Decode(raw)
+	c, ok, err := validation.Position(s.cursor, scope, raw)
 	if err != nil {
-		return nil, invalid
+		return nil, err
 	}
 	if !ok {
 		return nil, nil
@@ -93,7 +109,9 @@ func (s *Service) List(ctx context.Context, q ListQuery) (pagination.PageResult[
 	next := ""
 	if len(rows) > params.Limit {
 		rows = rows[:params.Limit]
-		next = encodeCursor(params.Order, rows[len(rows)-1])
+		if next, err = s.encodeCursor(params.Scope, params.Order, rows[len(rows)-1]); err != nil {
+			return pagination.PageResult[PlaceItem]{}, apperr.Unavailable("servicio no disponible")
+		}
 	}
 	now := s.now()
 	items := make([]PlaceItem, 0, len(rows))
@@ -125,7 +143,8 @@ func (s *Service) listParams(q ListQuery) (listParams, error) {
 		return listParams{}, err
 	}
 	p.Match = match
-	after, err := decodeCursor(q.Cursor, p.Order)
+	p.Scope = s.listScope(q, p)
+	after, err := s.decodeCursor(p.Scope, q.Cursor, p.Order)
 	if err != nil {
 		return listParams{}, err
 	}

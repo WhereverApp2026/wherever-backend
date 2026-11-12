@@ -85,6 +85,7 @@ func (h *Handler) listSessions(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	c.Set(fiber.HeaderCacheControl, "no-store") // datos del usuario: sin caché ni 304 (nv-17)
 	return c.JSON(sessions)
 }
 

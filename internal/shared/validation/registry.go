@@ -132,8 +132,7 @@ func message(fe validator.FieldError) string {
 }
 
 func validCursor(fl validator.FieldLevel) bool {
-	_, _, err := pagination.Decode(fl.Field().String())
-	return err == nil
+	return pagination.Valid(fl.Field().String())
 }
 
 func validPassword(fl validator.FieldLevel) bool {

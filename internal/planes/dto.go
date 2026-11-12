@@ -75,7 +75,7 @@ type CloneRequest struct {
 // ListQuery es GET /planes.
 type ListQuery struct {
 	Pestana string `query:"pestana" validate:"oneof=proximos guardados pasados"`
-	Cursor  string `query:"cursor" validate:"omitempty,max=200,cursor"`
+	Cursor  string `query:"cursor" validate:"omitempty,max=300,cursor"`
 	Limit   int    `query:"limite" validate:"min=1,max=50"`
 }
 

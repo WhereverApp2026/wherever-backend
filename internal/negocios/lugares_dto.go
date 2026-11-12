@@ -34,7 +34,7 @@ type ListQuery struct {
 	Lng      *float64 `query:"lng" validate:"omitempty,longitude"`
 	RadiusM  int      `query:"radio_m" validate:"omitempty,min=1,max=20000"`
 	Order    string   `query:"orden" validate:"omitempty,oneof=distancia calificacion precio"`
-	Cursor   string   `query:"cursor" validate:"omitempty,max=200"`
+	Cursor   string   `query:"cursor" validate:"omitempty,max=300,cursor"`
 	Limit    int      `query:"limite" validate:"min=1,max=50"`
 }
 

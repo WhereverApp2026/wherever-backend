@@ -141,17 +141,26 @@ func TestPlanes_ReordenarRepartaLasHoras(t *testing.T) {
 }
 
 func TestPlanes_CursorDeOtraPestana(t *testing.T) {
+	signer, err := pagination.NewSigner([]byte("solo_para_pruebas_cursor_no_usar_en_entornos_0789"))
+	require.NoError(t, err)
 	id := bson.NewObjectID()
-	raw := pagination.Encode(pagination.Cursor{ID: id.Hex(), Sort: TabPast + ":2026-11-01T06:00:00Z"})
-	pos, err := position(TabPast, raw)
+	owner := bson.NewObjectID().Hex()
+	past, upcoming := signer.Scope("planes", owner, TabPast), signer.Scope("planes", owner, TabUpcoming)
+	raw, err := signer.Encode(pagination.Cursor{ID: id.Hex(), Sort: TabPast + ":2026-11-01T06:00:00Z", Scope: past})
+	require.NoError(t, err)
+	pos, err := position(signer, past, TabPast, raw)
 	require.NoError(t, err)
 	assert.Equal(t, id, pos.ID)
 
-	_, err = position(TabUpcoming, raw)
+	_, err = position(signer, upcoming, TabUpcoming, raw)
 	assertField(t, err, "cursor")
-	_, err = position(TabPast, pagination.Encode(pagination.Cursor{ID: id.Hex(), Sort: TabPast + ":ayer"}))
+	_, err = position(signer, signer.Scope("planes", bson.NewObjectID().Hex(), TabPast), TabPast, raw)
+	assertField(t, err, "cursor") // cursor de otra cuenta
+	bad, err := signer.Encode(pagination.Cursor{ID: id.Hex(), Sort: TabPast + ":ayer", Scope: past})
+	require.NoError(t, err)
+	_, err = position(signer, past, TabPast, bad)
 	assertField(t, err, "cursor")
-	pos, err = position(TabPast, "")
+	pos, err = position(signer, past, TabPast, "")
 	require.NoError(t, err)
 	assert.Nil(t, pos)
 }

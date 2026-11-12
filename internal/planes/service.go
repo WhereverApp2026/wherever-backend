@@ -11,6 +11,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
 // Service resuelve los endpoints de planes (nv-30). Solo el dueño ve y edita su plan: toda
@@ -20,6 +21,8 @@ type Service struct {
 	calc  *Calculadora
 	graph Graph
 	now   func() time.Time
+	// cursor firma la paginación de GET /planes (nv-17).
+	cursor *pagination.Signer
 }
 
 // Graph recibe al dueño de un plan que cambió para reflejarlo en Neo4j (nv-52). Es
@@ -35,6 +38,12 @@ func (noGraph) Touch(context.Context, bson.ObjectID) error { return nil }
 // NewService recibe el repositorio y la calculadora por constructor.
 func NewService(repo *Repository, calc *Calculadora) *Service {
 	return &Service{repo: repo, calc: calc, graph: noGraph{}, now: time.Now}
+}
+
+// WithCursor fija la llave del cursor firmado (nv-17).
+func (s *Service) WithCursor(signer *pagination.Signer) *Service {
+	s.cursor = signer
+	return s
 }
 
 // WithGraph refleja los planes guardados en el grafo (nv-52).
@@ -257,7 +266,9 @@ func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagina
 	}
 	page := s.tab(q.Pestana)
 	page.Owner, page.Limit = ownerID, q.Limit
-	page.After, err = position(q.Pestana, q.Cursor)
+	// El ámbito ata el cursor al dueño y a la pestaña: uno de otra cuenta o pestaña es 422.
+	scope := s.cursor.Scope("planes", ownerID.Hex(), q.Pestana)
+	page.After, err = position(s.cursor, scope, q.Pestana, q.Cursor)
 	if err != nil {
 		return pagination.PageResult[Plan]{}, err
 	}
@@ -269,7 +280,10 @@ func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagina
 	if len(rows) > q.Limit {
 		rows = rows[:q.Limit]
 		last := rows[len(rows)-1]
-		next = pagination.Encode(pagination.Cursor{ID: last.ID.Hex(), Sort: q.Pestana + ":" + last.Fecha.UTC().Format(time.RFC3339Nano)})
+		next, err = s.cursor.Encode(pagination.Cursor{ID: last.ID.Hex(), Sort: q.Pestana + ":" + last.Fecha.UTC().Format(time.RFC3339Nano), Scope: scope})
+		if err != nil {
+			return pagination.PageResult[Plan]{}, errStore()
+		}
 	}
 	return pagination.NewPageResult(rows, next, q.Limit), nil
 }
@@ -289,11 +303,11 @@ func (s *Service) tab(name string) PageQuery {
 }
 
 // position lee el cursor; uno de otra pestaña o manipulado es 422.
-func position(tab, raw string) (*Position, error) {
+func position(signer *pagination.Signer, scope, tab, raw string) (*Position, error) {
 	bad := invalid("cursor", "cursor inválido")
-	c, ok, err := pagination.Decode(raw)
+	c, ok, err := validation.Position(signer, scope, raw)
 	if err != nil {
-		return nil, bad
+		return nil, err
 	}
 	if !ok {
 		return nil, nil
