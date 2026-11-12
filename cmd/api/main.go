@@ -14,10 +14,12 @@ import (
 	_ "time/tzdata" // el trabajo nocturno usa America/Mexico_City aunque la imagen no traiga zonas
 
 	goredis "github.com/redis/go-redis/v9"
+	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
@@ -136,6 +138,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
 	businessRepo := negocios.NewRepository(db)
 	businessSvc := negocios.NewService(businessRepo, users, log)
+	if err := withEmbeddings(businessSvc, cfg.IA, redisClient, db, log); err != nil {
+		return nil, nil, err
+	}
 	exports := privacidad.NewExports(db)
 	iaUses := ia.NewRegistroMongo(db)
 
@@ -185,6 +190,21 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 	}
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
+}
+
+// withEmbeddings activa los vectores de negocios al importar (nv-50). Sin IA_EMBEDDINGS_ID o
+// sin llave no hay vectores y todo sigue con el motor de reglas.
+func withEmbeddings(svc *negocios.Service, cfg config.IA, rdb *goredis.Client, db *mongodriver.Database, log *slog.Logger) error {
+	rec, err := embeddings.Armar(cfg, rdb, db, "")
+	if err != nil {
+		return fmt.Errorf("embeddings: %w", err)
+	}
+	if rec == nil {
+		log.Warn("sin GEMINI_API_KEY o IA_EMBEDDINGS_ID: los negocios no tienen vectores de significado")
+		return nil
+	}
+	svc.WithEmbeddings(rec)
+	return nil
 }
 
 // iaDeps son las bases que usa ia.Guardia: Redis (gasto, caché y límites) y usos_ia.

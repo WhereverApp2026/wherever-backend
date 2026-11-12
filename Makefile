@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades mail-dev lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
+.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades embeddings mail-dev lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -76,6 +76,10 @@ indexes:
 # Esquema y datos de demostración de Neo4j (nv-11): idempotente, lee NEO4J_URI de .env.
 siembra:
 	go run ./scripts/siembra
+
+# Vectores de significado de los negocios (nv-50): solo los desactualizados; TODOS=1 rehace todos.
+embeddings:
+	go run ./scripts/recalcular-embeddings $(if $(TODOS),-todos,)
 
 # Catálogo de ciudades: make importar-ciudades ARCHIVO=ciudades.csv (idempotente).
 importar-ciudades:

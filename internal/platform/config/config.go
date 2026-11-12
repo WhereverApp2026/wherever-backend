@@ -59,7 +59,14 @@ const (
 	maxIALimiteMin      = 15
 	defaultIALimiteDia  = 400
 	maxIALimiteDia      = 500
-	jwtKeyPlaceholder   = "PLACEHOLDER"
+	// Embeddings (nv-50): textos por minuto y por día. AI Studio no publica la cuota gratuita de
+	// gemini-embedding-2; los máximos son los de gemini-embedding-001 (100 y 1000) y el valor por
+	// defecto su 80 %. Se ajustan al leer la cuota del proyecto en AI Studio.
+	defaultIAEmbLimiteMin = 80
+	maxIAEmbLimiteMin     = 100
+	defaultIAEmbLimiteDia = 800
+	maxIAEmbLimiteDia     = 1000
+	jwtKeyPlaceholder     = "PLACEHOLDER"
 )
 
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
@@ -104,6 +111,9 @@ const (
 	KeyIALimiteHora     = "IA_LIMITE_HORA"
 	KeyIALimiteMin      = "IA_LIMITE_MIN"
 	KeyIALimiteDia      = "IA_LIMITE_DIA"
+	KeyIAEmbeddingsID   = "IA_EMBEDDINGS_ID"
+	KeyIAEmbLimiteMin   = "IA_EMB_LIMITE_MIN"
+	KeyIAEmbLimiteDia   = "IA_EMB_LIMITE_DIA"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -124,7 +134,7 @@ var optionalKeys = []string{
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 	KeyJobHour, KeyHideInternals,
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
-	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia,
+	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -176,10 +186,18 @@ type IA struct {
 	// (hora del Pacífico).
 	LimiteMin int
 	LimiteDia int
+	// EmbeddingsID es el modelo de embeddings (nv-50); usa la misma llave.
+	EmbeddingsID string
+	// EmbLimiteMin y EmbLimiteDia son los textos vectorizados de toda la app por minuto y por día.
+	EmbLimiteMin int
+	EmbLimiteDia int
 }
 
 // Enabled indica si hay proveedor de IA configurado.
 func (i IA) Enabled() bool { return i.GeminiAPIKey != "" && i.ModeloID != "" }
+
+// EmbeddingsEnabled indica si hay modelo de embeddings configurado (nv-50).
+func (i IA) EmbeddingsEnabled() bool { return i.GeminiAPIKey != "" && i.EmbeddingsID != "" }
 
 // Mail es la configuración del correo saliente (nv-06). Sin SMTPHost no hay servidor: dev y
 // staging usan el LogMailer; producción no arranca.
@@ -244,6 +262,7 @@ func Load(getenv func(string) string) (Config, error) {
 		IA: IA{
 			GeminiAPIKey: strings.TrimSpace(getenv(KeyGeminiAPIKey)),
 			ModeloID:     strings.TrimSpace(getenv(KeyIAModeloID)),
+			EmbeddingsID: strings.TrimSpace(getenv(KeyIAEmbeddingsID)),
 		},
 	}
 	errs = append(errs, cfg.parseNumbers(getenv)...)
@@ -274,6 +293,8 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyIALimiteHora, &c.IA.LimiteHora, defaultIALimiteHora},
 		{KeyIALimiteMin, &c.IA.LimiteMin, defaultIALimiteMin},
 		{KeyIALimiteDia, &c.IA.LimiteDia, defaultIALimiteDia},
+		{KeyIAEmbLimiteMin, &c.IA.EmbLimiteMin, defaultIAEmbLimiteMin},
+		{KeyIAEmbLimiteDia, &c.IA.EmbLimiteDia, defaultIAEmbLimiteDia},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -532,8 +553,13 @@ func (i IA) validate() []error {
 	errs = append(errs, validateLimit(KeyIALimiteHora, i.LimiteHora, maxIALimiteHora)...)
 	errs = append(errs, validateLimit(KeyIALimiteMin, i.LimiteMin, maxIALimiteMin)...)
 	errs = append(errs, validateLimit(KeyIALimiteDia, i.LimiteDia, maxIALimiteDia)...)
+	errs = append(errs, validateLimit(KeyIAEmbLimiteMin, i.EmbLimiteMin, maxIAEmbLimiteMin)...)
+	errs = append(errs, validateLimit(KeyIAEmbLimiteDia, i.EmbLimiteDia, maxIAEmbLimiteDia)...)
 	if strings.ContainsAny(i.ModeloID, "/?#: ") {
 		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-3.5-flash-lite)", KeyIAModeloID))
+	}
+	if strings.ContainsAny(i.EmbeddingsID, "/?#: ") {
+		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-embedding-2)", KeyIAEmbeddingsID))
 	}
 	return errs
 }

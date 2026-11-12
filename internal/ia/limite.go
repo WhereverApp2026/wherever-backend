@@ -114,12 +114,17 @@ func NewLimitadorRedis(rdb *goredis.Client) *LimitadorRedis { return &LimitadorR
 
 // Tomar suma uno a cada ventana; la vida solo se pone cuando la llave nace.
 func (l *LimitadorRedis) Tomar(ctx context.Context, ventanas ...Ventana) ([]Cuenta, error) {
+	return l.Sumar(ctx, 1, ventanas...)
+}
+
+// Sumar suma n a cada ventana con los mismos 3 comandos por ventana (INCRBY en lugar de INCR).
+func (l *LimitadorRedis) Sumar(ctx context.Context, n int64, ventanas ...Ventana) ([]Cuenta, error) {
 	pipe := l.rdb.Pipeline()
 	incr := make([]*goredis.IntCmd, len(ventanas))
 	vida := make([]*goredis.DurationCmd, len(ventanas))
 	for i, v := range ventanas {
 		pipe.SetNX(ctx, v.Llave, 0, v.Vida)
-		incr[i] = pipe.Incr(ctx, v.Llave)
+		incr[i] = pipe.IncrBy(ctx, v.Llave, n)
 		vida[i] = pipe.PTTL(ctx, v.Llave)
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
