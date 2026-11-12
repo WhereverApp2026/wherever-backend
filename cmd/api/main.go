@@ -20,6 +20,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
+	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -159,9 +160,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planPrivacy := planes.NewPrivacy(planRepo)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue)
 	recoRepo := recomendaciones.NewRepository(db)
+	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph.queue), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grafo.NewPrivacy(graph.queue), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -169,6 +171,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
 	registry.RegisterExporter(recomendaciones.NewPrivacy(recoRepo))
+	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
@@ -200,7 +203,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		account.NewHandler(accountSvc, validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
-		semantica.NewHandler(sem, validator), // antes que negocios: /lugares/:id
+		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
+		semantica.NewHandler(sem, validator),
+		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),

@@ -2,6 +2,7 @@
   "status": 200,
   "body": {
     "amistades": [],
+    "busquedas_recientes": [],
     "descartes_usuario": [],
     "planes": [],
     "sesiones": [

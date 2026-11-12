@@ -397,6 +397,13 @@
 - A evitar: olvidar `scripts/routes/main.go` al agregar un módulo (`check_endpoints` no ve sus rutas); leer el cuerpo con `readAll` dentro de los argumentos de `require` y luego decodificarlo (ya se consumió).
 - Pendiente: sin prueba Contract propia (el golden se genera con `CONTRACT_CAPTURE=1` y contenedores).
 
+## Spec nv-22 — Búsqueda y autocompletar (2026-11-12)
+- Estado (2026-11-12): implementada en la rama `nv-22` sobre `main`; local en verde (build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`); Integration, Security, Database y Contract las corre el CI. Falta la firma. Paquete `internal/busquedas`: `GET /lugares/autocompletar`, `GET /lugares/buscar` (auth opcional) y `GET/DELETE /busquedas/recientes`.
+- Corrección del hallazgo: el índice de texto de MongoDB no tolera errores y Atlas Search no corre en Testcontainers. Primero `$text` en español; si no llena la página, se compara en Go contra nombre, etiquetas y giro de hasta 1000 aprobados (Damerau: 1 letra de 4 a 7, 2 de 8 o más; prefijos con error; todas las palabras) y se marca `aproximada: true`. Con mucho más catálogo: trigramas o Atlas Search.
+- Decisión: `q` se reduce a letras y dígitos (`busquedas.Palabras`) antes de `$text`; el autocompletar escapa con `regexp.QuoteMeta`. Así ningún operador ni comodín llega a MongoDB.
+- Decisión propuesta (privacidad): `busquedas_recientes` se guarda al buscar con sesión sin pedir `aprendizaje_personalizado` (historial visible y borrable); 10 por usuario, 90 días (TTL), en ARCO. Sin comandos nuevos de Redis.
+- A evitar: registrar `busquedas` después de `negocios` (`/lugares/:id` atiende «buscar»); devolver o registrar el error de MongoDB (puede repetir lo escrito).
+
 ## NV-33 — Respaldo, cancelación y «otra idea» (2026-11-11)
 - Estado: rama `nv-33` desde `origin/nv-32` con `origin/nv-28` fusionada (trae nv-27 y nv-28); PR contra `nv-32`, se reduce al fusionar #44 y #46. Build, vet, Unit, lint y las cuatro suites con contenedor en verde en local. Falta la medición con IA real (20 frases) y la firma.
 - Decisión: toda falla de la IA (tiempo, 429, falla, inválida, bloqueada, tope, gasto o límites desconocidos, límite global o del usuario, IA apagada) responde el motor de reglas con `fuente: reglas` y aviso. Ya no hay 429 ni 503 por la IA. El respaldo no llama al modelo: no cuenta contra el tope ni los límites.
