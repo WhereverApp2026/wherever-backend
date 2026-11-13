@@ -103,6 +103,14 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 - **Sin variables nuevas:** la región sale del entorno y las credenciales del rol de la instancia.
 - **Costo:** US$0.001 por imagen; ver `specs/nv-42/spec.md`.
 
+## Imágenes: S3 y CloudFront (spec nv-44)
+- **Recursos** (`imagenes.tf`): bucket `wherever-dev-imagenes-<cuenta>` con el acceso público bloqueado, sin ACL, cifrado SSE-S3 y sin listar; segunda distribución de CloudFront con control de acceso de origen y caché de un año. CloudFront solo lee `i/`; `cuarentena/` nunca sale y S3 la vacía a las 24 h (hasta unas 48 h por su ciclo diario).
+- **Rol de la instancia** (`aws_iam_role_policy.imagenes`): `s3:PutObject`, `GetObject` y `DeleteObject` solo en `cuarentena/*` e `i/*`; el boundary repite ese techo (`ImagenesDelProyecto`).
+- **Aplicar** (antes de nv-45 en AWS): un administrador crea una versión nueva de `wherever-dev-boundary` con el JSON del repo y crea la política `wherever-dev-deployer-imagenes` (`iam/wherever-dev-deployer-imagenes.json`) adjunta a `wherever-deployer` (la del deployer ya no admite más caracteres). Espera a que IAM propague y corre `crear.sh`; agrega recursos y no recrea las instancias.
+- **Variables para nv-45** en `/wherever/dev/`: `IMAGENES_BUCKET` (salida `imagenes_bucket`) e `IMAGENES_URL` (salida `imagenes_url`). Las define nv-45 como opcionales fuera de prod; esta spec no cambia la API.
+- **`destruir.sh`** vacía y borra el bucket (`force_destroy`): las imágenes se pierden y la URL de imágenes cambia al recrear.
+- **Costo:** dentro de la capa gratuita de CloudFront (1 TB y 10 millones de peticiones al mes); S3 unos centavos al mes para el piloto.
+
 ## Pendiente: correo
 La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
 
@@ -135,7 +143,7 @@ Pasos manuales tras recrear; `crear.sh` también los imprime:
 2. **SNS:** confirma el correo *Subscription Confirmation*; se pierde al destruir.
 3. **URL:** cambia al recrear, porque la distribución de CloudFront es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
 
-**`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch.
+**`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch y las imágenes del bucket.
 
 Antes de las 21:50 o después de las 08:00: fuera de horario, la instancia nueva se apaga o el actualizador no instala.
 La IP elástica se libera con el destroy; una suelta cobra. Los parámetros de `/wherever/dev/` no los crea Terraform: bórralos con `aws ssm delete-parameter` si ya no sirven.

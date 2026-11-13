@@ -13,6 +13,16 @@ output "cloudfront_url" {
   value       = "https://${aws_cloudfront_distribution.api.domain_name}"
 }
 
+output "imagenes_bucket" {
+  description = "Bucket privado de imágenes (nv-44); IMAGENES_BUCKET en Parameter Store."
+  value       = aws_s3_bucket.imagenes.id
+}
+
+output "imagenes_url" {
+  description = "URL de CloudFront de las imágenes (nv-44); IMAGENES_URL en Parameter Store. Cambia si se recrea."
+  value       = "https://${aws_cloudfront_distribution.imagenes.domain_name}"
+}
+
 output "alb_dns" {
   description = "Balanceador; no responde directo desde internet."
   value       = aws_lb.api.dns_name
@@ -40,5 +50,5 @@ output "param_path" {
 
 output "verificar" {
   description = "Comprobación de solo lectura del Free Tier y la exposición."
-  value       = "./scripts/verificar.sh --profile ${var.profile} --region ${var.region} --instance ${aws_instance.api["a"].id} --url https://${aws_cloudfront_distribution.api.domain_name}"
+  value       = "./scripts/verificar.sh --profile ${var.profile} --region ${var.region} --instance ${aws_instance.api["a"].id} --url https://${aws_cloudfront_distribution.api.domain_name} --imagenes https://${aws_cloudfront_distribution.imagenes.domain_name}"
 }
