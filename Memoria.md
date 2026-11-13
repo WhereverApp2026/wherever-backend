@@ -565,6 +565,14 @@
 - Medido: ~1,4 µs por cifrar y descifrar un valor.
 - A evitar: varios heredocs `<<'EOF'` en un mismo comando de Bash con acentos y comillas; fallan con «unexpected EOF». Usar Write para los documentos.
 
+## NV-49 — Cifrar datos sensibles (2026-11-12)
+- Estado: rama `nv-49` desde `nv-48`, PR contra `main`. Falta la firma, cargar `DATA_KEYS` en `/wherever/dev/` y correr la migración en ese entorno.
+- Decisión: la capa vive en `usuarios.Repository` (`WithCipher`): `Create` y `apply` cifran, `findOne` y `apply` descifran. `account`, `recomendaciones`, `asistente` y la exportación no cambian.
+- Decisión: `User.BirthDate` (`bson:"-"`) queda en claro para el código y `BirthDateStored` (`any`) va a la base: texto cifrado o la fecha de antes. `mayor_de_edad: true` al registrar.
+- Decisión: un valor que no abre = `ErrCipher` (503); nunca se devuelve el texto cifrado como dato. Un valor copiado de otra cuenta no abre (dato asociado con el id).
+- Migración: `make migrar-cifrado` (cuenta) y `make migrar-cifrado APLICAR=1`; idempotente, también rota, y no sube `version`.
+- A evitar: construir un `usuarios.Repository` de producción sin `WithCipher` (leería el texto cifrado como alergias y el filtro de nv-23 dejaría solo `["ninguno"]`); hoy son `cmd/api` (`users` y `startVotes`) y `authtest`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
