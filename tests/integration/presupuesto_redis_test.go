@@ -105,3 +105,33 @@ func TestPresupuestoRedis_CacheDeFicha(t *testing.T) {
 	assert.Equal(t, 2, fallo-base, "fallo: GET + SET")
 	assert.Equal(t, 1, acierto-base, "acierto: GET")
 }
+
+// nv-64: las dos políticas nuevas (`personas_codigo`, `errores_reporte`) cuestan lo mismo que
+// la ventana por usuario de `personas_buscar` (nv-35): una ruta igual más esa ventana.
+func TestPresupuestoRedis_VentanasPorUsuarioNV64(t *testing.T) {
+	env := authEnv(t)
+	env.ClearRateLimits(t)
+	app := env.App()
+	access := registerHTTP(t, app, "presupuesto64@example.com")
+
+	read := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, access).StatusCode)
+	})
+	write := commandsOf(t, func() {
+		resp := sendJSON(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"datos_sensibles": false}, access)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+	window := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/personas/buscar?q=nadie", nil, access).StatusCode)
+	}) - read
+	require.Positive(t, window)
+	t.Logf("ventana por usuario: %d comandos", window)
+
+	assert.Equal(t, read+window, commandsOf(t, func() {
+		assert.Equal(t, http.StatusNotFound, sendJSON(t, app, http.MethodGet, "/api/v1/personas/codigo/ZZZZZZZZ", nil, access).StatusCode)
+	}), "GET /personas/codigo: lectura autenticada + ventana")
+	assert.Equal(t, write+window, commandsOf(t, func() {
+		resp := sendJSON(t, app, http.MethodPost, "/api/v1/errores", map[string]string{"modulo": "pagos", "mensaje": "falló", "version": "1.4.0"}, access)
+		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+	}), "POST /errores: escritura autenticada + ventana")
+}

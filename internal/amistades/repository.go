@@ -214,6 +214,16 @@ func (r *Repository) BlockedWith(ctx context.Context, me bson.ObjectID) ([]bson.
 	return out, nil
 }
 
+// Relation es el estado de la relación entre me y other ("" si no hay) y si la creó me (en
+// `bloqueada`, si me bloqueó). Una sola consulta por `par` cubre los dos sentidos (nv-64).
+func (r *Repository) Relation(ctx context.Context, me, other bson.ObjectID) (status string, mine bool, err error) {
+	f, found, err := r.FindByPair(ctx, me, other)
+	if err != nil || !found {
+		return "", false, err
+	}
+	return f.Status, f.From == me, nil
+}
+
 // ListByUser devuelve todas las relaciones de me (exportación ARCO).
 func (r *Repository) ListByUser(ctx context.Context, me bson.ObjectID) ([]Friendship, error) {
 	return r.find(ctx, bson.D{participant(me)}, 0)

@@ -98,12 +98,15 @@ func invalid(msg string) error {
 type Users interface {
 	SearchByUsernamePrefix(ctx context.Context, prefix string, exclude []bson.ObjectID, limit int64) ([]usuarios.User, error)
 	FindByPhoneSearchable(ctx context.Context, phoneHash string, exclude []bson.ObjectID) (usuarios.User, bool, error)
+	FindByFriendCode(ctx context.Context, code string) (usuarios.User, error)
 }
 
 // Blocks da las personas con relación `bloqueada` con el usuario, en cualquier sentido
-// (amistades, nv-36): no aparecen en su búsqueda.
+// (amistades, nv-36): no aparecen en su búsqueda. Relation es la relación con una persona
+// (nv-64): estado ("" si no hay) y si la creó quien pregunta.
 type Blocks interface {
 	BlockedWith(ctx context.Context, userID bson.ObjectID) ([]bson.ObjectID, error)
+	Relation(ctx context.Context, me, other bson.ObjectID) (status string, mine bool, err error)
 }
 
 // Service busca personas.
@@ -154,4 +157,49 @@ func (s *Service) Search(ctx context.Context, subject, raw string) (SearchRespon
 		return SearchResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
 	}
 	return newSearchResponse(found), nil
+}
+
+// ParseFriendCode pasa el código a mayúsculas y lo valida contra el alfabeto y largo de
+// `usuarios` (8 de 23456789ABCDEFGHJKMNPQRSTUVWXYZ); otro formato es 422.
+func ParseFriendCode(raw string) (string, error) {
+	code := strings.ToUpper(strings.TrimSpace(raw))
+	if !usuarios.ValidFriendCode(code) {
+		return "", apperr.Validation("código inválido",
+			apperr.FieldError{Field: "codigo", Message: "el código de amigo tiene 8 letras o números"})
+	}
+	return code, nil
+}
+
+// ByFriendCode devuelve el perfil público de quien tiene el código y su relación con quien
+// pregunta. Código inexistente, cuenta no activa, el propio código y un bloqueo en cualquier
+// sentido dan el mismo 404. `buscable_por_usuario` no aplica: compartir el QR es explícito.
+func (s *Service) ByFriendCode(ctx context.Context, subject, raw string) (CodeResponse, error) {
+	self, err := bson.ObjectIDFromHex(subject)
+	if err != nil {
+		return CodeResponse{}, apperr.Unauthorized("credenciales inválidas")
+	}
+	code, err := ParseFriendCode(raw)
+	if err != nil {
+		return CodeResponse{}, err
+	}
+	notFound := apperr.NotFound("no encontramos a nadie con ese código")
+	u, err := s.users.FindByFriendCode(ctx, code)
+	if errors.Is(err, usuarios.ErrNotFound) {
+		return CodeResponse{}, notFound
+	}
+	if err != nil {
+		return CodeResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+	}
+	if u.ID == self || u.Status != usuarios.StatusActive {
+		return CodeResponse{}, notFound
+	}
+	status, mine, err := s.blocks.Relation(ctx, self, u.ID)
+	if err != nil {
+		return CodeResponse{}, apperr.Unavailable("servicio no disponible").WithDetail(err.Error())
+	}
+	rel, visible := relationOf(status, mine)
+	if !visible {
+		return CodeResponse{}, notFound
+	}
+	return CodeResponse{Person: newPerson(u), Relation: rel}, nil
 }

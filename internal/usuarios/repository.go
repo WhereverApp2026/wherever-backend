@@ -257,6 +257,24 @@ func (r *Repository) FindByID(ctx context.Context, id bson.ObjectID) (User, erro
 	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}})
 }
 
+// FindByFriendCode busca por `codigo_amigo` con ux_codigo_amigo (QR de amistad, nv-64).
+func (r *Repository) FindByFriendCode(ctx context.Context, code string) (User, error) {
+	return r.findOne(ctx, bson.D{{Key: "codigo_amigo", Value: code}})
+}
+
+// ValidFriendCode dice si code tiene el largo y el alfabeto de los códigos de amigo.
+func ValidFriendCode(code string) bool {
+	if len(code) != friendCodeLen {
+		return false
+	}
+	for _, r := range code {
+		if !strings.ContainsRune(friendCodeAlphabet, r) {
+			return false
+		}
+	}
+	return true
+}
+
 // EmailExists responde con el índice único ux_correo.
 func (r *Repository) EmailExists(ctx context.Context, email string) (bool, error) {
 	n, err := r.col.CountDocuments(ctx, bson.D{{Key: "correo", Value: NormalizeEmail(email)}}, options.Count().SetLimit(1))
