@@ -48,8 +48,19 @@ type Group struct {
 	// CodeHash es el SHA-256 del código del enlace (nv-38); el código nunca se guarda.
 	CodeHash    string     `bson:"codigo_hash,omitempty"`
 	CodeExpires *time.Time `bson:"codigo_vence,omitempty"`
-	CreatedAt   time.Time  `bson:"creado_en"`
-	UpdatedAt   time.Time  `bson:"actualizado_en"`
+	// LastMessage es el último mensaje del chat (nv-57); solo lo ven los confirmados.
+	LastMessage *LastMessage `bson:"ultimo_mensaje,omitempty"`
+	CreatedAt   time.Time    `bson:"creado_en"`
+	UpdatedAt   time.Time    `bson:"actualizado_en"`
+}
+
+// LastMessage resume el último mensaje del chat: texto recortado, autor (vacío en avisos del
+// sistema) y fecha. Lo escribe chat con SetLastMessage y lo limpia al borrar ese mensaje.
+type LastMessage struct {
+	MessageID bson.ObjectID  `bson:"mensaje_id"`
+	Text      string         `bson:"texto"`
+	AuthorID  *bson.ObjectID `bson:"autor_id,omitempty"`
+	At        time.Time      `bson:"fecha"`
 }
 
 // Member devuelve al integrante userID, si está.
