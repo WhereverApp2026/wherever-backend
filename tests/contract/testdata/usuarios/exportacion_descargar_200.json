@@ -6,6 +6,10 @@
     "consentimientos": [],
     "descartes_usuario": [],
     "grupos": [],
+    "mensajes": {
+      "mensajes": [],
+      "reacciones": []
+    },
     "moderacion": [],
     "notificaciones": {
       "avisos": [],
