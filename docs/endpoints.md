@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -55,7 +55,7 @@
 | GET | `/api/v1/lugares/{id}/amigos` → `{total, amigos[{id, nombre, nombre_usuario, foto_url}], degradado}`; mis amigos (aceptados en Mongo) con un plan activo que incluye el negocio, según Neo4j; `amigos` muestra hasta 3; negocio no público o id mal formado = 404; Neo4j caído o lento (3 s) = `total: 0` con `degradado: true`; `Cache-Control: no-store` | JWT | global | 200/401/403/404 | nv-53 (J2) |
 | POST | `/api/v1/planes` → `{nombre, fecha (día), personas, presupuesto, movilidad, origen?, paradas[{negocio_id, llega, minutos, precio, nota?}]}` (1 a 6 paradas); responde el plan calculado con `ETag` | JWT | global | 201/400/401/403/422 | nv-30 (A4) |
 | GET | `/api/v1/planes` con `?pestana=&cursor=&limite=`; `pestana` es `proximos` (por defecto), `guardados` o `pasados`; solo los planes activos de quien llama | JWT | global | 200/401/422 | nv-30 (A4) |
-| GET | `/api/v1/planes/{id}` → plan con `traslados`, `costo_total`, `costo_por_persona` y `version`; ajeno o borrado = 404 | JWT, dueño | global | 200/401/404 | nv-30 (A4) |
+| GET | `/api/v1/planes/{id}` → plan con `traslados`, `costo_total`, `costo_por_persona` y `version`; también lo leen los integrantes invitados o confirmados de su grupo (nv-37), que no lo editan; ajeno o borrado = 404 | JWT, dueño o integrante | global | 200/401/404 | nv-30 (A4) |
 | PATCH | `/api/v1/planes/{id}` con `If-Match` → cambia nombre, fecha (mueve las paradas), personas, presupuesto o movilidad | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | DELETE | `/api/v1/planes/{id}` con `If-Match` → borrado lógico | JWT, dueño | global | 204/400/401/403/404/409 | nv-30 (A4) |
 | POST | `/api/v1/planes/{id}/clonar` → `{fecha, nombre?}`; plan nuevo con las mismas horas en el día nuevo, sin reservas ni integrantes | JWT, dueño | global | 201/401/403/404/422 | nv-30 (A4) |
@@ -63,6 +63,14 @@
 | PUT | `/api/v1/planes/{id}/paradas/orden` con `If-Match` → `{orden[ids]}`; reparte las mismas horas de llegada en el orden pedido | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | PATCH | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → mueve la parada o cambia minutos, precio o nota | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
 | DELETE | `/api/v1/planes/{id}/paradas/{parada_id}` con `If-Match` → quita la parada (la última no, 422) | JWT, dueño | global | 200/400/401/403/404/409/422 | nv-30 (A4) |
+| POST | `/api/v1/grupos` con `{plan_id, invitados?[ids]}` (hasta 11 amigos) → grupo `{id, plan_id, organizador_id, mi_rol, mi_estado, cupo{max, ocupados}, resumen{confirmados, invitados, declinados?}, integrantes[{usuario_id, persona?{id, nombre, nombre_usuario, foto_url}, rol, estado, desde}], creado_en, actualizado_en}`; un grupo por plan (409 si ya tiene); plan ajeno o borrado = 404; invitado que no es amigo aceptado, cuenta inactiva o uno mismo = 422; sin cupo = 409; `Cache-Control: no-store` | JWT, dueño del plan | 30 invitaciones por hora por usuario | 201/400/401/403/404/409/422/429 | nv-37 (J3) |
+| GET | `/api/v1/grupos` con `?cursor=&limite=` → `{items[grupo], siguiente_cursor, limite}`; los grupos donde soy integrante (cualquier estado), por `actualizado_en` descendente; sin los de planes borrados; cursor firmado | JWT | global | 200/401/422 | nv-37 (J3) |
+| GET | `/api/v1/grupos/{id}` → grupo; el organizador ve a todos y `resumen.declinados`; los demás no ven a quien declinó; ajeno o plan borrado = 404 | JWT, integrante | global | 200/401/404 | nv-37 (J3) |
+| POST | `/api/v1/grupos/{id}/integrantes` con `{usuarios[ids]}` (1 a 11) → grupo; solo amigos aceptados con cuenta activa (si no, 422); quien ya está invitado o confirmado no cambia; quien declinó vuelve a `invitado`; nunca más de 12 que no declinaron (409) | JWT, organizador (integrante = 403) | 30 por hora por usuario | 200/400/401/403/404/409/422/429 | nv-37 (J3) |
+| POST | `/api/v1/planes/{id}/invitaciones` con `{usuarios[ids]}` → grupo; como el anterior y crea el grupo del plan si no existe | JWT, dueño del plan | 30 por hora por usuario | 200/400/401/403/404/409/422/429 | nv-37 (A4) |
+| PATCH | `/api/v1/grupos/{id}/integrantes/yo` con `{estado}` (`confirmado` o `declinado`) → grupo; confirmar después de declinar exige cupo (409); el organizador no responde (422) | JWT, integrante | global | 200/400/401/403/404/409/422 | nv-37 (J3) |
+| DELETE | `/api/v1/grupos/{id}/integrantes/yo` → sale del grupo y libera su lugar; el organizador no sale (422) | JWT, integrante | global | 204/401/403/404/422 | nv-37 (J3) |
+| DELETE | `/api/v1/grupos/{id}/integrantes/{usuario_id}` → saca a un integrante; a sí mismo = 422; quien no está = 404 | JWT, organizador (integrante = 403) | global | 204/401/403/404/422 | nv-37 (J3) |
 | GET | `/api/v1/busquedas/recientes` → `{items[{texto, buscado_en}]}`; las 10 más nuevas del usuario (repetir una solo la sube); cada una vive 90 días; `Cache-Control: no-store` | JWT | global | 200/401/403 | nv-22 (A2) |
 | DELETE | `/api/v1/busquedas/recientes` → borra todas las búsquedas recientes del usuario | JWT | global | 204/401/403 | nv-22 (A2) |
 | GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |
