@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
@@ -33,8 +34,9 @@ type Users interface {
 	FindPublicByIDs(ctx context.Context, ids []bson.ObjectID) ([]usuarios.User, error)
 }
 
-// Service maneja los grupos (nv-37). La notificación `invitacion_plan` llega con nv-40.
+// Service maneja los grupos (nv-37). Avisa `invitacion_plan` a cada invitado nuevo (nv-40).
 type Service struct {
+	notify  notificaciones.Notifier
 	repo    *Repository
 	plans   Plans
 	friends Friends
@@ -46,7 +48,13 @@ type Service struct {
 
 // NewService recibe sus dependencias por constructor; sin cursor la lista falla cerrada.
 func NewService(repo *Repository, plans Plans, friends Friends, users Users, cursor *pagination.Signer) *Service {
-	return &Service{repo: repo, plans: plans, friends: friends, users: users, cursor: cursor, now: time.Now}
+	return &Service{repo: repo, plans: plans, friends: friends, users: users, cursor: cursor, notify: notificaciones.Noop{}, now: time.Now}
+}
+
+// WithNotifier guarda los avisos en el centro de notificaciones (nv-40).
+func (s *Service) WithNotifier(n notificaciones.Notifier) *Service {
+	s.notify = n
+	return s
 }
 
 // Errores públicos: se crean en cada llamada porque la etapa de errores puede anotarlos.
@@ -200,13 +208,13 @@ func (s *Service) checkInvitees(ctx context.Context, me bson.ObjectID, raw []str
 // invite agrega a cada invitado con su propia operación atómica. Antes revisa que quepan
 // todos; si otra petición llena el grupo a la mitad, los que alcanzaron quedan y es 409.
 func (s *Service) invite(ctx context.Context, g Group, me bson.ObjectID, invitees []bson.ObjectID) (View, error) {
-	needed := 0
+	fresh := []bson.ObjectID{}
 	for _, id := range invitees {
 		if m, in := g.Member(id); !in || m.Status == StatusDeclined {
-			needed++
+			fresh = append(fresh, id)
 		}
 	}
-	if g.Occupied+needed > MaxMembers {
+	if g.Occupied+len(fresh) > MaxMembers {
 		return View{}, errFull()
 	}
 	now := s.now().UTC()
@@ -218,6 +226,9 @@ func (s *Service) invite(ctx context.Context, g Group, me bson.ObjectID, invitee
 		if err != nil {
 			return View{}, errStore()
 		}
+	}
+	for _, id := range fresh {
+		s.notify.Emit(ctx, id, notificaciones.KindPlanInvite, map[string]string{"grupo_id": g.ID.Hex(), "plan_id": g.PlanID.Hex(), "usuario_id": me.Hex()})
 	}
 	return s.view(ctx, g.ID, me)
 }

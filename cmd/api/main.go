@@ -33,6 +33,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
@@ -170,13 +171,16 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// Los integrantes del grupo leen el plan (nv-37).
 	groupRepo := grupos.NewRepository(db)
 	voteRepo := votaciones.NewRepository(db)
+	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
+	notifRepo := notificaciones.NewRepository(db)
+	notifier := notificaciones.NewService(notifRepo, cursor, log)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -188,6 +192,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
+	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
@@ -210,7 +215,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
+	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -230,12 +235,13 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
-		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log), validator).WithActiveGuard(active),
-		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase), validator).WithActiveGuard(active),
+		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier), validator).WithActiveGuard(active),
+		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
 		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
+		notificaciones.NewHandler(notifier, validator).WithActiveGuard(active),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
@@ -354,6 +360,7 @@ type socialDeps struct {
 	friends   *amistades.Repository
 	places    *negocios.Repository
 	graph     graphStores
+	notifier  notificaciones.Notifier
 	phoneKey  []byte
 	validator *validation.Validator
 	active    fiber.Handler
@@ -367,7 +374,7 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("amistades: %w", err)
 	}
-	friends.WithGraph(d.graph.queue)
+	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier)
 	people, err := personas.NewService(d.users, d.friends, d.phoneKey, log)
 	if err != nil {
 		return nil, err
@@ -402,7 +409,8 @@ func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 	planRepo := planes.NewRepository(db)
 	places := negocios.NewRepository(db)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue)
-	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log)
+	notifier := notificaciones.NewService(notificaciones.NewRepository(db), nil, log)
+	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log).WithNotifier(notifier)
 	closer := votaciones.NewCloser(svc, log)
 	done := make(chan struct{})
 	go func() {

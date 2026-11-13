@@ -18,6 +18,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
@@ -29,21 +30,23 @@ import (
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
 // `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52), `busquedas_recientes` (nv-22), `consentimientos` (nv-19) y `grupos` (nv-37).
 var expected = map[string][]string{
-	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
-	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
-	privacidad.ExportsCollection:  {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
-	auth.SessionsCollection:       {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
-	auth.TokensCollection:         {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
-	negocios.Collection:           {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
-	planes.Collection:             {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
-	asistente.DescartesCollection: {"_id_", "ttl_descarte", "ix_motivo_fecha"},
-	recomendaciones.Collection:    {"_id_", "ux_usuario_negocio"},
-	amistades.Collection:          {"_id_", "ux_par", "ix_de_estado", "ix_para_estado"},
-	grafo.Collection:              {"_id_", "ix_disponible_en"},
-	busquedas.Collection:          {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
-	usuarios.ConsentsCollection:   {"_id_", "ix_usuario_fecha"},
-	grupos.Collection:             {"_id_", "ux_plan", "ix_integrante_actualizado", "ux_codigo_hash"},
-	votaciones.Collection:         {"_id_", "ux_parada_abierta", "ix_grupo_creada", "ix_estado_cierra"},
+	usuarios.Collection:              {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
+	ciudades.Collection:              {"_id_", "ux_ciudad", "ix_centro"},
+	privacidad.ExportsCollection:     {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
+	auth.SessionsCollection:          {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
+	auth.TokensCollection:            {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
+	negocios.Collection:              {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
+	planes.Collection:                {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha"},
+	asistente.DescartesCollection:    {"_id_", "ttl_descarte", "ix_motivo_fecha"},
+	recomendaciones.Collection:       {"_id_", "ux_usuario_negocio"},
+	amistades.Collection:             {"_id_", "ux_par", "ix_de_estado", "ix_para_estado"},
+	grafo.Collection:                 {"_id_", "ix_disponible_en"},
+	busquedas.Collection:             {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
+	usuarios.ConsentsCollection:      {"_id_", "ix_usuario_fecha"},
+	grupos.Collection:                {"_id_", "ux_plan", "ix_integrante_actualizado", "ux_codigo_hash"},
+	votaciones.Collection:            {"_id_", "ux_parada_abierta", "ix_grupo_creada", "ix_estado_cierra"},
+	notificaciones.Collection:        {"_id_", "ix_usuario_creada", "ttl_notificacion"},
+	notificaciones.DevicesCollection: {"_id_", "ux_token_hash", "ix_usuario_uso"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -94,14 +97,15 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
 
 	for collection, names := range map[string][]string{
-		usuarios.Collection:        {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash", "ux_nombre_usuario"},
-		ciudades.Collection:        {"ux_ciudad"},
-		auth.SessionsCollection:    {"ux_refresh_hash"},
-		auth.TokensCollection:      {"ux_token_hash"},
-		negocios.Collection:        {"ux_slug", "ux_qr_checkin"},
-		recomendaciones.Collection: {"ux_usuario_negocio"},
-		grupos.Collection:          {"ux_plan", "ux_codigo_hash"},
-		votaciones.Collection:      {"ux_parada_abierta"},
+		usuarios.Collection:              {"ux_correo", "ux_google_id", "ux_codigo_amigo", "ux_telefono_hash", "ux_nombre_usuario"},
+		ciudades.Collection:              {"ux_ciudad"},
+		auth.SessionsCollection:          {"ux_refresh_hash"},
+		auth.TokensCollection:            {"ux_token_hash"},
+		negocios.Collection:              {"ux_slug", "ux_qr_checkin"},
+		recomendaciones.Collection:       {"ux_usuario_negocio"},
+		grupos.Collection:                {"ux_plan", "ux_codigo_hash"},
+		votaciones.Collection:            {"ux_parada_abierta"},
+		notificaciones.DevicesCollection: {"ux_token_hash"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

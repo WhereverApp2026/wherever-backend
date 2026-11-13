@@ -10,6 +10,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 )
@@ -34,9 +35,10 @@ type Places interface {
 	FindCards(ctx context.Context, ids []bson.ObjectID, now time.Time) ([]negocios.PlaceItem, error)
 }
 
-// Service maneja las votaciones. Las notificaciones `votacion_abierta` y `votacion_cerrada`
-// llegan con nv-40/41.
+// Service maneja las votaciones. Avisa `votacion_abierta` y `votacion_cerrada` a los
+// invitados y confirmados del grupo, menos a quien la abrió (nv-40).
 type Service struct {
+	notify  notificaciones.Notifier
 	repo    *Repository
 	groups  Groups
 	plans   Plans
@@ -48,7 +50,23 @@ type Service struct {
 
 // NewService recibe sus dependencias por constructor.
 func NewService(repo *Repository, groups Groups, plans Plans, applier Applier, places Places, log *slog.Logger) *Service {
-	return &Service{repo: repo, groups: groups, plans: plans, applier: applier, places: places, log: log, now: time.Now}
+	return &Service{repo: repo, groups: groups, plans: plans, applier: applier, places: places, notify: notificaciones.Noop{}, log: log, now: time.Now}
+}
+
+// WithNotifier guarda los avisos en el centro de notificaciones (nv-40).
+func (s *Service) WithNotifier(n notificaciones.Notifier) *Service {
+	s.notify = n
+	return s
+}
+
+// announce avisa a los invitados y confirmados del grupo, menos a quien abrió la votación.
+func (s *Service) announce(ctx context.Context, g grupos.Group, v Vote, kind string) {
+	data := map[string]string{"votacion_id": v.ID.Hex(), "grupo_id": g.ID.Hex(), "plan_id": v.PlanID.Hex()}
+	for _, m := range g.Members {
+		if m.UserID != v.CreatedBy && m.Status != grupos.StatusDeclined {
+			s.notify.Emit(ctx, m.UserID, kind, data)
+		}
+	}
 }
 
 func errVoteNotFound() error  { return apperr.NotFound("votación no encontrada") }
@@ -129,6 +147,7 @@ func (s *Service) Open(ctx context.Context, subject, rawGroupID string, req Open
 	} else if err != nil {
 		return View{}, errStore()
 	}
+	s.announce(ctx, a.group, v, notificaciones.KindVoteOpened)
 	return s.view(ctx, v, me)
 }
 
@@ -329,6 +348,10 @@ func (s *Service) closeOpen(ctx context.Context, v Vote, by string) (Vote, error
 			return v, errStore()
 		}
 		if ok {
+			// Solo quien la cerró avisa: con dos instancias el aviso sale una vez.
+			if g, err := s.groups.FindByID(ctx, v.GroupID); err == nil {
+				s.announce(ctx, g, v, notificaciones.KindVoteClosed)
+			}
 			return v, nil
 		}
 	}

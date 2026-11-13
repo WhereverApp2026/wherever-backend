@@ -526,6 +526,15 @@
 - A evitar: votar quien declinó (403); decir quién votó qué en la respuesta.
 - Lección: la prueba de dos instancias encontró que cerrar era único pero aplicar no: las dos veían «cerrada sin aplicar» y cambiaban el plan. `ClaimApply` reserva la aplicación (`aplicando_hasta`, 1 min) con un `UpdateOne` condicionado.
 
+## NV-40 — Dispositivos y centro de notificaciones (2026-11-12)
+- Estado: rama `nv-40` desde `nv-39`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (98 rutas). Falta la firma.
+- Corrección de drift: el token de FCM iba en la ruta (`/dispositivos/{fcm_token}`); ahora `PUT/DELETE /dispositivos` con `{token}` en el cuerpo, por el log de acceso.
+- Decisión: `notificaciones.Notifier` (`Emit`) lo reciben amistades, grupos y votaciones con `WithNotifier` (por defecto `Noop`). `Emit` guarda y, si falla, solo registra el tipo: nunca cambia la respuesta de la acción.
+- Decisión: `datos` solo lleva ids; la app arma el texto. TTL de 90 días (`expira_en`).
+- Decisión: el token se guarda (nv-41 lo necesita) y se busca por SHA-256 (`ux_token_hash`). Si era de otra cuenta, pasa a la nueva. El sexto teléfono es 422.
+- Para nv-41: el push sale del mismo `Emit` (envolverlo, no llamar a FCM desde los módulos); falta `RemoveDeviceByHash` para los tokens `UNREGISTERED`.
+- A evitar: heredocs largos de Python con comillas y acentos en Bash (fallan); escribir el script en el scratchpad y correrlo con `python -I archivo.py "$(pwd -W)"`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
