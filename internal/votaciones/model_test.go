@@ -80,3 +80,11 @@ func TestNewView_SoloConteosYMiVoto(t *testing.T) {
 	assert.NotContains(t, string(raw), other.Hex(), "no dice quién votó qué")
 	assert.NotContains(t, string(raw), me.Hex())
 }
+
+func TestResultText_SingularYPlural(t *testing.T) {
+	a, b := bson.NewObjectID(), bson.NewObjectID()
+	v := Vote{Options: []bson.ObjectID{a, b}, Ballots: map[string]bson.ObjectID{"u1": a, "u2": a, "u3": b}, Winner: &a}
+	assert.Equal(t, "Ganó Café Tula con 2 votos", ResultText("Café Tula", v))
+	v.Ballots = map[string]bson.ObjectID{"u1": a}
+	assert.Equal(t, "Ganó Café Tula con 1 voto", ResultText("Café Tula", v))
+}

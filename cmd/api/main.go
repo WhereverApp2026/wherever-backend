@@ -21,6 +21,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/asistente"
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
+	"github.com/WhereverApp2026/wherever-backend/internal/chat"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
@@ -179,6 +180,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	syncRepo := sincronizacion.NewRepository(db)
 	syncActions := sincronizacion.NewActions(db)
 	voteRepo := votaciones.NewRepository(db)
+	chatRepo := chat.NewRepository(db)
 	modRepo := moderacion.NewRepository(db)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
@@ -189,7 +191,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), favoritos.NewPrivacy(favRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), chat.NewPrivacy(chatRepo, groupRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), favoritos.NewPrivacy(favRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -205,6 +207,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(vaca.NewDebtsPrivacy(vacaRepo))
 	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
+	registry.RegisterExporter(chat.NewPrivacy(chatRepo, groupRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
@@ -237,6 +240,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
+	// Chat de grupo (nv-57): REST y push agrupado, sin canal en vivo ni Redis.
+	chatSvc := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		// Aceptación de términos y aviso (nv-19) con las versiones que publica /configuracion.
@@ -250,8 +255,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
 		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
-		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
-		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier), validator).WithActiveGuard(active),
+		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
+		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
+		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
 		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), validator).WithActiveGuard(active),
@@ -431,7 +437,10 @@ func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue).WithSync(sincronizacion.NewRepository(db))
 	notifRepo := notificaciones.NewRepository(db)
 	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
-	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log).WithNotifier(notifier)
+	groupRepo := grupos.NewRepository(db)
+	// El resultado también queda en el chat del grupo (nv-57); publicar no usa cursor ni cuentas.
+	posts := chat.NewService(chat.NewRepository(db), groupRepo, planRepo, nil, nil, log)
+	svc := votaciones.NewService(votaciones.NewRepository(db), groupRepo, planRepo, plans, places, log).WithNotifier(notifier).WithChat(posts)
 	closer := votaciones.NewCloser(svc, log)
 	done := make(chan struct{})
 	go func() {

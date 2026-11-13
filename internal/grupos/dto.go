@@ -71,8 +71,29 @@ type View struct {
 	Seats       Seats        `json:"cupo"`
 	Summary     Summary      `json:"resumen"`
 	Members     []MemberView `json:"integrantes"`
-	CreatedAt   time.Time    `json:"creado_en"`
-	UpdatedAt   time.Time    `json:"actualizado_en"`
+	// LastMessage sale solo a los confirmados: quien está invitado o declinó no lee el chat.
+	LastMessage *LastMessageView `json:"ultimo_mensaje,omitempty"`
+	CreatedAt   time.Time        `json:"creado_en"`
+	UpdatedAt   time.Time        `json:"actualizado_en"`
+}
+
+// LastMessageView es el último mensaje del chat en la lista de grupos (nv-57).
+type LastMessageView struct {
+	MessageID string    `json:"mensaje_id"`
+	Text      string    `json:"texto"`
+	AuthorID  string    `json:"autor_id,omitempty"`
+	At        time.Time `json:"fecha"`
+}
+
+func lastMessageView(g Group, mine Member) *LastMessageView {
+	if g.LastMessage == nil || mine.Status != StatusConfirmed {
+		return nil
+	}
+	out := &LastMessageView{MessageID: g.LastMessage.MessageID.Hex(), Text: g.LastMessage.Text, At: g.LastMessage.At}
+	if g.LastMessage.AuthorID != nil {
+		out.AuthorID = g.LastMessage.AuthorID.Hex()
+	}
+	return out
 }
 
 // newView arma la vista de `me`. El organizador ve a todos; los demás no ven a quien
@@ -84,7 +105,7 @@ func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User) 
 		ID: g.ID.Hex(), PlanID: g.PlanID.Hex(), OrganizerID: g.OrganizerID.Hex(),
 		MyRole: mine.Role, MyStatus: mine.Status,
 		Seats:   Seats{Max: MaxMembers, Occupied: g.Occupied},
-		Members: []MemberView{}, CreatedAt: g.CreatedAt, UpdatedAt: g.UpdatedAt,
+		Members: []MemberView{}, LastMessage: lastMessageView(g, mine), CreatedAt: g.CreatedAt, UpdatedAt: g.UpdatedAt,
 	}
 	declined := 0
 	for _, m := range g.Members {

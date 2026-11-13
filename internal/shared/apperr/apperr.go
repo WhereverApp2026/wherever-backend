@@ -31,18 +31,18 @@ type kindInfo struct {
 }
 
 var kinds = map[Kind]kindInfo{
-	KindInternal:     {http.StatusInternalServerError, "error_interno", "error interno"},
-	KindBadRequest:   {http.StatusBadRequest, "solicitud_invalida", "petición mal formada"},
-	KindUnauthorized: {http.StatusUnauthorized, "no_autenticado", "autenticación requerida"},
-	KindForbidden:    {http.StatusForbidden, "prohibido", "sin permiso para este recurso"},
-	KindNotFound:     {http.StatusNotFound, "no_encontrado", "recurso no encontrado"},
-	KindTimeout:      {http.StatusRequestTimeout, "tiempo_agotado", "la petición excedió el tiempo máximo"},
-	KindConflict:     {http.StatusConflict, "conflicto", "conflicto con el estado actual"},
-	KindGone:         {http.StatusGone, "vencido", "el recurso ya no está disponible"},
-	KindValidation:   {http.StatusUnprocessableEntity, "validacion", "datos inválidos"},
-	KindLocked:       {http.StatusLocked, "bloqueado", "recurso bloqueado"},
-	KindRateLimited:  {http.StatusTooManyRequests, "demasiadas_peticiones", "demasiadas peticiones, intenta más tarde"},
-	KindUnavailable:  {http.StatusServiceUnavailable, "no_disponible", "servicio no disponible"},
+	KindInternal:        {http.StatusInternalServerError, "error_interno", "error interno"},
+	KindBadRequest:      {http.StatusBadRequest, "solicitud_invalida", "petición mal formada"},
+	KindUnauthorized:    {http.StatusUnauthorized, "no_autenticado", "autenticación requerida"},
+	KindForbidden:       {http.StatusForbidden, "prohibido", "sin permiso para este recurso"},
+	KindNotFound:        {http.StatusNotFound, "no_encontrado", "recurso no encontrado"},
+	KindTimeout:         {http.StatusRequestTimeout, "tiempo_agotado", "la petición excedió el tiempo máximo"},
+	KindConflict:        {http.StatusConflict, "conflicto", "conflicto con el estado actual"},
+	KindGone:            {http.StatusGone, "vencido", "el recurso ya no está disponible"},
+	KindValidation:      {http.StatusUnprocessableEntity, "validacion", "datos inválidos"},
+	KindLocked:          {http.StatusLocked, "bloqueado", "recurso bloqueado"},
+	KindRateLimited:     {http.StatusTooManyRequests, "demasiadas_peticiones", "demasiadas peticiones, intenta más tarde"},
+	KindUnavailable:     {http.StatusServiceUnavailable, "no_disponible", "servicio no disponible"},
 	KindUpgradeRequired: {http.StatusUpgradeRequired, "actualizacion_requerida", "actualiza la app"},
 }
 

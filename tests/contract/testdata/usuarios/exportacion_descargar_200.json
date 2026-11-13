@@ -9,6 +9,10 @@
     "favoritos": [],
     "gastos": [],
     "grupos": [],
+    "mensajes": {
+      "mensajes": [],
+      "reacciones": []
+    },
     "moderacion": [],
     "notificaciones": {
       "avisos": [],

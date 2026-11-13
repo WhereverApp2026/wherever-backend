@@ -281,3 +281,30 @@ func joinResult(ok bool, err error) error {
 	}
 	return ErrFull
 }
+
+// SetLastMessage guarda el último mensaje del chat solo si es más nuevo que el guardado: dos
+// envíos en carrera dejan el más reciente (nv-57). No cambia `actualizado_en`.
+func (r *Repository) SetLastMessage(ctx context.Context, groupID bson.ObjectID, last LastMessage) error {
+	_, err := r.col.UpdateOne(ctx, bson.D{
+		{Key: "_id", Value: groupID},
+		{Key: "$or", Value: bson.A{
+			bson.D{{Key: "ultimo_mensaje", Value: bson.D{{Key: "$exists", Value: false}}}},
+			bson.D{{Key: "ultimo_mensaje.mensaje_id", Value: bson.D{{Key: "$lt", Value: last.MessageID}}}},
+		}},
+	}, bson.D{{Key: "$set", Value: bson.D{{Key: "ultimo_mensaje", Value: last}}}})
+	return err
+}
+
+// ClearLastMessage quita `ultimo_mensaje` si era ese mensaje (se borró).
+func (r *Repository) ClearLastMessage(ctx context.Context, groupID, messageID bson.ObjectID) error {
+	_, err := r.col.UpdateOne(ctx, bson.D{{Key: "_id", Value: groupID}, {Key: "ultimo_mensaje.mensaje_id", Value: messageID}},
+		bson.D{{Key: "$unset", Value: bson.D{{Key: "ultimo_mensaje", Value: ""}}}})
+	return err
+}
+
+// ClearLastMessagesBy quita `ultimo_mensaje` donde el autor es userID (borrado de la cuenta).
+func (r *Repository) ClearLastMessagesBy(ctx context.Context, userID bson.ObjectID) error {
+	_, err := r.col.UpdateMany(ctx, bson.D{{Key: "ultimo_mensaje.autor_id", Value: userID}},
+		bson.D{{Key: "$unset", Value: bson.D{{Key: "ultimo_mensaje", Value: ""}}}})
+	return err
+}
