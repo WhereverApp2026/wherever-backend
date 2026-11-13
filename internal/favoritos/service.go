@@ -129,7 +129,7 @@ func (s *Service) view(f Favorite, b *negocios.Business) View {
 		coupon, open := b.Coupons > 0, negocios.OpenAt(b.ScheduleMin, s.now())
 		v.CouponToday, v.OpenNow = &coupon, &open
 	}
-	v.Summary = SummaryView{Name: sum.Name, PhotoURL: sum.PhotoURL, Category: sum.Category}
+	v.Summary = SummaryView(sum)
 	return v
 }
 
@@ -240,6 +240,39 @@ func (s *Service) Search(ctx context.Context, subject string, q SearchQuery) (Se
 // favorito; un objetivo que ya no existe (plan borrado, negocio con `eliminado_en` o id
 // ausente) se omite y su favorito se borra.
 func (s *Service) visible(ctx context.Context, me bson.ObjectID, rows []Favorite) ([]View, error) {
+	shops, activePlans, err := s.targets(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	views := []View{}
+	gone := map[string][]bson.ObjectID{}
+	for _, f := range rows {
+		if f.Type == TypePlan {
+			if activePlans[f.TargetID] {
+				views = append(views, s.view(f, nil))
+			} else {
+				gone[TypePlan] = append(gone[TypePlan], f.TargetID)
+			}
+			continue
+		}
+		b, ok := shops[f.TargetID]
+		switch {
+		case !ok || b.DeletedAt != nil:
+			gone[TypeBusiness] = append(gone[TypeBusiness], f.TargetID)
+		case b.State == negocios.StatusApproved:
+			views = append(views, s.view(f, &b))
+		}
+	}
+	for _, kind := range []string{TypeBusiness, TypePlan} {
+		if err := s.repo.DeleteTargets(ctx, me, kind, gone[kind]); err != nil {
+			return nil, errStore()
+		}
+	}
+	return views, nil
+}
+
+// targets lee de una vez los negocios y los planes activos de las filas.
+func (s *Service) targets(ctx context.Context, rows []Favorite) (map[bson.ObjectID]negocios.Business, map[bson.ObjectID]bool, error) {
 	var businessIDs, planIDs []bson.ObjectID
 	for _, f := range rows {
 		if f.Type == TypePlan {
@@ -250,42 +283,17 @@ func (s *Service) visible(ctx context.Context, me bson.ObjectID, rows []Favorite
 	}
 	cards, err := s.businesses.FindFavoriteCards(ctx, businessIDs)
 	if err != nil {
-		return nil, errStore()
+		return nil, nil, errStore()
 	}
-	byID := make(map[bson.ObjectID]negocios.Business, len(cards))
+	shops := make(map[bson.ObjectID]negocios.Business, len(cards))
 	for _, b := range cards {
-		byID[b.ID] = b
+		shops[b.ID] = b
 	}
 	activePlans, err := s.plans.ActiveIDs(ctx, planIDs)
 	if err != nil {
-		return nil, errStore()
+		return nil, nil, errStore()
 	}
-	views := []View{}
-	var goneBusinesses, gonePlans []bson.ObjectID
-	for _, f := range rows {
-		if f.Type == TypePlan {
-			if !activePlans[f.TargetID] {
-				gonePlans = append(gonePlans, f.TargetID)
-				continue
-			}
-			views = append(views, s.view(f, nil))
-			continue
-		}
-		b, ok := byID[f.TargetID]
-		switch {
-		case !ok || b.DeletedAt != nil:
-			goneBusinesses = append(goneBusinesses, f.TargetID)
-		case b.State == negocios.StatusApproved:
-			views = append(views, s.view(f, &b))
-		}
-	}
-	if err := s.repo.DeleteTargets(ctx, me, TypeBusiness, goneBusinesses); err != nil {
-		return nil, errStore()
-	}
-	if err := s.repo.DeleteTargets(ctx, me, TypePlan, gonePlans); err != nil {
-		return nil, errStore()
-	}
-	return views, nil
+	return shops, activePlans, nil
 }
 
 func position(signer *pagination.Signer, scope, raw string) (*Position, error) {

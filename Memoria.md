@@ -604,6 +604,15 @@
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
 - A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
 
+## NV-54 — Favoritos de negocios y planes (2026-11-13)
+- Estado: rama `nv-54` (WIP de base nv-37 + `origin/main`), PR contra `main`. Paquete `internal/favoritos`, colección `favoritos`, cinco rutas `/api/v1/favoritos…` solo para `consumidor` con `RequireActive`. Local: build, vet, Unit, lint 0, critic, `check_sdd` y `check_endpoints` (111 rutas, en Docker). Integration, Security, Database y Contract en el CI. Falta la firma.
+- Corrección de drift: `FindCards` ya existía en `negocios` (nv-38, tarjetas visibles); la de favoritos es `FindFavoriteCards` (sin filtrar estado, para limpiar borrados). Con grupos (nv-37) sigue marcando un plan solo su dueño; favoritos de planes de grupo quedan fuera. Sin paquete `favoritostest`: se arma en `authtest`.
+- Decisión: PUT responde 200 siempre (idempotente, sin `If-Match`); plan ajeno, negocio no aprobado e id inexistente dan el mismo 404. Tope 500 por tipo contado antes del `upsert` (dos marcas simultáneas pueden dejar 501).
+- Decisión: al listar, un negocio pausado se oculta sin borrar el favorito; uno con `eliminado_en` o un plan borrado se limpia ahí mismo. El resumen de negocios se refresca en cada lectura; el nombre del plan es el del momento de marcar.
+- ARCO: `Purger` borra con la cuenta y no con «borrar historial»; la exportación lleva `favoritos` (contrato actualizado).
+- Operador: nada. Sin variables ni Terraform ni comandos de Redis; los índices los crea `actualizar.sh` con `/indexes`.
+- A evitar: al fusionar `main` en un WIP viejo, buscar métodos con el mismo nombre en el receptor (`FindCards`): el conflicto no sale en git sino al compilar.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
