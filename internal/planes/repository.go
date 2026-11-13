@@ -65,6 +65,40 @@ func (r *Repository) FindOwned(ctx context.Context, owner, id bson.ObjectID) (Pl
 	return p, err
 }
 
+// FindActive trae el plan activo sin importar el dueño; solo para lectores autorizados por
+// otro módulo (integrantes del grupo, nv-37).
+func (r *Repository) FindActive(ctx context.Context, id bson.ObjectID) (Plan, error) {
+	var p Plan
+	err := r.col.FindOne(ctx, bson.D{{Key: "_id", Value: id}, {Key: "estado", Value: StatusActive}}).Decode(&p)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return Plan{}, ErrNotFound
+	}
+	return p, err
+}
+
+// ActiveIDs dice cuáles de los planes siguen activos (una sola consulta, solo `_id`).
+func (r *Repository) ActiveIDs(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]bool, error) {
+	out := map[bson.ObjectID]bool{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	filter := bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}, {Key: "estado", Value: StatusActive}}
+	cur, err := r.col.Find(ctx, filter, options.Find().SetProjection(bson.D{{Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = true
+	}
+	return out, nil
+}
+
 // UpdateIfVersion reemplaza lo editable del plan solo si la versión sigue siendo `version`
 // (If-Match) y sube la versión. El plan debe venir recalculado.
 func (r *Repository) UpdateIfVersion(ctx context.Context, p *Plan, version int) error {

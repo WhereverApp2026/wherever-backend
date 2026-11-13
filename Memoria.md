@@ -498,6 +498,16 @@
 - Sin Redis: no cambia `TestPresupuestoRedis_*`. La dependencia con nv-18 no era real.
 - A evitar: correr `gofmt -w` sobre todo `internal/` con Go 1.27.3 reformatea `internal/shared/apperr/apperr.go` (alineación de un mapa); limitarlo a los archivos tocados.
 
+## NV-37 — Grupos e integrantes (2026-11-12)
+- Estado: rama `nv-37` desde `main` (`48e866f`), PR contra `main`. Local: build, vet, Unit, lint 0, critic, `check_sdd` y `check_endpoints` (83 rutas) en verde. Integration, Security, Database y Contract en el CI del PR. Falta la firma.
+- Corrección de drift: unirse por enlace es de nv-38, votaciones y su cierre de nv-39 y notificaciones de nv-40/41; la spec y el plan ya no los piden aquí.
+- Decisión: un grupo por plan (`ux_plan`); el organizador va en `integrantes` (`organizador`/`confirmado`) y cuenta en los 12. `ocupados` = integrantes que no declinaron y solo cambia con un `$inc` en la misma operación que cambia `integrantes`, con `ocupados < 12` en el filtro. Probado con 20 invitaciones simultáneas al repositorio.
+- Decisión: solo amigos `aceptada` con cuenta activa; un solo 422 para no amigo, inactivo o uno mismo (no revela cuál). Quien declina libera su lugar, sigue viendo el grupo y puede volver a confirmar si hay cupo; los demás integrantes no lo ven.
+- Decisión: `planes.Service.WithMembers(grupos.Repository)`: `GET /planes/{id}` lo leen invitados y confirmados; ediciones, borrado y clonado pasan por `getOwned` (dueño). `planes` no importa `grupos`.
+- Decisión: `grupos` va antes que `planes` en la lista de módulos (`cmd/api`, `authtest`, `scripts/routes`): atiende `POST /planes/{id}/invitaciones` sin pasar por el grupo `/planes`.
+- Límite nuevo: 30 invitaciones por hora por usuario (`rate:grupos_invitacion:{usuario}`), +3 comandos de Redis por invitación (limitador).
+- A evitar: probar la concurrencia del tope por HTTP con un solo organizador; el límite de 10 escrituras simultáneas da 429 antes.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

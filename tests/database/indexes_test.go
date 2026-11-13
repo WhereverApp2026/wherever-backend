@@ -15,6 +15,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
+	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -25,7 +26,7 @@ import (
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
-// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52), `busquedas_recientes` (nv-22) y `consentimientos` (nv-19).
+// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52), `busquedas_recientes` (nv-22), `consentimientos` (nv-19) y `grupos` (nv-37).
 var expected = map[string][]string{
 	usuarios.Collection:           {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
 	ciudades.Collection:           {"_id_", "ux_ciudad", "ix_centro"},
@@ -40,6 +41,7 @@ var expected = map[string][]string{
 	grafo.Collection:              {"_id_", "ix_disponible_en"},
 	busquedas.Collection:          {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
 	usuarios.ConsentsCollection:   {"_id_", "ix_usuario_fecha"},
+	grupos.Collection:             {"_id_", "ux_plan", "ix_integrante_actualizado"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -96,6 +98,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		auth.TokensCollection:      {"ux_token_hash"},
 		negocios.Collection:        {"ux_slug", "ux_qr_checkin"},
 		recomendaciones.Collection: {"ux_usuario_negocio"},
+		grupos.Collection:          {"ux_plan"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

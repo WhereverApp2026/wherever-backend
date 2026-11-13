@@ -14,13 +14,15 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 )
 
-// Service resuelve los endpoints de planes (nv-30). Solo el dueño ve y edita su plan: toda
-// lectura pasa por FindOwned y un plan ajeno responde 404, igual que uno que no existe.
+// Service resuelve los endpoints de planes (nv-30). Solo el dueño edita su plan; lo leen el
+// dueño y los integrantes de su grupo (nv-37). Para cualquier otro un plan responde 404,
+// igual que uno que no existe.
 type Service struct {
-	repo  *Repository
-	calc  *Calculadora
-	graph Graph
-	now   func() time.Time
+	repo    *Repository
+	calc    *Calculadora
+	graph   Graph
+	members Members
+	now     func() time.Time
 	// cursor firma la paginación de GET /planes (nv-17).
 	cursor *pagination.Signer
 }
@@ -35,14 +37,32 @@ type noGraph struct{}
 
 func (noGraph) Touch(context.Context, bson.ObjectID) error { return nil }
 
+// Members dice si alguien que no es el dueño puede leer el plan: está invitado o confirmado
+// en su grupo (nv-37, lo cumple grupos.Repository).
+type Members interface {
+	CanRead(ctx context.Context, planID, userID bson.ObjectID) (bool, error)
+}
+
+type noMembers struct{}
+
+func (noMembers) CanRead(context.Context, bson.ObjectID, bson.ObjectID) (bool, error) {
+	return false, nil
+}
+
 // NewService recibe el repositorio y la calculadora por constructor.
 func NewService(repo *Repository, calc *Calculadora) *Service {
-	return &Service{repo: repo, calc: calc, graph: noGraph{}, now: time.Now}
+	return &Service{repo: repo, calc: calc, graph: noGraph{}, members: noMembers{}, now: time.Now}
 }
 
 // WithCursor fija la llave del cursor firmado (nv-17).
 func (s *Service) WithCursor(signer *pagination.Signer) *Service {
 	s.cursor = signer
+	return s
+}
+
+// WithMembers deja leer el plan a los integrantes de su grupo (nv-37).
+func (s *Service) WithMembers(m Members) *Service {
+	s.members = m
 	return s
 }
 
@@ -123,27 +143,62 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 	return *p, nil
 }
 
-// Get trae el plan del dueño; ajeno, borrado o id mal formado = 404.
+// Get trae el plan para leerlo: del dueño o de un grupo donde quien llama está invitado o
+// confirmado (nv-37). Ajeno, borrado o id mal formado = 404.
 func (s *Service) Get(ctx context.Context, subject, rawID string) (Plan, error) {
-	ownerID, err := owner(subject)
+	reader, id, err := ids(subject, rawID)
 	if err != nil {
 		return Plan{}, err
 	}
-	id, err := bson.ObjectIDFromHex(rawID)
+	p, err := s.repo.FindOwned(ctx, reader, id)
+	if !errors.Is(err, ErrNotFound) {
+		return p, storeErrorOrNil(err)
+	}
+	ok, err := s.members.CanRead(ctx, id, reader)
 	if err != nil {
+		return Plan{}, errStore()
+	}
+	if !ok {
 		return Plan{}, errPlanNotFound()
 	}
-	p, err := s.repo.FindOwned(ctx, ownerID, id)
+	p, err = s.repo.FindActive(ctx, id)
+	return p, storeErrorOrNil(err)
+}
+
+// getOwned trae el plan del dueño; es la única entrada de las ediciones, el borrado y el
+// clonado. Ajeno (aunque sea integrante), borrado o id mal formado = 404.
+func (s *Service) getOwned(ctx context.Context, subject, rawID string) (Plan, error) {
+	ownerID, id, err := ids(subject, rawID)
 	if err != nil {
-		return Plan{}, storeError(err)
+		return Plan{}, err
 	}
-	return p, nil
+	p, err := s.repo.FindOwned(ctx, ownerID, id)
+	return p, storeErrorOrNil(err)
+}
+
+func ids(subject, rawID string) (bson.ObjectID, bson.ObjectID, error) {
+	who, err := owner(subject)
+	if err != nil {
+		return bson.ObjectID{}, bson.ObjectID{}, err
+	}
+	id, err := bson.ObjectIDFromHex(rawID)
+	if err != nil {
+		return bson.ObjectID{}, bson.ObjectID{}, errPlanNotFound()
+	}
+	return who, id, nil
+}
+
+func storeErrorOrNil(err error) error {
+	if err == nil {
+		return nil
+	}
+	return storeError(err)
 }
 
 // edit carga el plan del dueño, comprueba la versión, aplica el cambio, recalcula y guarda
 // con If-Match. Es el único camino de las ediciones.
 func (s *Service) edit(ctx context.Context, subject, rawID string, version int, change func(*Plan) error) (Plan, error) {
-	p, err := s.Get(ctx, subject, rawID)
+	p, err := s.getOwned(ctx, subject, rawID)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -221,7 +276,7 @@ func (s *Service) Reorder(ctx context.Context, subject, rawID string, version in
 
 // Delete hace el borrado lógico con If-Match.
 func (s *Service) Delete(ctx context.Context, subject, rawID string, version int) error {
-	p, err := s.Get(ctx, subject, rawID)
+	p, err := s.getOwned(ctx, subject, rawID)
 	if err != nil {
 		return err
 	}
@@ -235,7 +290,7 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string, version int
 // Clone repite un plan propio en otra fecha (US-058): paradas con ids nuevos y las mismas
 // horas en el día nuevo. No copia reservas ni integrantes.
 func (s *Service) Clone(ctx context.Context, subject, rawID string, req CloneRequest) (Plan, error) {
-	src, err := s.Get(ctx, subject, rawID)
+	src, err := s.getOwned(ctx, subject, rawID)
 	if err != nil {
 		return Plan{}, err
 	}
