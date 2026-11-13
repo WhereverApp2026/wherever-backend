@@ -79,8 +79,8 @@ type TextoModerador interface {
 	EvaluarTexto(ctx context.Context, texto string) (map[string]float64, error)
 }
 
-// FuenteReglas entrega las reglas vigentes. Hoy son fijas (Fijas); nv-43 las guarda en
-// moderacion_reglas para ajustarlas sin recompilar.
+// FuenteReglas entrega las reglas vigentes: Service las lee de moderacion_reglas (nv-43) y
+// Fijas las deja constantes.
 type FuenteReglas interface {
 	Reglas(ctx context.Context) (Reglas, error)
 }

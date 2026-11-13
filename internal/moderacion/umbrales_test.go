@@ -41,6 +41,7 @@ func TestUmbrales_Bordes(t *testing.T) {
 func TestUmbrales_ReglasInvalidas(t *testing.T) {
 	for _, r := range []moderacion.Reglas{
 		{Cuarentena: 0, Rechazo: 80},
+		{Cuarentena: 39, Rechazo: 80}, // por debajo de la confianza mínima de Rekognition
 		{Cuarentena: 80, Rechazo: 80},
 		{Cuarentena: 40, Rechazo: 101},
 	} {

@@ -32,6 +32,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
+	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
@@ -175,6 +176,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	syncRepo := sincronizacion.NewRepository(db)
 	syncActions := sincronizacion.NewActions(db)
 	voteRepo := votaciones.NewRepository(db)
+	modRepo := moderacion.NewRepository(db)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
@@ -184,7 +186,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -198,6 +200,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
+	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
 	pesos, err := recomendador.PesosPorDefecto()
@@ -237,6 +240,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
+		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
+		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier), validator).WithActiveGuard(active),
