@@ -172,6 +172,12 @@ func (r *Repository) RemoveDevice(ctx context.Context, userID bson.ObjectID, tok
 	return nil
 }
 
+// RemoveDeviceByHash borra un token que FCM dio por no registrado (nv-41).
+func (r *Repository) RemoveDeviceByHash(ctx context.Context, tokenHash string) error {
+	_, err := r.devices.DeleteOne(ctx, bson.D{{Key: "token_hash", Value: tokenHash}})
+	return err
+}
+
 // Devices trae los teléfonos del usuario, del uso más reciente al más viejo.
 func (r *Repository) Devices(ctx context.Context, userID bson.ObjectID) ([]Device, error) {
 	return findAll[Device](ctx, r.devices, bson.D{{Key: "usuario_id", Value: userID}}, options.Find().SetSort(bson.D{{Key: "ultimo_uso", Value: -1}}))

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/push"
 )
 
 // Entornos admitidos en APP_ENV.
@@ -121,6 +123,9 @@ const (
 	KeyTerminosVersion  = "TERMINOS_VERSION"
 	KeyAvisoVersion     = "AVISO_VERSION"
 	KeyMantenimiento    = "MODO_MANTENIMIENTO"
+	KeyFCMProjectID     = "FCM_PROJECT_ID"
+	KeyFCMCredenciales  = "FCM_CREDENCIALES_B64" // #nosec G101 -- nombre de la variable, no su valor
+	KeyFCMURL           = "FCM_URL"
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -144,6 +149,7 @@ var optionalKeys = []string{
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
 	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
 	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
+	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -177,7 +183,9 @@ type Config struct {
 	JobHour           int
 	HideInternals     bool
 	IA                IA
-	VersionApp        VersionApp
+	// FCM es el push por Firebase (nv-41); sin credenciales solo queda el centro de avisos.
+	FCM        FCM
+	VersionApp VersionApp
 }
 
 // IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
@@ -271,6 +279,11 @@ func Load(getenv func(string) string) (Config, error) {
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
 		HideInternals:     strings.EqualFold(strings.TrimSpace(getenv(KeyHideInternals)), "true"),
+		FCM: FCM{
+			ProjectID:      strings.TrimSpace(getenv(KeyFCMProjectID)),
+			CredentialsB64: strings.TrimSpace(getenv(KeyFCMCredenciales)),
+			BaseURL:        strings.TrimSpace(getenv(KeyFCMURL)),
+		},
 		IA: IA{
 			GeminiAPIKey: strings.TrimSpace(getenv(KeyGeminiAPIKey)),
 			ModeloID:     strings.TrimSpace(getenv(KeyIAModeloID)),
@@ -397,6 +410,7 @@ func (c Config) validate() []error {
 	}
 	errs = append(errs, c.validateMail()...)
 	errs = append(errs, c.IA.validate()...)
+	errs = append(errs, c.FCM.validate(c.Env)...)
 	return append(errs, c.validateLimits()...)
 }
 
@@ -605,4 +619,33 @@ func validatePrice(key string, price float64) []error {
 		return []error{fmt.Errorf("%s debe estar entre 0 y %v", key, maxIAPrecioUSDMTok)}
 	}
 	return nil
+}
+
+// FCM es la configuración del push (nv-41). Las credenciales son el JSON de la cuenta de
+// servicio de Firebase en base64 (una línea, para `.env` y Parameter Store).
+type FCM struct {
+	ProjectID      string
+	CredentialsB64 string
+	BaseURL        string
+}
+
+// Enabled dice si hay push: proyecto y credenciales.
+func (f FCM) Enabled() bool { return f.ProjectID != "" && f.CredentialsB64 != "" }
+
+// validate: van juntos o ninguno; las credenciales deben ser una cuenta de servicio válida y
+// FCM_URL solo cambia fuera de producción (pruebas locales).
+func (f FCM) validate(env string) []error {
+	var errs []error
+	if (f.ProjectID == "") != (f.CredentialsB64 == "") {
+		errs = append(errs, fmt.Errorf("%s y %s van juntos (o ninguno, y no hay push)", KeyFCMProjectID, KeyFCMCredenciales))
+	}
+	if f.CredentialsB64 != "" {
+		if _, _, err := push.ParseCredentials(f.CredentialsB64); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", KeyFCMCredenciales, err))
+		}
+	}
+	if f.BaseURL != "" && env == EnvProd {
+		errs = append(errs, fmt.Errorf("%s no se cambia en prod", KeyFCMURL))
+	}
+	return errs
 }

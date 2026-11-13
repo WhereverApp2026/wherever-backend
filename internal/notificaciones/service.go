@@ -18,6 +18,7 @@ import (
 // Service atiende el centro de avisos y el registro de teléfonos, y cumple Notifier.
 type Service struct {
 	repo   *Repository
+	pusher *Pusher
 	cursor *pagination.Signer
 	log    *slog.Logger
 	now    func() time.Time
@@ -26,6 +27,14 @@ type Service struct {
 // NewService recibe sus dependencias por constructor; sin cursor la lista falla cerrada.
 func NewService(repo *Repository, cursor *pagination.Signer, log *slog.Logger) *Service {
 	return &Service{repo: repo, cursor: cursor, log: log, now: time.Now}
+}
+
+// WithPush manda además un push por FCM de cada aviso (nv-41). Sin él, solo el centro.
+func (s *Service) WithPush(p *Pusher) *Service {
+	if p != nil {
+		s.pusher = p
+	}
+	return s
 }
 
 func errNoteNotFound() error { return apperr.NotFound("aviso no encontrado") }
@@ -56,6 +65,10 @@ func (s *Service) Emit(ctx context.Context, to bson.ObjectID, kind string, data 
 	n := Notification{ID: bson.NewObjectID(), UserID: to, Kind: kind, Data: data, CreatedAt: now, ExpiresAt: now.Add(Retention)}
 	if err := s.repo.Insert(ctx, &n); err != nil {
 		s.log.Warn("notificaciones: el aviso no se guardó", "evento", "aviso_fallido", "tipo", kind)
+		return // el centro y el push cuentan lo mismo: sin aviso guardado no hay push
+	}
+	if s.pusher != nil {
+		s.pusher.Enqueue(to, kind, data)
 	}
 }
 

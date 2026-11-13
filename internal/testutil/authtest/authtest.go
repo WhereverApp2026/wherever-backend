@@ -163,7 +163,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	groupRepo := grupos.NewRepository(client.DB())
 	voteRepo := votaciones.NewRepository(client.DB())
 	notifRepo := notificaciones.NewRepository(client.DB())
-	notifier := notificaciones.NewService(notifRepo, cursor, log)
+	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	registry := privacidad.NewRegistry()
