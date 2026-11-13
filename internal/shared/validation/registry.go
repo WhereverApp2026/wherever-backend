@@ -26,6 +26,9 @@ var rules = map[string]validator.Func{
 	"hhmm":     validHHMM,
 	"objectid": validObjectID,
 	"username": validUsername,
+	"semver":   validSemver,
+	"modulo":   validModule,
+	"traceid":  validTraceID,
 }
 
 // Formatos de las reglas propias (hoja A1).
@@ -40,6 +43,10 @@ var (
 	hhmmPattern     = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 	objectIDPattern = regexp.MustCompile(`^[0-9a-f]{24}$`)
 	usernamePattern = regexp.MustCompile(`^[a-z0-9_]{3,20}$`)
+	// Reporte de errores de la app (nv-64).
+	semverPattern  = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
+	modulePattern  = regexp.MustCompile(`^[a-z_]{2,40}$`)
+	traceIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 )
 
 // reservedUsernames no se pueden tomar: suplantarían a la plataforma o a su personal (nv-34).
@@ -115,6 +122,9 @@ var messages = map[string]string{ // #nosec G101 -- mensajes de validación, no 
 	"hhmm":       "debe tener el formato HH:MM",
 	"objectid":   "no es un identificador válido",
 	"username":   "debe tener de 3 a 20 caracteres: minúsculas, números o guion bajo, y no estar reservado",
+	"semver":     "debe ser una versión como 1.4.0",
+	"modulo":     "debe tener de 2 a 40 minúsculas o guion bajo",
+	"traceid":    "debe tener hasta 64 letras, números o guiones",
 	"url":        "no es una URL válida",
 	"gtefield":   "debe ser mayor o igual que el mínimo",
 	"unique":     "tiene elementos repetidos",
@@ -129,6 +139,15 @@ func message(fe validator.FieldError) string {
 		return fmt.Sprintf(text, fe.Param())
 	}
 	return text
+}
+
+// validSemver acepta MAYOR.MENOR.PARCHE con prerelease y build opcionales (semver.org).
+func validSemver(fl validator.FieldLevel) bool { return semverPattern.MatchString(fl.Field().String()) }
+
+func validModule(fl validator.FieldLevel) bool { return modulePattern.MatchString(fl.Field().String()) }
+
+func validTraceID(fl validator.FieldLevel) bool {
+	return traceIDPattern.MatchString(fl.Field().String())
 }
 
 func validCursor(fl validator.FieldLevel) bool {

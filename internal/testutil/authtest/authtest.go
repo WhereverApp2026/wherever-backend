@@ -23,6 +23,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -211,6 +212,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
 	require.NoError(t, err)
+	appErrors, err := errores.NewService(errores.NewRepository(client.DB()), cursor)
+	require.NoError(t, err)
 
 	mods := moderacion.NewService(modRepo, cursor, log)
 	chats := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
@@ -241,6 +244,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			notificaciones.NewHandler(notifier, v).WithActiveGuard(usuarios.RequireActive(users)),
 			sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), v).
 				WithPending(sincronizacion.NewPending(syncActions, plans, acc, users, v), usuarios.RequireActive(users)),
+			errores.NewHandler(appErrors, v),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
 			sugerencias.NewHandler(suggestions).WithActiveGuard(usuarios.RequireActive(users)), // antes que amistades
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),

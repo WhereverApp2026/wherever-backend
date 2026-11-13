@@ -581,7 +581,7 @@
   - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-45 en `main` (nv-44 ya está).
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
-- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
+- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54` y `claude/nv-58-vaca` (solo local); `origin/nv-64` ya trae `main` (2026-11-13). Traerles `main` antes de seguir.
 - Pendiente del operador antes de desplegar: `/wherever/dev/DATA_KEYS` (nv-48/49) y después `make migrar-cifrado APLICAR=1` en ese entorno; `/wherever/dev/FCM_PROJECT_ID` y `FCM_CREDENCIALES_B64` (nv-41, van juntas o ninguna). Ninguna es obligatoria en staging: sin ellas la API arranca, guarda en claro y no manda push. `deploy-env.sh` lee todo `/wherever/dev/`, así que basta con instalar la siguiente imagen.
 - A evitar: fiarse del `main` local; el 2026-11-13 iba 21 commits atrás de `origin/main`. Hacer `git fetch` antes de revisar el estado.
 
@@ -603,6 +603,14 @@
 - Decisión: el módulo HTTP se arma en `cmd/api` sin variables nuevas; el `Moderador` y los destinos los arma nv-45. Si el destino falla, la decisión queda y el recurso sigue sin publicarse. ARCO borra y exporta lo del autor; el id del administrador en la decisión se conserva.
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
 - A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
+
+## NV-64 — Errores de la app y código de amigo (2026-11-13)
+- Estado: rama `nv-64` desde el WIP `232c253` (base nv-37) con `origin/main` fusionado; PR contra `main`. Local en `golang:1.27.3`: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints` en verde. Integration (`errores_test.go`, `personas_codigo_test.go`, `TestPresupuestoRedis_VentanasPorUsuarioNV64`), Security (`errores_security_test.go`), Database (índices y TTL de `errores_app`) y Contract (`errores/`, `personas/codigo_*`, capturas escritas a mano) las corre el CI.
+- Decisión: `errores_app` sin `usuario_id` (nada que purgar ni exportar en ARCO); el mensaje se filtra antes de guardar (`errores.Scrub`: JWT, luego `logger.RedactText`, luego 7 o más dígitos) y la huella se calcula sobre el texto filtrado. Porqué: dos reportes con datos personales distintos caen en el mismo grupo y nada personal llega a la base.
+- Decisión: `GET /admin/errores` usa la política `admin` (200/min por IP) como moderación e importación; el reporte y la búsqueda por código usan ventanas por usuario de 30/h (`errores_reporte`, `personas_codigo`).
+- Decisión: `personas.Blocks.Relation` (cumple `amistades.Repository`) da la relación en una consulta; un bloqueo en cualquier sentido, cuenta no activa y el propio código dan el mismo 404.
+- Logs: no se agregan campos; los filtros de CloudWatch (`level`, `estado`, `duracion_ms`, `dependencia`, `evento`) no cambian. Sin variables nuevas.
+- A evitar: el `TestPresupuestoRedis` de una política nueva se mide relativo a una ruta igual (no con un número fijo) cuando no se pueden correr contenedores en local.
 
 ## NV-57 — Chat de grupo (2026-11-13)
 - Estado: rama `nv-57` desde `origin/main`, PR contra `main`. `internal/chat` (4 rutas REST, `PublicarSistema`, ARCO), `grupos.ultimo_mensaje`, aviso `mensaje_grupo`. Local: build, vet, Unit, lint, `check_sdd` y `check_endpoints` (110 rutas). `critic` no corrió en local (límite de uso): lo corre el CI. Falta la firma.
