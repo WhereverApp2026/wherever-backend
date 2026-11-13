@@ -557,6 +557,14 @@
 - Decisión: si la base falla a la mitad, lo aplicado queda y la acción que falló se suelta (`Release`): 503 y reintentar es seguro.
 - Corrección de drift: 101 acciones = 422 (no 413); conflicto de ajustes por `usuarios.version` (sus PATCH no llevan If-Match).
 
+## NV-48 — Capa de cifrado de campos (2026-11-12)
+- Estado: rama `nv-48` desde `nv-47`, PR contra `main`. Paquete `internal/platform/cifrado` y `DATA_KEYS` en la configuración; lo usa nv-49. Falta la firma.
+- Decisión: `DATA_KEYS` = `id:base64,…` (32 bytes cada una); la primera cifra y todas descifran. Dato asociado de GCM = colección, campo e id del documento. Formato `enc:v1:<id>:<nonce>:<cifrado>` en base64url.
+- Decisión: obligatoria en prod (no arranca); en dev y staging puede faltar y nv-49 guarda en claro con aviso. El servidor de AWS es staging: cargar `/wherever/dev/DATA_KEYS` (SecureString) para que cifre allá.
+- Corrección de drift: el ánimo no se guarda (solo el consentimiento `estado_animo`); se cifran alergias y fecha de nacimiento.
+- Medido: ~1,4 µs por cifrar y descifrar un valor.
+- A evitar: varios heredocs `<<'EOF'` en un mismo comando de Bash con acentos y comillas; fallan con «unexpected EOF». Usar Write para los documentos.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
