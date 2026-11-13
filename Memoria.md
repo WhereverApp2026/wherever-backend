@@ -602,7 +602,7 @@
 - Decisión: decidir es un `findOneAndUpdate` condicionado a `pendiente` y la versión, así la segunda decisión es 409. Solo entra cuarentena; un recurso no entra dos veces mientras espera (índice único parcial). La imagen va por llave de S3, nunca en bytes.
 - Decisión: el módulo HTTP se arma en `cmd/api` sin variables nuevas; el `Moderador` y los destinos los arma nv-45. Si el destino falla, la decisión queda y el recurso sigue sin publicarse. ARCO borra y exporta lo del autor; el id del administrador en la decisión se conserva.
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
-- A evitar: editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
+- A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
