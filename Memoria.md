@@ -499,7 +499,7 @@
 - A evitar: correr `gofmt -w` sobre todo `internal/` con Go 1.27.3 reformatea `internal/shared/apperr/apperr.go` (alineación de un mapa); limitarlo a los archivos tocados.
 
 ## NV-37 — Grupos e integrantes (2026-11-12)
-- Estado: rama `nv-37` desde `main` (`48e866f`), PR contra `main`. Local: build, vet, Unit, lint 0, critic, `check_sdd` y `check_endpoints` (83 rutas) en verde. Integration, Security, Database y Contract en el CI del PR. Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #69) con el CI completo. Local: build, vet, Unit, lint 0, critic, `check_sdd` y `check_endpoints` (83 rutas) en verde. Falta la firma.
 - Corrección de drift: unirse por enlace es de nv-38, votaciones y su cierre de nv-39 y notificaciones de nv-40/41; la spec y el plan ya no los piden aquí.
 - Decisión: un grupo por plan (`ux_plan`); el organizador va en `integrantes` (`organizador`/`confirmado`) y cuenta en los 12. `ocupados` = integrantes que no declinaron y solo cambia con un `$inc` en la misma operación que cambia `integrantes`, con `ocupados < 12` en el filtro. Probado con 20 invitaciones simultáneas al repositorio.
 - Decisión: solo amigos `aceptada` con cuenta activa; un solo 422 para no amigo, inactivo o uno mismo (no revela cuál). Quien declina libera su lugar, sigue viendo el grupo y puede volver a confirmar si hay cupo; los demás integrantes no lo ven.
@@ -509,7 +509,7 @@
 - A evitar: probar la concurrencia del tope por HTTP con un solo organizador; el límite de 10 escrituras simultáneas da 429 antes.
 
 ## NV-38 — Enlace de invitación y vista pública (2026-11-12)
-- Estado: rama `nv-38` desde `nv-37`, PR contra `main` (trae nv-37 hasta que se fusione #69). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (87 rutas). Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #70). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (87 rutas). Falta la firma.
 - Corrección de drift: el código iba en la ruta (`/planes/compartidos/{codigo}`, `/grupos/unirse/{codigo}`), pero `Errors` registra `ruta` en cada línea de acceso (y CloudFront también). Ahora va en el cuerpo (`POST {codigo}`) y en el fragmento del enlace (`{APP_LINK_BASE}/plan#codigo=…`), como los tokens de correo de nv-06. Se agregó `DELETE /planes/{id}/compartir` para revocar.
 - Decisión: un código por grupo en `grupos.codigo_hash` (SHA-256, `ux_codigo_hash` único parcial) y `codigo_vence`; crear otro reemplaza al anterior. Compartir crea el grupo si falta.
 - Decisión: unirse no pide amistad (el enlace es la invitación) pero sí cuenta activa y que no haya bloqueo con el organizador (404). Entra o vuelve confirmado con `ocupados < 12` en la misma operación. Vencido: vista 404, unirse 410.
@@ -518,7 +518,7 @@
 - Para la app: leer `codigo` de `location.hash` y mandarlo por `POST`; no ponerlo en la URL. `APP_LINK_BASE` cambia si se recrea CloudFront.
 
 ## NV-39 — Votaciones (2026-11-12)
-- Estado: rama `nv-39` desde `nv-38`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (91 rutas). Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #71). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (91 rutas). Falta la firma.
 - Decisión (cierra el hallazgo de Redis): el vencimiento lo cierra un `Closer` por instancia cada minuto que solo consulta MongoDB (`ix_estado_cierra`). No hace falta `lock:` porque cerrar es un `UpdateOne` condicionado a `estado = abierta` y `votos_version`: 0 comandos de Redis en lugar del ~7 % estimado. Listar o votar una vencida también la cierra.
 - Decisión: `votos` es un mapa `{usuario_hex: negocio_id}` con `votos_version` que sube en cada voto. No condicionar el cierre al mapa: Go codifica los mapas en orden aleatorio y la igualdad de documentos en MongoDB depende del orden.
 - Decisión: la ganadora se aplica con `planes.Service.ReplaceBusiness` (lee la versión y reintenta una vez si otra edición gana). Si el plan o la parada no existen o la ganadora no abre a esa hora, `aplicada: false` con `motivo`; si falla la base, `aplicada` queda sin valor y el `Closer` lo reintenta.
@@ -527,7 +527,7 @@
 - Lección: la prueba de dos instancias encontró que cerrar era único pero aplicar no: las dos veían «cerrada sin aplicar» y cambiaban el plan. `ClaimApply` reserva la aplicación (`aplicando_hasta`, 1 min) con un `UpdateOne` condicionado.
 
 ## NV-40 — Dispositivos y centro de notificaciones (2026-11-12)
-- Estado: rama `nv-40` desde `nv-39`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (98 rutas). Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #72). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (98 rutas). Falta la firma.
 - Corrección de drift: el token de FCM iba en la ruta (`/dispositivos/{fcm_token}`); ahora `PUT/DELETE /dispositivos` con `{token}` en el cuerpo, por el log de acceso.
 - Decisión: `notificaciones.Notifier` (`Emit`) lo reciben amistades, grupos y votaciones con `WithNotifier` (por defecto `Noop`). `Emit` guarda y, si falla, solo registra el tipo: nunca cambia la respuesta de la acción.
 - Decisión: `datos` solo lleva ids; la app arma el texto. TTL de 90 días (`expira_en`).
@@ -536,7 +536,7 @@
 - A evitar: heredocs largos de Python con comillas y acentos en Bash (fallan); escribir el script en el scratchpad y correrlo con `python -I archivo.py "$(pwd -W)"`.
 
 ## NV-41 — Push con Firebase (2026-11-12)
-- Estado: rama `nv-41` desde `nv-40`, PR contra `main`. Implementada y probada contra `internal/testutil/fcmtest` (servidor local con llave propia). Falta la prueba en vivo: el equipo crea el proyecto de Firebase y carga las credenciales (nunca por el chat). Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #73). Implementada y probada contra `internal/testutil/fcmtest` (servidor local con llave propia). Falta la prueba en vivo: el equipo crea el proyecto de Firebase y carga las credenciales (nunca por el chat). Falta la firma.
 - Decisión: cliente propio de FCM HTTP v1 (`internal/platform/push`) que firma el JWT RS256 con `golang-jwt` y cambia el token en `token_uri`; sin librerías de Google. Token de acceso en memoria hasta 1 min antes de vencer (`Reset()` con mutex).
 - Decisión: credenciales en `FCM_CREDENCIALES_B64` (JSON en base64, una línea) con `FCM_PROJECT_ID`; van juntas o ninguna, y sin ellas no hay push. Corrige el hallazgo de la revisión (`fcm-service-account` no era nombre de variable y el JSON tenía varias líneas). `FCM_URL` solo fuera de prod.
 - Decisión: el push sale del mismo `Emit` que el centro y solo si el aviso se guardó. Cola de 500 y 4 trabajadores; 3 intentos solo en fallos temporales; `UNREGISTERED` borra el token.
@@ -544,7 +544,7 @@
 - Operación: PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("llave.json"))`; en AWS, `/wherever/dev/FCM_PROJECT_ID` (String) y `/wherever/dev/FCM_CREDENCIALES_B64` (SecureString); la siguiente instalación de imagen los toma.
 
 ## NV-46 — Descarga de cambios (2026-11-12)
-- Estado: rama `nv-46` desde `nv-41`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (99 rutas). Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #74). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (99 rutas). Falta la firma.
 - Decisión: contador `sync_estado.seq` por usuario con `$inc` atómico; `planes.Service.WithSync` numera alta, edición y borrado (`planes.sync_seq`, `ix_dueno_sync`). `startVotes` también lo usa: la ganadora de una votación cambia el plan.
 - Decisión: los ajustes no se numeran; viajan cuando cambia `usuarios.version` (todas las ediciones del perfil pasan por `apply`, que la sube). `account.SettingsOf` da la misma forma que `GET /usuarios/yo`.
 - Decisión: cursor `desde` firmado (nv-17) con `seq:version:emitido_unix` (hora del servidor). Más de 30 días = 410 con `campos[{desde: requiere_completa}]`.
@@ -552,13 +552,13 @@
 - Para nv-47: aplicar acciones con los mismos `planes.Service` (ya numeran) y `account` (ya sube la versión).
 
 ## NV-47 — Acciones sin conexión (2026-11-12)
-- Estado: rama `nv-47` desde `nv-46`, PR contra `main`. Local: build, vet, Unit, lint 0, critic, `check_sdd`, `check_endpoints` (100 rutas) e Integration de sincronización en verde. Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #75). Local: build, vet, Unit, lint 0, critic, `check_sdd`, `check_endpoints` (100 rutas) e Integration de sincronización en verde. Falta la firma.
 - Decisión: cada acción se reclama insertando en `sync_acciones` (`ux_usuario_cliente`, TTL 7 días) antes de aplicarla; repetir responde `duplicada` con `resultado_original`. Se aplica con los mismos `planes.Service` y `account.Service` de la API.
 - Decisión: si la base falla a la mitad, lo aplicado queda y la acción que falló se suelta (`Release`): 503 y reintentar es seguro.
 - Corrección de drift: 101 acciones = 422 (no 413); conflicto de ajustes por `usuarios.version` (sus PATCH no llevan If-Match).
 
 ## NV-48 — Capa de cifrado de campos (2026-11-12)
-- Estado: rama `nv-48` desde `nv-47`, PR contra `main`. Paquete `internal/platform/cifrado` y `DATA_KEYS` en la configuración; lo usa nv-49. Falta la firma.
+- Estado (2026-11-13): fusionada en `main` (PR #76). Paquete `internal/platform/cifrado` y `DATA_KEYS` en la configuración; lo usa nv-49 (PR #77, abierto). Falta la firma.
 - Decisión: `DATA_KEYS` = `id:base64,…` (32 bytes cada una); la primera cifra y todas descifran. Dato asociado de GCM = colección, campo e id del documento. Formato `enc:v1:<id>:<nonce>:<cifrado>` en base64url.
 - Decisión: obligatoria en prod (no arranca); en dev y staging puede faltar y nv-49 guarda en claro con aviso. El servidor de AWS es staging: cargar `/wherever/dev/DATA_KEYS` (SecureString) para que cifre allá.
 - Corrección de drift: el ánimo no se guarda (solo el consentimiento `estado_animo`); se cifran alergias y fecha de nacimiento.
@@ -566,12 +566,24 @@
 - A evitar: varios heredocs `<<'EOF'` en un mismo comando de Bash con acentos y comillas; fallan con «unexpected EOF». Usar Write para los documentos.
 
 ## NV-49 — Cifrar datos sensibles (2026-11-12)
-- Estado: rama `nv-49` desde `nv-48`, PR contra `main`. Falta la firma, cargar `DATA_KEYS` en `/wherever/dev/` y correr la migración en ese entorno.
+- Estado (2026-11-13): fusionada en `main` (PR #77). Falta la firma, cargar `DATA_KEYS` en `/wherever/dev/` y correr la migración en ese entorno.
 - Decisión: la capa vive en `usuarios.Repository` (`WithCipher`): `Create` y `apply` cifran, `findOne` y `apply` descifran. `account`, `recomendaciones`, `asistente` y la exportación no cambian.
 - Decisión: `User.BirthDate` (`bson:"-"`) queda en claro para el código y `BirthDateStored` (`any`) va a la base: texto cifrado o la fecha de antes. `mayor_de_edad: true` al registrar.
 - Decisión: un valor que no abre = `ErrCipher` (503); nunca se devuelve el texto cifrado como dato. Un valor copiado de otra cuenta no abre (dato asociado con el id).
 - Migración: `make migrar-cifrado` (cuenta) y `make migrar-cifrado APLICAR=1`; idempotente, también rota, y no sube `version`.
 - A evitar: construir un `usuarios.Repository` de producción sin `WithCipher` (leería el texto cifrado como alergias y el filtro de nv-23 dejaría solo `["ninguno"]`); hoy son `cmd/api` (`users` y `startVotes`) y `authtest`.
+
+## Estado de las olas (2026-11-13)
+- Olas 5 (nv-37 a nv-41) y 7 (nv-46 a nv-49) completas en `main` (PRs #69 a #77). Las nueve siguen sin firma.
+- Sin ejecutar: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
+- Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
+  - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
+  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8.
+  - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
+  - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
+- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
+- Pendiente del operador antes de desplegar: `/wherever/dev/DATA_KEYS` (nv-48/49) y después `make migrar-cifrado APLICAR=1` en ese entorno; `/wherever/dev/FCM_PROJECT_ID` y `FCM_CREDENCIALES_B64` (nv-41, van juntas o ninguna). Ninguna es obligatoria en staging: sin ellas la API arranca, guarda en claro y no manda push. `deploy-env.sh` lee todo `/wherever/dev/`, así que basta con instalar la siguiente imagen.
+- A evitar: fiarse del `main` local; el 2026-11-13 iba 21 commits atrás de `origin/main`. Hacer `git fetch` antes de revisar el estado.
 
 ## NV-42 — Evaluación de imágenes y texto (2026-11-13)
 - Estado: rama `nv-42` desde `main`, PR contra `main`. Paquete `internal/moderacion` (`Moderador.Evaluar`, `Rekognition`, `TextoIA`, reglas) y doble `internal/testutil/rekognitiontest`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints`. Falta la firma y la prueba en vivo (`MODERACION_LIVE=1`), que espera el permiso del deployer.
