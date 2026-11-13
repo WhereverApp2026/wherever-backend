@@ -26,6 +26,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
+	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -174,6 +175,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planPrivacy := planes.NewPrivacy(planRepo)
 	// Los integrantes del grupo leen el plan (nv-37); cada cambio se numera para la sincronización (nv-46).
 	groupRepo := grupos.NewRepository(db)
+	favRepo := favoritos.NewRepository(db)
 	syncRepo := sincronizacion.NewRepository(db)
 	syncActions := sincronizacion.NewActions(db)
 	voteRepo := votaciones.NewRepository(db)
@@ -188,7 +190,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), chat.NewPrivacy(chatRepo, groupRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), chat.NewPrivacy(chatRepo, groupRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), favoritos.NewPrivacy(favRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -199,6 +201,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(chat.NewPrivacy(chatRepo, groupRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
@@ -252,6 +255,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
+		favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
