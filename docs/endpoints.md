@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -86,6 +86,7 @@
 | POST | `/api/v1/notificaciones/leer-todas` → marca todas como leídas | JWT | global | 204/401/403 | nv-40 (A6) |
 | PATCH | `/api/v1/notificaciones/{id}` con `{leida}` → el aviso; la de otra persona = 404 | JWT, destinatario | global | 200/400/401/403/404/422 | nv-40 (A6) |
 | DELETE | `/api/v1/notificaciones/{id}` → borra el aviso; la de otra persona = 404 | JWT, destinatario | global | 204/401/403/404 | nv-40 (A6) |
+| GET | `/api/v1/sync/cambios` con `?desde=&limite=` → `{planes[plan], borrados[{tipo, id}], ajustes?{version, preferencias, privacidad, gustos}, siguiente, hay_mas}`; sin `desde` es la descarga completa; `desde` es el `siguiente` anterior (opaco y firmado; guarda un contador del servidor, nunca la hora del teléfono); solo los planes propios activos cambiados y los borrados de los últimos 30 días, en orden de cambio; `ajustes` solo si cambió la versión del perfil; `limite` 100 por defecto y 200 máx.; con `hay_mas` se vuelve a pedir; un `desde` de hace más de 30 días = 410 con `campos[{campo: desde, mensaje: requiere_completa}]`; `Cache-Control: no-store` | JWT | global | 200/401/410/422 | nv-46 (A6) |
 | GET | `/api/v1/busquedas/recientes` → `{items[{texto, buscado_en}]}`; las 10 más nuevas del usuario (repetir una solo la sube); cada una vive 90 días; `Cache-Control: no-store` | JWT | global | 200/401/403 | nv-22 (A2) |
 | DELETE | `/api/v1/busquedas/recientes` → borra todas las búsquedas recientes del usuario | JWT | global | 204/401/403 | nv-22 (A2) |
 | GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |

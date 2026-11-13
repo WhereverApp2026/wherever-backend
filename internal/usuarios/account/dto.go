@@ -298,3 +298,9 @@ func profileResponse(u usuarios.User) ProfileResponse {
 	}
 	return out
 }
+
+// SettingsOf da los gustos, las preferencias y la privacidad con la misma forma de
+// GET /usuarios/yo; la usa la sincronización (nv-46).
+func SettingsOf(u usuarios.User) (*TastesResponse, PreferencesResponse, PrivacyResponse) {
+	return tastesResponse(u.Tastes), preferencesResponse(u.Preferences), privacyResponse(u.Privacy)
+}

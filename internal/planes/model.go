@@ -73,6 +73,8 @@ type Plan struct {
 	Estado          string        `bson:"estado" json:"-"`
 	Origen          string        `bson:"origen" json:"origen"`
 	Version         int           `bson:"version" json:"version"`
-	CreadoEn        time.Time     `bson:"creado_en" json:"creado_en"`
-	ActualizadoEn   time.Time     `bson:"actualizado_en" json:"actualizado_en"`
+	// SyncSeq es el número del último cambio en la sincronización del dueño (nv-46).
+	SyncSeq       int64     `bson:"sync_seq" json:"-"`
+	CreadoEn      time.Time `bson:"creado_en" json:"creado_en"`
+	ActualizadoEn time.Time `bson:"actualizado_en" json:"actualizado_en"`
 }

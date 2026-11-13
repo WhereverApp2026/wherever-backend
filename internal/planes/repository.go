@@ -18,13 +18,14 @@ var (
 	ErrVersionConflict = errors.New("la versión no coincide")
 )
 
-// Indexes son los 2 índices de la spec. El único creador es scripts/indexes.
+// Indexes son los índices de la spec y el de sincronización (nv-46). El único creador es scripts/indexes.
 func Indexes() []platformmongo.IndexSet {
 	return []platformmongo.IndexSet{{
 		Collection: Collection,
 		Models: []mongo.IndexModel{
 			{Keys: bson.D{{Key: "dueno_id", Value: 1}, {Key: "estado", Value: 1}, {Key: "fecha", Value: 1}}, Options: options.Index().SetName("ix_dueno_estado_fecha")},
 			{Keys: bson.D{{Key: "estado", Value: 1}, {Key: "fecha", Value: 1}}, Options: options.Index().SetName("ix_estado_fecha")},
+			{Keys: bson.D{{Key: "dueno_id", Value: 1}, {Key: "sync_seq", Value: 1}}, Options: options.Index().SetName("ix_dueno_sync")},
 		},
 	}}
 }
@@ -108,6 +109,7 @@ func (r *Repository) UpdateIfVersion(ctx context.Context, p *Plan, version int) 
 		{Key: "movilidad", Value: p.Movilidad}, {Key: "paradas", Value: p.Paradas},
 		{Key: "traslados", Value: p.Traslados}, {Key: "costo_total", Value: p.CostoTotal},
 		{Key: "costo_por_persona", Value: p.CostoPorPersona}, {Key: "actualizado_en", Value: r.now().UTC()},
+		{Key: "sync_seq", Value: p.SyncSeq},
 	}
 	filter := append(ownedActive(p.OwnerID, p.ID), bson.E{Key: "version", Value: version})
 	update := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
@@ -145,11 +147,12 @@ func (r *Repository) DeleteByOwner(ctx context.Context, owner bson.ObjectID) err
 	return err
 }
 
-// DeleteIfVersion hace el borrado lógico del plan del dueño si la versión coincide.
-func (r *Repository) DeleteIfVersion(ctx context.Context, owner, id bson.ObjectID, version int) error {
+// DeleteIfVersion hace el borrado lógico del plan del dueño si la versión coincide; `seq`
+// es el número del cambio para la sincronización (nv-46).
+func (r *Repository) DeleteIfVersion(ctx context.Context, owner, id bson.ObjectID, version int, seq int64) error {
 	filter := append(ownedActive(owner, id), bson.E{Key: "version", Value: version})
 	update := bson.D{
-		{Key: "$set", Value: bson.D{{Key: "estado", Value: StatusDeleted}, {Key: "actualizado_en", Value: r.now().UTC()}}},
+		{Key: "$set", Value: bson.D{{Key: "estado", Value: StatusDeleted}, {Key: "actualizado_en", Value: r.now().UTC()}, {Key: "sync_seq", Value: seq}}},
 		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}},
 	}
 	res, err := r.col.UpdateOne(ctx, filter, update)
@@ -224,4 +227,19 @@ func pageFilter(q PageQuery) bson.D {
 		}})
 	}
 	return filter
+}
+
+// ChangedAfter trae hasta limit planes activos del dueño cambiados después de `after`, en
+// orden de cambio (sincronización, nv-46). Usa ix_dueno_sync.
+func (r *Repository) ChangedAfter(ctx context.Context, owner bson.ObjectID, after int64, limit int) ([]Plan, error) {
+	filter := bson.D{{Key: "dueno_id", Value: owner}, {Key: "estado", Value: StatusActive}, {Key: "sync_seq", Value: bson.D{{Key: "$gt", Value: after}}}}
+	cur, err := r.col.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "sync_seq", Value: 1}}).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, err
+	}
+	out := []Plan{}
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
