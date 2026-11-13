@@ -48,6 +48,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
+	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
 )
 
 // Password es la contraseña de los usuarios de prueba; no es secreto de ningún entorno.
@@ -172,6 +173,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	vacaRepo := vaca.NewRepository(client.DB())
+	registry.RegisterExporter(vaca.NewExpensesPrivacy(vacaRepo))
+	registry.RegisterExporter(vaca.NewDebtsPrivacy(vacaRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
@@ -204,6 +208,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
+			vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(rdb), cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			clima.NewHandler(weather, cities, v),

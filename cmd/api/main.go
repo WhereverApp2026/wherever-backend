@@ -51,6 +51,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
+	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
 )
 
 // version se fija al compilar: -ldflags "-X main.version=v0.1.0".
@@ -183,6 +184,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	vacaRepo := vaca.NewRepository(db)
+	registry.RegisterExporter(vaca.NewExpensesPrivacy(vacaRepo))
+	registry.RegisterExporter(vaca.NewDebtsPrivacy(vacaRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
@@ -226,6 +230,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// grupos va antes que planes: atiende POST /planes/:id/invitaciones (nv-37).
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor), validator).WithActiveGuard(active),
+		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
