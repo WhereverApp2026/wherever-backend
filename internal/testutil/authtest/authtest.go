@@ -30,6 +30,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
@@ -161,10 +162,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	graph := grafo.NewQueue(client.DB(), log)
 	groupRepo := grupos.NewRepository(client.DB())
 	voteRepo := votaciones.NewRepository(client.DB())
+	notifRepo := notificaciones.NewRepository(client.DB())
+	notifier := notificaciones.NewService(notifRepo, cursor, log)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -176,6 +179,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
+	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
@@ -187,13 +191,13 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	weather := clima.NewServicio(clima.NewOpenMeteo(openMeteo.URL), log)
 	friends, err := amistades.NewService(friendRepo, users, log)
 	require.NoError(t, err)
-	friends.WithGraph(graph)
+	friends.WithGraph(graph).WithNotifier(notifier)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
 	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
 	require.NoError(t, err)
 
-	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log)
+	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches,
@@ -209,11 +213,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos
-			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
+			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			clima.NewHandler(weather, cities, v),
 			inicio.NewHandler(inicio.NewService(reco, weather), v),
+			notificaciones.NewHandler(notifier, v).WithActiveGuard(usuarios.RequireActive(users)),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
 			sugerencias.NewHandler(suggestions).WithActiveGuard(usuarios.RequireActive(users)), // antes que amistades
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),

@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -79,6 +79,13 @@
 | GET | `/api/v1/grupos/{id}/votaciones` → `{items[votación]}` (hasta 100, la más nueva primero); cierra antes las vencidas; conteos sin decir quién votó qué | JWT, integrante | global | 200/401/404 | nv-39 (J3) |
 | PUT | `/api/v1/votaciones/{id}/voto` con `{negocio_id}` → votación; un voto por persona, se cambia hasta el cierre; cerrada o vencida = 409; quien declinó = 403; opción que no está = 422 | JWT, integrante invitado o confirmado | global | 200/400/401/403/404/409/422 | nv-39 (J3) |
 | POST | `/api/v1/votaciones/{id}/cerrar` → votación cerrada con `ganadora` (más votos; en empate, la propuesta primero) y `aplicada` (la parada del plan cambia a la ganadora y se recalcula; si no cabe, `aplicada: false` y `motivo`); ya cerrada = 409. Al vencer `cierra_en` la cierra el trabajador de cada instancia (cada minuto, solo MongoDB) | JWT, organizador (integrante = 403) | global | 200/401/403/404/409 | nv-39 (J3) |
+| PUT | `/api/v1/dispositivos` con `{token, plataforma?}` (`android`) → registra el token de FCM del teléfono o renueva su uso; si era de otra cuenta, pasa a esta; hasta 5 por cuenta (el sexto = 422); el token va en el cuerpo, nunca en la ruta | JWT | global | 204/400/401/403/422 | nv-40 (A6) |
+| DELETE | `/api/v1/dispositivos` con `{token}` → quita el teléfono de la cuenta; si no es suyo = 404 | JWT | global | 204/400/401/403/404/422 | nv-40 (A6) |
+| GET | `/api/v1/notificaciones` con `?cursor=&limite=` → `{items[{id, tipo, datos{ids}, leida, creada_en}], siguiente_cursor, limite}`; del más nuevo al más viejo; tipos `solicitud_amistad`, `amistad_aceptada`, `invitacion_plan`, `votacion_abierta`, `votacion_cerrada`; `datos` solo lleva ids; se borran a los 90 días; cursor firmado | JWT | global | 200/401/422 | nv-40 (A6) |
+| GET | `/api/v1/notificaciones/no-leidas` → `{total}` | JWT | global | 200/401 | nv-40 (A6) |
+| POST | `/api/v1/notificaciones/leer-todas` → marca todas como leídas | JWT | global | 204/401/403 | nv-40 (A6) |
+| PATCH | `/api/v1/notificaciones/{id}` con `{leida}` → el aviso; la de otra persona = 404 | JWT, destinatario | global | 200/400/401/403/404/422 | nv-40 (A6) |
+| DELETE | `/api/v1/notificaciones/{id}` → borra el aviso; la de otra persona = 404 | JWT, destinatario | global | 204/401/403/404 | nv-40 (A6) |
 | GET | `/api/v1/busquedas/recientes` → `{items[{texto, buscado_en}]}`; las 10 más nuevas del usuario (repetir una solo la sube); cada una vive 90 días; `Cache-Control: no-store` | JWT | global | 200/401/403 | nv-22 (A2) |
 | DELETE | `/api/v1/busquedas/recientes` → borra todas las búsquedas recientes del usuario | JWT | global | 204/401/403 | nv-22 (A2) |
 | GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |
