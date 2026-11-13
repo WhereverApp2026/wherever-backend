@@ -40,10 +40,15 @@ func ReglasPorDefecto() Reglas {
 	}
 }
 
-// Validar exige 0 < Cuarentena < Rechazo <= 100.
+// CuarentenaMinima es el umbral de cuarentena más bajo que se acepta: Rekognition no devuelve
+// etiquetas con menos confianza (confianzaMinima), así que un umbral menor no vería nada nuevo
+// en las imágenes y daría una falsa sensación de rigor (nv-43).
+const CuarentenaMinima = confianzaMinima
+
+// Validar exige CuarentenaMinima <= Cuarentena < Rechazo <= 100.
 func (r Reglas) Validar() error {
-	if r.Cuarentena <= 0 || r.Cuarentena >= r.Rechazo || r.Rechazo > 100 {
-		return fmt.Errorf("%w: se pide 0 < cuarentena (%v) < rechazo (%v) <= 100", ErrReglasInvalid, r.Cuarentena, r.Rechazo)
+	if r.Cuarentena < CuarentenaMinima || r.Cuarentena >= r.Rechazo || r.Rechazo > 100 {
+		return fmt.Errorf("%w: se pide %v <= cuarentena (%v) < rechazo (%v) <= 100", ErrReglasInvalid, CuarentenaMinima, r.Cuarentena, r.Rechazo)
 	}
 	return nil
 }
@@ -88,7 +93,8 @@ func plano(s string) string {
 	return strings.TrimSpace(noLetras.ReplaceAllString(sin, " "))
 }
 
-// Fijas son reglas que no cambian en ejecución, hasta que nv-43 las lea de moderacion_reglas.
+// Fijas son reglas que no cambian en ejecución (pruebas y respaldo); en el servidor las lee
+// Service de moderacion_reglas (nv-43).
 type Fijas Reglas
 
 // Reglas devuelve las reglas fijas.
