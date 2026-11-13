@@ -578,7 +578,7 @@
 - Sin ejecutar: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
 - Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
   - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
-  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8.
+  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-44/45 en `main`.
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
@@ -603,6 +603,13 @@
 - Decisión: el módulo HTTP se arma en `cmd/api` sin variables nuevas; el `Moderador` y los destinos los arma nv-45. Si el destino falla, la decisión queda y el recurso sigue sin publicarse. ARCO borra y exporta lo del autor; el id del administrador en la decisión se conserva.
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
 - A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
+
+## Specs nv-55 y nv-56 — Negocios aliados (2026-11-13)
+- Estado: specs en Borrador (sin código) desde la hoja A5 del Excel v3, leída con `openpyxl` en solo lectura. `SDD-OK` y `check_endpoints` OK.
+- Decisión propuesta: el expediente (INE, comprobante, fiscales, CLABE) va en `negocios_documentos`, no en `negocios`, cifrado con `DATA_KEYS`; los archivos pasan por la API y van cifrados a `privado/` del bucket de nv-44, fuera de CloudFront. Cada lectura del admin exige `motivo` y queda en `accesos_expediente` (fail-closed).
+- Decisión propuesta: el panel junta reservas (nv-59), cupones (nv-61, P-49) y reseñas (nv-62, P-50) por interfaces `PanelFuente`; la pausa avisa por `negocios.Observador`. `reservas_config` lleva `confirmacion` y `permite_cambios` que pidió nv-59.
+- Choque abierto con nv-60: nv-60 reclama `PUT /cuenta-deposito`; nv-55 propone guardarla cifrada y que nv-60 la mande a Stripe y la borre (D3/D11).
+- A evitar: correr Python con `-I` en esta máquina: desactiva el `site` del usuario y `openpyxl` no carga; usar `-E -P` y `sys.stdout.reconfigure(encoding="utf-8")` (con `-E` se ignora `PYTHONIOENCODING`). Poner filas de rutas sin código en la tabla viva rompe `check_endpoints`: van como viñetas en «Diferidos».
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
