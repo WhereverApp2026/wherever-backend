@@ -1,9 +1,9 @@
 # plan.md — NV-64 Reporte de errores de la app y búsqueda por código de amigo
 
 1. Mapeo
-- Crear: `internal/errores/{repository,service,handler,dto}.go`, `internal/testutil/errorestest`, pruebas de las cuatro suites.
-- Modificar: `internal/platform/logger` (exportar `RedactText`), `internal/personas` (handler, service y DTO de la ruta por código), `scripts/indexes` y los índices declarados de `/ready`, registro de rutas en `internal/http`, `docs/endpoints.md` y `docs/rate-limit-matrix.md`.
-- Sin cambios: `usuarios` (el índice `ux_codigo_amigo` ya existe), `amistades`, variables.
+- Crear: `internal/errores/{repository,service,handler,dto}.go` y pruebas de las cinco suites. El armado para pruebas va en `internal/testutil/authtest` (no hizo falta `errorestest`).
+- Modificar: `internal/platform/logger` (exportar `RedactText`), `internal/shared/validation` (`modulo`, `semver`, `traceid`), `internal/personas` (handler, service y DTO de la ruta por código), `internal/usuarios` (`FindByFriendCode`, `ValidFriendCode`), `internal/amistades` (`Relation`), `internal/indexes` (los índices de `scripts/indexes` y `/ready`), `cmd/api` y `scripts/routes`, `docs/endpoints.md` y `docs/rate-limit-matrix.md`.
+- Sin cambios: índices de `usuarios` (`ux_codigo_amigo` ya existe), variables.
 
 2. Guardarraíles
 - Servicios reales en las pruebas, sin secretos en Git, sin datos personales en logs ni en `errores_app`, rol validado en cada endpoint y cada ruta nueva en `docs/endpoints.md`.

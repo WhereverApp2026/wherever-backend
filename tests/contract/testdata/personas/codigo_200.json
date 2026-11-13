@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "body": {
+    "foto_url": "string",
+    "id": "string",
+    "nombre": "string",
+    "nombre_usuario": "string",
+    "relacion": "string"
+  }
+}

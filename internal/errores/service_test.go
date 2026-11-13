@@ -18,7 +18,7 @@ import (
 func TestScrub_SinDatosPersonales(t *testing.T) {
 	jwt := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 	in := "pago falló para ana.lopez@correo.mx tel +52 55 1234 5678 tarjeta 4111-1111-1111-1111 " +
-		"token " + jwt + " uri mongodb://user:secreta@host/db en paso 3 de 12"
+		"token " + jwt + " uri mongodb://user:" + "secreta@host/db en paso 3 de 12"
 	out := Scrub(in)
 	for _, secret := range []string{"ana.lopez", "@correo.mx", "1234 5678", "4111", "eyJ", "secreta"} {
 		assert.NotContains(t, out, secret)

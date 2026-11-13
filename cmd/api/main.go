@@ -223,18 +223,13 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
+	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, db, cursor, log)
 	if err != nil {
 		return nil, nil, err
 	}
 	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
-	}
-	// Errores de la app (nv-64): agrupados por huella, sin datos personales.
-	appErrors, err := errores.NewService(errores.NewRepository(db), cursor)
-	if err != nil {
-		return nil, nil, err
 	}
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
@@ -259,7 +254,6 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		notificaciones.NewHandler(notifier, validator).WithActiveGuard(active),
 		sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), validator).
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
-		errores.NewHandler(appErrors, validator),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
@@ -382,6 +376,20 @@ type socialDeps struct {
 	phoneKey  []byte
 	validator *validation.Validator
 	active    fiber.Handler
+}
+
+// buildExtras arma los módulos sociales y los errores de la app (nv-64: agrupados por huella,
+// sin datos personales). Va aparte porque buildModules está al límite de gocyclo.
+func buildExtras(d socialDeps, db *mongodriver.Database, cursor *pagination.Signer, log *slog.Logger) ([]httpapi.Module, error) {
+	social, err := buildSocial(d, log)
+	if err != nil {
+		return nil, err
+	}
+	appErrors, err := errores.NewService(errores.NewRepository(db), cursor)
+	if err != nil {
+		return nil, fmt.Errorf("errores: %w", err)
+	}
+	return append([]httpapi.Module{errores.NewHandler(appErrors, d.validator)}, social...), nil
 }
 
 // buildSocial arma la búsqueda de personas (nv-35), las sugerencias y la señal social del

@@ -17,6 +17,10 @@ const (
 	reportPolicy = "errores_reporte"
 	reportLimit  = 30
 	reportWindow = time.Hour
+	// Las rutas admin comparten la política `admin` (nv-20, nv-43).
+	adminPolicy = "admin"
+	adminLimit  = 200
+	adminWindow = time.Minute
 )
 
 // Handler traduce HTTP ↔ service. No toca la base ni atrapa pánicos (test de arquitectura).
@@ -34,11 +38,13 @@ func NewHandler(svc *Service, v *validation.Validator) *Handler {
 // El reporte no pide cuenta activa: una cuenta en eliminación también puede fallar.
 func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	report := []fiber.Handler{middleware.RequireAuth()}
+	admin := []fiber.Handler{}
 	if limiter != nil {
 		report = append(report, limiter.WindowUser(reportPolicy, reportLimit, reportWindow))
+		admin = append(admin, limiter.Window(adminPolicy, adminLimit, adminWindow))
 	}
 	v1.Post("/errores", append(report, h.report)...)
-	v1.Get("/admin/errores", middleware.RequireRoles(middleware.RoleAdmin), h.list)
+	v1.Get("/admin/errores", append(admin, middleware.RequireRoles(middleware.RoleAdmin), h.list)...)
 }
 
 // report decodifica en estricto: JSON ilegible o con campos de más → 400; reglas → 422.

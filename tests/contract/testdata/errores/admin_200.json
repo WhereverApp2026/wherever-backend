@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "conteo": "number",
+        "creado_en": "string",
+        "id": "string",
+        "mensaje": "string",
+        "modulo": "string",
+        "origen": "string",
+        "ultimo_en": "string",
+        "version": "string"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}
