@@ -595,6 +595,16 @@
 - Operación (antes de nv-45 en AWS, no bloquea este PR): un administrador sube versiones nuevas de `wherever-dev-boundary` y `wherever-dev-deployer-policy` (el deployer no puede cambiar el boundary) y luego `terraform apply`. Recomendado: exclusión de servicios de IA de AWS Organizations.
 - A evitar: bajar el umbral de cuarentena por debajo de 40 sin bajar `confianzaMinima` (Rekognition no devuelve etiquetas menores). Publicar contenido de usuarios con moderación sin antes agregarla al aviso y subir `AVISO_VERSION` (nv-45).
 
+## NV-44 — Bucket de imágenes y CloudFront (2026-11-13)
+- Estado: rama `claude/nv-44-0bfc9a` desde `origin/main`, PR contra `main`. `infra/aws-dev/imagenes.tf` (bucket privado, OAC, caché de un año, segunda distribución), política en línea `imagenes` en el rol, `ImagenesDelProyecto` en el boundary y política nueva `wherever-dev-deployer-imagenes`. Local: `fmt`, `validate`, Trivy en 0, critic, `check_sdd`, `check_endpoints`. Sin Go. Falta la firma y que el operador aplique.
+- Decisión: `force_destroy` en el bucket. Porqué: `destruir.sh` fallaba con un bucket con objetos; las imágenes del entorno de desarrollo no se respaldan.
+- Decisión: CloudFront solo lee `i/*` (política del bucket con `AWS:SourceArn`); `cuarentena/` se vence a 1 día. Sin `s3:ListBucket` en el rol: una clave inexistente da 403.
+- Decisión: SSE-S3 y no KMS, sin versiones ni registros de acceso (costo; excepciones de Trivy con motivo). Política de caché propia con TTL mínimo de un año: los nombres son inmutables.
+- Decisión: los permisos de CloudFront y S3 del deployer van en `iam/wherever-dev-deployer-imagenes.json`, porque la del deployer ya no admite más (6144). Drift: los permisos de balanceador y CloudFront que crearon nv-12 no están en el repo; esta política solo agrega lo de imágenes.
+- Costo: CloudFront en capa gratuita; S3 unos US$0.05 al mes. Total estimado unos US$41.35 de US$50 (infraestructura US$41 + Rekognition US$0.30).
+- Operación, en orden (antes de nv-45 en AWS, no bloquea este PR): 1) administrador: versión nueva de `wherever-dev-boundary` (JSON del repo) y política nueva `wherever-dev-deployer-imagenes` adjunta a `wherever-deployer`; esperar a que IAM propague. 2) `crear.sh --solo-plan`: solo recursos nuevos, sin reemplazar instancias. 3) `crear.sh`. 4) `verificar.sh` (salida `verificar`, ya con `--imagenes`). 5) Al fusionar nv-45: `/wherever/dev/IMAGENES_BUCKET` e `IMAGENES_URL` (salidas de Terraform) e `instalar-actualizador.sh` en las dos instancias.
+- A evitar: guardar algo que no se pueda perder en el bucket de desarrollo (`destruir.sh` lo vacía). Publicar en otra ruta que no sea `i/`: CloudFront no la sirve.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

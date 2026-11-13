@@ -1,0 +1,76 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BucketDeImagenes",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:DeleteBucketPolicy",
+        "s3:Get*",
+        "s3:List*",
+        "s3:Put*"
+      ],
+      "Resource": "arn:aws:s3:::wherever-dev-imagenes-816101201001"
+    },
+    {
+      "Sid": "VaciarAlDestruir",
+      "Effect": "Allow",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::wherever-dev-imagenes-816101201001/*"
+    },
+    {
+      "Sid": "NuncaPublico",
+      "Effect": "Deny",
+      "Action": [
+        "s3:PutBucketAcl",
+        "s3:PutObjectAcl",
+        "s3:PutBucketWebsite"
+      ],
+      "Resource": [
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001",
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontDeImagenes",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:CreateCachePolicy",
+        "cloudfront:GetCachePolicy",
+        "cloudfront:UpdateCachePolicy",
+        "cloudfront:DeleteCachePolicy",
+        "cloudfront:CreateDistribution",
+        "cloudfront:CreateDistributionWithTags",
+        "cloudfront:GetDistribution",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::816101201001:*"
+    },
+    {
+      "Sid": "CloudFrontListar",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetResponseHeadersPolicy",
+        "cloudfront:ListOriginAccessControls",
+        "cloudfront:ListCachePolicies",
+        "cloudfront:ListResponseHeadersPolicies",
+        "cloudfront:ListDistributions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
