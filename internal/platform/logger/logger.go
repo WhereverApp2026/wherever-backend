@@ -29,8 +29,9 @@ func New(w io.Writer, env string) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(w, opts))
 }
 
-// redactText oculta correos y credenciales de URI; un correo ya enmascarado (a***@x.com) no coincide.
-func redactText(text string) string {
+// RedactText oculta correos, llaves de API y credenciales de URI en un texto libre; un correo
+// ya enmascarado (a***@x.com) no coincide. También lo usa el reporte de errores de la app (nv-64).
+func RedactText(text string) string {
 	text = uriUserinfo.ReplaceAllString(text, "://"+Redacted+"@")
 	text = googleAPIKey.ReplaceAllString(text, Redacted)
 	return emailInText.ReplaceAllString(text, Redacted)
@@ -42,7 +43,7 @@ func redact(_ []string, attr slog.Attr) slog.Attr {
 		return slog.String(attr.Key, Redacted)
 	}
 	if attr.Value.Kind() == slog.KindString {
-		return slog.String(attr.Key, redactText(attr.Value.String()))
+		return slog.String(attr.Key, RedactText(attr.Value.String()))
 	}
 	return attr
 }

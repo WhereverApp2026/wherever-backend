@@ -25,6 +25,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
+	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -213,6 +214,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
+	// Errores de la app (nv-64): agrupados por huella, sin datos personales.
+	appErrors, err := errores.NewService(errores.NewRepository(db), cursor)
+	if err != nil {
+		return nil, nil, err
+	}
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		// Aceptación de términos y aviso (nv-19) con las versiones que publica /configuracion.
@@ -230,6 +236,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
 		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
+		errores.NewHandler(appErrors, validator),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
