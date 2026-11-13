@@ -517,6 +517,15 @@
 - Límites nuevos: vista pública 30/min por IP y unirse 30/h por usuario; +3 comandos de Redis por petición (limitador).
 - Para la app: leer `codigo` de `location.hash` y mandarlo por `POST`; no ponerlo en la URL. `APP_LINK_BASE` cambia si se recrea CloudFront.
 
+## NV-39 — Votaciones (2026-11-12)
+- Estado: rama `nv-39` desde `nv-38`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (91 rutas). Falta la firma.
+- Decisión (cierra el hallazgo de Redis): el vencimiento lo cierra un `Closer` por instancia cada minuto que solo consulta MongoDB (`ix_estado_cierra`). No hace falta `lock:` porque cerrar es un `UpdateOne` condicionado a `estado = abierta` y `votos_version`: 0 comandos de Redis en lugar del ~7 % estimado. Listar o votar una vencida también la cierra.
+- Decisión: `votos` es un mapa `{usuario_hex: negocio_id}` con `votos_version` que sube en cada voto. No condicionar el cierre al mapa: Go codifica los mapas en orden aleatorio y la igualdad de documentos en MongoDB depende del orden.
+- Decisión: la ganadora se aplica con `planes.Service.ReplaceBusiness` (lee la versión y reintenta una vez si otra edición gana). Si el plan o la parada no existen o la ganadora no abre a esa hora, `aplicada: false` con `motivo`; si falla la base, `aplicada` queda sin valor y el `Closer` lo reintenta.
+- Decisión: `votaciones` va antes que `grupos` en la lista de módulos (`/grupos/:id/votaciones`).
+- A evitar: votar quien declinó (403); decir quién votó qué en la respuesta.
+- Lección: la prueba de dos instancias encontró que cerrar era único pero aplicar no: las dos veían «cerrada sin aplicar» y cambiaban el plan. `ClaimApply` reserva la aplicación (`aplicando_hasta`, 1 min) con un `UpdateOne` condicionado.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

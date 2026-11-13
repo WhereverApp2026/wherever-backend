@@ -23,6 +23,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
+	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
@@ -42,6 +43,7 @@ var expected = map[string][]string{
 	busquedas.Collection:          {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
 	usuarios.ConsentsCollection:   {"_id_", "ix_usuario_fecha"},
 	grupos.Collection:             {"_id_", "ux_plan", "ix_integrante_actualizado", "ux_codigo_hash"},
+	votaciones.Collection:         {"_id_", "ux_parada_abierta", "ix_grupo_creada", "ix_estado_cierra"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -99,6 +101,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		negocios.Collection:        {"ux_slug", "ux_qr_checkin"},
 		recomendaciones.Collection: {"ux_usuario_negocio"},
 		grupos.Collection:          {"ux_plan", "ux_codigo_hash"},
+		votaciones.Collection:      {"ux_parada_abierta"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

@@ -51,6 +51,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
+	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
 // version se fija al compilar: -ldflags "-X main.version=v0.1.0".
@@ -114,6 +115,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
+	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -128,6 +130,7 @@ func run() error {
 
 	stop()
 	waitGraph()
+	waitVotes()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -166,13 +169,14 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planPrivacy := planes.NewPrivacy(planRepo)
 	// Los integrantes del grupo leen el plan (nv-37).
 	groupRepo := grupos.NewRepository(db)
+	voteRepo := votaciones.NewRepository(db)
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -183,6 +187,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
@@ -224,7 +229,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
-		// grupos va antes que planes: atiende POST /planes/:id/invitaciones (nv-37).
+		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
+		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
@@ -385,6 +391,22 @@ func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 	done := make(chan struct{})
 	go func() {
 		worker.Run(ctx)
+		close(done)
+	}()
+	return func() { <-done }
+}
+
+// startVotes cierra cada minuto las votaciones vencidas y aplica su ganadora al plan (nv-39)
+// hasta que ctx termina. Solo usa MongoDB; la función devuelta espera a que termine.
+func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, log *slog.Logger) func() {
+	planRepo := planes.NewRepository(db)
+	places := negocios.NewRepository(db)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue)
+	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log)
+	closer := votaciones.NewCloser(svc, log)
+	done := make(chan struct{})
+	go func() {
+		closer.Run(ctx)
 		close(done)
 	}()
 	return func() { <-done }
