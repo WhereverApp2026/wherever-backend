@@ -575,7 +575,7 @@
 
 ## Estado de las olas (2026-11-13)
 - Olas 5 (nv-37 a nv-41) y 7 (nv-46 a nv-49) completas en `main` (PRs #69 a #77). Las nueve siguen sin firma.
-- Sin ejecutar: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
+- Ola 6: nv-42, 43 y 44 en `main`; nv-45 en PR (2026-11-13). Antes: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
 - Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
   - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
   - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-45 en `main` (nv-44 ya está).
@@ -640,6 +640,16 @@
 - Costo: CloudFront en capa gratuita; S3 unos US$0.05 al mes. Total estimado unos US$41.35 de US$50 (infraestructura US$41 + Rekognition US$0.30).
 - Operación, en orden (antes de nv-45 en AWS, no bloquea este PR): 1) administrador: versión nueva de `wherever-dev-boundary` (JSON del repo) y política nueva `wherever-dev-deployer-imagenes` adjunta a `wherever-deployer`; esperar a que IAM propague. 2) `crear.sh --solo-plan`: solo recursos nuevos, sin reemplazar instancias. 3) `crear.sh`. 4) `verificar.sh` (salida `verificar`, ya con `--imagenes`). 5) Al fusionar nv-45: `/wherever/dev/IMAGENES_BUCKET` e `IMAGENES_URL` (salidas de Terraform) e `instalar-actualizador.sh` en las dos instancias.
 - A evitar: guardar algo que no se pueda perder en el bucket de desarrollo (`destruir.sh` lo vacía). Publicar en otra ruta que no sea `i/`: CloudFront no la sirve.
+
+## NV-45 — Subida, validación y publicación de imágenes (2026-11-13)
+- Estado: rama `nv-45-imagenes` (retoma `origin/nv-45` con `main` fusionado), PR contra `main`. Paquete `internal/imagenes`, doble `internal/testutil/imagenestest`, tres rutas `/api/v1/imagenes…`. Local: build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`. Integration, Security, Database y Contract en el CI. Falta la firma y la prueba en vivo.
+- Decisión: formulario POST firmado (no PUT) porque solo la política de POST fija `content-length-range`; clave, tipo y 1..5 MB exactos, 5 minutos.
+- Decisión: 6000 px por lado y 64 MB decodificada (la spec decía 4000), revisados con la cabecera antes de decodificar; una decodificación a la vez por instancia. Se modera una vez por original; solo una falla del proveedor permite volver a moderar.
+- Decisión: los umbrales salen de `moderacion_reglas` (el `moderacion.Service` es la `FuenteReglas`); lo dudoso entra a la cola de nv-43 después de guardar el estado y `imagenes.Destino` aplica la decisión (aprobada se recodifica y publica, rechazada se borra). Una falla del proveedor no se encola: la persona vuelve a confirmar.
+- Decisión: 20 por hora y 50 por día: el tope diario acota Rekognition a US$1.50 al mes por persona en el peor caso. `hop_limit` de IMDSv2 a 2 para que el contenedor tome el rol.
+- Decisión: aviso de privacidad con S3, CloudFront y Rekognition como encargados, sin subir `AVISO_VERSION` (indicación del revisor). Subirla cuando se publique a usuarios reales.
+- Operación, en orden (antes de desplegar nv-45): 1) administrador: versión nueva de `wherever-dev-boundary` y política `wherever-dev-deployer-imagenes` adjunta a `wherever-deployer` (nv-42/44); esperar a IAM. 2) `crear.sh --solo-plan` y `crear.sh` (nv-44, incluye `hop_limit` 2) y `verificar.sh --imagenes`. 3) `/wherever/dev/IMAGENES_BUCKET` e `IMAGENES_URL` (salidas de Terraform; `IMAGENES_REGION` opcional). 4) `instalar-actualizador.sh` en las dos instancias.
+- A evitar: que el administrador tarde más de un día en decidir: el original vence en `cuarentena/` y la foto queda en revisión sin publicarse. Si `APP_ENV=prod`, la API no arranca sin `IMAGENES_*`: crear las variables antes de instalar la imagen. Las imágenes de negocios esperan a nv-55/56.
 
 ## Specs nv-55 y nv-56 — Negocios aliados (2026-11-13)
 - Estado: specs en Borrador (sin código) desde la hoja A5 del Excel v3, leída con `openpyxl` en solo lectura. `SDD-OK` y `check_endpoints` OK.

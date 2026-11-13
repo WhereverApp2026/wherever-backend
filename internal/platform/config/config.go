@@ -128,7 +128,13 @@ const (
 	KeyFCMCredenciales  = "FCM_CREDENCIALES_B64" // #nosec G101 -- nombre de la variable, no su valor
 	KeyFCMURL           = "FCM_URL"
 	KeyDataKeys         = "DATA_KEYS" // #nosec G101 -- nombre de la variable, no su valor
+	KeyImagenesBucket   = "IMAGENES_BUCKET"
+	KeyImagenesURL      = "IMAGENES_URL"
+	KeyImagenesRegion   = "IMAGENES_REGION"
 )
+
+// DefaultImagenesRegion es la región del bucket y de Rekognition (nv-44, nv-45).
+const DefaultImagenesRegion = "us-east-2"
 
 // Modos de SMTP_TLS (spec nv-06).
 const (
@@ -152,6 +158,7 @@ var optionalKeys = []string{
 	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
 	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
 	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL, KeyDataKeys,
+	KeyImagenesBucket, KeyImagenesURL, KeyImagenesRegion,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -190,6 +197,9 @@ type Config struct {
 	// FCM es el push por Firebase (nv-41); sin credenciales solo queda el centro de avisos.
 	FCM        FCM
 	VersionApp VersionApp
+	// Imagenes es el bucket y el CloudFront de imágenes (nv-44, nv-45); sin ellos las rutas
+	// de imágenes responden 503.
+	Imagenes Imagenes
 }
 
 // IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
@@ -288,6 +298,11 @@ func Load(getenv func(string) string) (Config, error) {
 			ProjectID:      strings.TrimSpace(getenv(KeyFCMProjectID)),
 			CredentialsB64: strings.TrimSpace(getenv(KeyFCMCredenciales)),
 			BaseURL:        strings.TrimSpace(getenv(KeyFCMURL)),
+		},
+		Imagenes: Imagenes{
+			Bucket: strings.TrimSpace(getenv(KeyImagenesBucket)),
+			URL:    strings.TrimRight(strings.TrimSpace(getenv(KeyImagenesURL)), "/"),
+			Region: orDefault(strings.TrimSpace(getenv(KeyImagenesRegion)), DefaultImagenesRegion),
 		},
 		IA: IA{
 			GeminiAPIKey: strings.TrimSpace(getenv(KeyGeminiAPIKey)),
@@ -416,6 +431,7 @@ func (c Config) validate() []error {
 	errs = append(errs, c.validateMail()...)
 	errs = append(errs, c.IA.validate()...)
 	errs = append(errs, c.FCM.validate(c.Env)...)
+	errs = append(errs, c.Imagenes.validate(c.Env)...)
 	errs = append(errs, c.validateDataKeys()...)
 	return append(errs, c.validateLimits()...)
 }
@@ -654,6 +670,41 @@ func (f FCM) validate(env string) []error {
 		errs = append(errs, fmt.Errorf("%s no se cambia en prod", KeyFCMURL))
 	}
 	return errs
+}
+
+// Imagenes configura la subida (nv-45): bucket privado y URL pública de su CloudFront.
+type Imagenes struct {
+	Bucket string
+	URL    string
+	Region string
+}
+
+// Enabled dice si hay imágenes: bucket y URL.
+func (i Imagenes) Enabled() bool { return i.Bucket != "" && i.URL != "" }
+
+// validate: en prod son obligatorias; fuera de prod van juntas o ninguna (sin ellas la API
+// arranca y las rutas de imágenes responden 503). La URL es HTTPS salvo en dev.
+func (i Imagenes) validate(env string) []error {
+	var errs []error
+	switch {
+	case !i.Enabled() && env == EnvProd:
+		errs = append(errs, fmt.Errorf("%s y %s son obligatorias en prod (nv-45)", KeyImagenesBucket, KeyImagenesURL))
+	case (i.Bucket == "") != (i.URL == ""):
+		errs = append(errs, fmt.Errorf("%s y %s van juntas (o ninguna, y no hay imágenes)", KeyImagenesBucket, KeyImagenesURL))
+	}
+	if i.URL != "" && !urlImagenesValida(i.URL, env) {
+		errs = append(errs, fmt.Errorf("%s debe ser https://dominio, sin ruta", KeyImagenesURL))
+	}
+	return errs
+}
+
+// urlImagenesValida: https://dominio sin ruta ni consulta; http solo en dev.
+func urlImagenesValida(raw, env string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.Path != "" || u.RawQuery != "" {
+		return false
+	}
+	return u.Scheme == "https" || (env == EnvDev && u.Scheme == "http")
 }
 
 // validateDataKeys: en prod las llaves son obligatorias (sin ellas la API no arranca); fuera

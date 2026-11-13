@@ -181,7 +181,9 @@ resource "aws_instance" "api" {
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 1
+    # 2 saltos: la API corre en Docker (red bridge) y toma las credenciales del rol para S3 y
+    # Rekognition (nv-45). Con 1, la respuesta del token IMDSv2 no llega al contenedor.
+    http_put_response_hop_limit = 2
   }
 
   root_block_device {
