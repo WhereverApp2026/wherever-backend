@@ -79,6 +79,24 @@ func (r *Repository) Tomar(ctx context.Context, id string, dueno bson.ObjectID, 
 	return &img, nil
 }
 
+// TomarRevision pasa a `procesando` una foto en revisión con veredicto (sin falla del proveedor)
+// para aplicar la decisión del administrador; ErrNoTomable si ya no está en revisión.
+func (r *Repository) TomarRevision(ctx context.Context, id string, dueno bson.ObjectID, ahora time.Time) (*Imagen, error) {
+	filtro := bson.M{"_id": id, "dueno_id": dueno, "estado": EstadoEnRevision, "$or": bson.A{
+		bson.M{"moderacion.falla": bson.M{"$exists": false}}, bson.M{"moderacion.falla": ""},
+	}}
+	cambio := bson.M{"$set": bson.M{"estado": EstadoProcesando, "actualizada_en": ahora}}
+	var img Imagen
+	err := r.col.FindOneAndUpdate(ctx, filtro, cambio, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&img)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, ErrNoTomable
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &img, nil
+}
+
 // Terminar guarda el resultado si la imagen sigue `procesando`; devuelve false si mientras
 // tanto la borraron.
 func (r *Repository) Terminar(ctx context.Context, img *Imagen) (bool, error) {

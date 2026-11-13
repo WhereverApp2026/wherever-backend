@@ -149,8 +149,9 @@ type Modulo struct {
 	Rekognition *rekognitiontest.Server
 }
 
-// Build arma el service con el doble del bucket y el Rekognition local.
-func Build(t testing.TB, db *mongo.Database, log *slog.Logger) Modulo {
+// Build arma el service con el doble del bucket y el Rekognition local; las reglas y la cola son
+// las reales de nv-43 (mods), y la decisión del administrador publica o descarta la foto.
+func Build(t testing.TB, db *mongo.Database, mods *moderacion.Service, log *slog.Logger) Modulo {
 	t.Helper()
 	rek := rekognitiontest.New(t)
 	adaptador, err := moderacion.NewRekognition(context.Background(), moderacion.RekognitionConfig{
@@ -159,8 +160,10 @@ func Build(t testing.TB, db *mongo.Database, log *slog.Logger) Modulo {
 	require.NoError(t, err)
 	almacen := NuevoAlmacen()
 	repo := imagenes.NewRepository(db)
-	mod := moderacion.New(adaptador, nil, moderacion.Fijas(moderacion.ReglasPorDefecto()), log)
+	mod := moderacion.New(adaptador, nil, mods, log)
 	svc, err := imagenes.NewService(repo, almacen, mod, imagenes.Config{URLPublica: URLPublica}, log)
 	require.NoError(t, err)
+	svc.WithCola(mods)
+	mods.WithDestino(imagenes.TipoCola, svc.Destino())
 	return Modulo{Service: svc, Privacy: imagenes.NewPrivacy(repo, almacen, URLPublica), Almacen: almacen, Rekognition: rek}
 }

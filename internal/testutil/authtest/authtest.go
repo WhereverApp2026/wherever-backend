@@ -178,7 +178,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
-	images := imagenestest.Build(t, client.DB(), log)
+	mods := moderacion.NewService(modRepo, cursor, log)
+	images := imagenestest.Build(t, client.DB(), mods, log)
 	registry := privacidad.NewRegistry()
 	for _, p := range []privacidad.Purger{images.Privacy, auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), favoritos.NewPrivacy(favRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
@@ -213,7 +214,6 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
 	require.NoError(t, err)
 
-	mods := moderacion.NewService(modRepo, cursor, log)
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods,

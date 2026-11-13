@@ -180,6 +180,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	syncActions := sincronizacion.NewActions(db)
 	voteRepo := votaciones.NewRepository(db)
 	modRepo := moderacion.NewRepository(db)
+	// Cola de revisión y reglas (nv-43): las fotos leen ahí sus umbrales y mandan lo dudoso.
+	modSvc := moderacion.NewService(modRepo, cursor, log)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
@@ -188,7 +190,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
-	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, log)
+	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("imagenes: %w", err)
 	}
@@ -244,8 +246,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
-		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
-		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
+		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
+		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier), validator).WithActiveGuard(active),
@@ -281,7 +283,7 @@ func buildRecomendaciones(repo *recomendaciones.Repository, users recomendacione
 // buildImagenes arma la subida de fotos (nv-45) con S3 y Rekognition por el rol de la
 // instancia. Sin IMAGENES_BUCKET e IMAGENES_URL (solo fuera de prod) no hay service: las rutas
 // responden 503 y ARCO igual borra las filas.
-func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, log *slog.Logger) (*imagenes.Service, *imagenes.Privacy, error) {
+func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, mods *moderacion.Service, log *slog.Logger) (*imagenes.Service, *imagenes.Privacy, error) {
 	repo := imagenes.NewRepository(db)
 	if !cfg.Enabled() {
 		log.Warn("sin IMAGENES_BUCKET e IMAGENES_URL: /api/v1/imagenes responde 503")
@@ -297,11 +299,15 @@ func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, log *slog.Logg
 		return nil, nil, err
 	}
 	// Solo imágenes: el texto (reseñas, postales) lo cablea su spec con la ia.Guardia.
-	mod := moderacion.New(rek, nil, moderacion.Fijas(moderacion.ReglasPorDefecto()), log)
+	// Los umbrales salen de moderacion_reglas en cada evaluación (nv-43); lo dudoso va a la cola
+	// y la decisión del administrador publica o descarta la foto.
+	mod := moderacion.New(rek, nil, mods, log)
 	svc, err := imagenes.NewService(repo, almacen, mod, imagenes.Config{URLPublica: cfg.URL}, log)
 	if err != nil {
 		return nil, nil, err
 	}
+	svc.WithCola(mods)
+	mods.WithDestino(imagenes.TipoCola, svc.Destino())
 	return svc, imagenes.NewPrivacy(repo, almacen, cfg.URL), nil
 }
 

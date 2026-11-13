@@ -20,6 +20,7 @@ import (
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
+	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
@@ -206,4 +207,40 @@ func TestImagenes_SinConfiguracionResponde503(t *testing.T) {
 	imgCall(t, app, http.MethodPost, imagenesPath+"/subida", map[string]string{"tipo": "image/jpeg"}, "", http.StatusUnauthorized)
 	imgCall(t, app, http.MethodPost, imagenesPath+"/subida", map[string]string{"tipo": "image/jpeg"}, token, http.StatusServiceUnavailable)
 	imgCall(t, app, http.MethodDelete, imagenesPath+"/0123456789abcdef0123456789abcdef", nil, token, http.StatusServiceUnavailable)
+}
+
+// La dudosa entra a la cola de nv-43 y la decisión del administrador la publica o la descarta.
+func TestImagenes_ColaDeRevisionPublicaODescarta(t *testing.T) {
+	env, app, yo := imagenesEnv(t)
+	ctx := context.Background()
+	admin := bson.NewObjectID().Hex()
+	decidir := func(id, decision string) {
+		t.Helper()
+		var it moderacion.Item
+		require.NoError(t, env.Mongo.DB().Collection(moderacion.ColeccionCola).FindOne(ctx, bson.M{"referencia": id}).Decode(&it))
+		assert.Equal(t, imagenes.TipoCola, it.Tipo)
+		assert.Equal(t, "cuarentena/"+id, it.ImagenClave, "la cola guarda la llave, nunca los bytes")
+		_, err := env.Moderacion.Decidir(ctx, admin, it.ID.Hex(), it.Version, moderacion.DecisionRequest{Decision: decision, Motivo: "revisada"})
+		require.NoError(t, err)
+	}
+	estado := func(id string) string {
+		t.Helper()
+		var img imagenes.Imagen
+		require.NoError(t, env.Mongo.DB().Collection(imagenes.Collection).FindOne(ctx, bson.M{"_id": id}).Decode(&img))
+		return img.Estado
+	}
+
+	env.Imagenes.Rekognition.Responder(rekognitiontest.Etiqueta{Name: "Violence", Confidence: 55, TaxonomyLevel: 1})
+	aprobada := subirFoto(t, env, app, yo.token, "image/jpeg", fotoJPEG(t, 64, 64))
+	imgCall(t, app, http.MethodPost, imagenesPath+"/"+aprobada+"/confirmar", nil, yo.token, http.StatusOK)
+	decidir(aprobada, moderacion.EstadoAprobado)
+	assert.Equal(t, imagenes.EstadoPublicada, estado(aprobada))
+	assert.Equal(t, []string{"i/" + aprobada + "/1080.jpg", "i/" + aprobada + "/320.jpg"}, env.Imagenes.Almacen.Claves())
+
+	rechazada := subirFoto(t, env, app, yo.token, "image/jpeg", fotoJPEG(t, 64, 64))
+	imgCall(t, app, http.MethodPost, imagenesPath+"/"+rechazada+"/confirmar", nil, yo.token, http.StatusOK)
+	decidir(rechazada, moderacion.EstadoRechazado)
+	assert.Equal(t, imagenes.EstadoRechazada, estado(rechazada))
+	_, quedo := env.Imagenes.Almacen.Objeto("cuarentena/" + rechazada)
+	assert.False(t, quedo, "el original rechazado se borra")
 }

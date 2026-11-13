@@ -61,6 +61,7 @@ type Service struct {
 	repo      *Repository
 	almacen   Almacen
 	moderador Moderador
+	cola      Cola
 	cfg       Config
 	turnos    chan struct{}
 	log       *slog.Logger
@@ -196,6 +197,9 @@ func (s *Service) decidir(ctx context.Context, img *Imagen, proc Procesada) (*Im
 	}
 	if err := s.terminar(ctx, img); err != nil {
 		return nil, err
+	}
+	if img.Estado == EstadoEnRevision {
+		s.encolar(ctx, img) // después de guardar: la decisión del administrador la encuentra en revisión
 	}
 	s.log.InfoContext(ctx, "imagen procesada", slog.String("evento", "imagen_procesada"), slog.String("imagen", img.ID),
 		slog.String("estado", img.Estado), slog.String("veredicto", img.Moderacion.Veredicto), slog.String("falla", img.Moderacion.Falla))
