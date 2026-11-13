@@ -32,10 +32,13 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
+	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cifrado"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
@@ -48,10 +51,12 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
 // version se fija al compilar: -ldflags "-X main.version=v0.1.0".
@@ -115,6 +120,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
+	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, cfg.DataKeys, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -129,6 +135,7 @@ func run() error {
 
 	stop()
 	waitGraph()
+	waitVotes()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -142,7 +149,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		return nil, nil, err
 	}
 	db := mongoClient.DB()
-	users := usuarios.NewRepository(db)
+	users := usuarios.NewRepository(db).WithCipher(fieldCipher(cfg.DataKeys, log))
 	authRepo := auth.NewRepository(db)
 	authSvc, err := auth.NewService(users, authRepo, redisClient, mail.requests, auth.Config{
 		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
@@ -165,15 +172,22 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// ARCO: el documento del usuario se borra al final (si otro módulo falla, se reintenta).
 	planRepo := planes.NewRepository(db)
 	planPrivacy := planes.NewPrivacy(planRepo)
-	// Los integrantes del grupo leen el plan (nv-37).
+	// Los integrantes del grupo leen el plan (nv-37); cada cambio se numera para la sincronización (nv-46).
 	groupRepo := grupos.NewRepository(db)
-	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo)
+	syncRepo := sincronizacion.NewRepository(db)
+	syncActions := sincronizacion.NewActions(db)
+	voteRepo := votaciones.NewRepository(db)
+	modRepo := moderacion.NewRepository(db)
+	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
+	notifRepo := notificaciones.NewRepository(db)
+	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -187,7 +201,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	vacaRepo := vaca.NewRepository(db)
 	registry.RegisterExporter(vaca.NewExpensesPrivacy(vacaRepo))
 	registry.RegisterExporter(vaca.NewDebtsPrivacy(vacaRepo))
+	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
+	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
+	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 
 	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
 	pesos, err := recomendador.PesosPorDefecto()
@@ -209,7 +226,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
+	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -227,14 +244,20 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
+		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
+		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
-		// grupos va antes que planes: atiende POST /planes/:id/invitaciones (nv-37).
-		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor), validator).WithActiveGuard(active),
+		// votaciones va antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39).
+		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier), validator).WithActiveGuard(active),
+		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
 		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
 		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
+		notificaciones.NewHandler(notifier, validator).WithActiveGuard(active),
+		sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), validator).
+			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil
@@ -353,6 +376,7 @@ type socialDeps struct {
 	friends   *amistades.Repository
 	places    *negocios.Repository
 	graph     graphStores
+	notifier  notificaciones.Notifier
 	phoneKey  []byte
 	validator *validation.Validator
 	active    fiber.Handler
@@ -366,7 +390,7 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("amistades: %w", err)
 	}
-	friends.WithGraph(d.graph.queue)
+	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier)
 	people, err := personas.NewService(d.users, d.friends, d.phoneKey, log)
 	if err != nil {
 		return nil, err
@@ -393,4 +417,37 @@ func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 		close(done)
 	}()
 	return func() { <-done }
+}
+
+// startVotes cierra cada minuto las votaciones vencidas y aplica su ganadora al plan (nv-39)
+// hasta que ctx termina. Solo usa MongoDB; la función devuelta espera a que termine.
+func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, fcm config.FCM, dataKeys string, log *slog.Logger) func() {
+	planRepo := planes.NewRepository(db)
+	places := negocios.NewRepository(db)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue).WithSync(sincronizacion.NewRepository(db))
+	notifRepo := notificaciones.NewRepository(db)
+	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
+	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log).WithNotifier(notifier)
+	closer := votaciones.NewCloser(svc, log)
+	done := make(chan struct{})
+	go func() {
+		closer.Run(ctx)
+		close(done)
+	}()
+	return func() { <-done }
+}
+
+// fieldCipher arma el llavero de DATA_KEYS (nv-48). config.Load ya lo validó; sin llaves
+// (solo fuera de prod) avisa y los datos sensibles se guardan en claro.
+func fieldCipher(keys string, log *slog.Logger) *cifrado.Llavero {
+	if keys == "" {
+		log.Warn("sin DATA_KEYS: alergias y fecha de nacimiento se guardan en claro", "evento", "cifrado_apagado")
+		return nil
+	}
+	l, err := cifrado.CargarLlavero(keys)
+	if err != nil {
+		log.Warn("DATA_KEYS inválido: alergias y fecha de nacimiento se guardan en claro", "evento", "cifrado_apagado")
+		return nil
+	}
+	return l
 }

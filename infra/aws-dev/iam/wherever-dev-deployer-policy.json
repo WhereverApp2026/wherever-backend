@@ -226,6 +226,17 @@
         "iam:SetDefaultPolicyVersion"
       ],
       "Resource": "arn:aws:iam::816101201001:policy/wherever-dev-boundary"
+    },
+    {
+      "Sid": "MedirModeracionEnVivo",
+      "Effect": "Allow",
+      "Action": "rekognition:DetectModerationLabels",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2"
+        }
+      }
     }
   ]
 }

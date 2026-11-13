@@ -10,6 +10,9 @@ import (
 const (
 	authPrefix   = "/api/v1/auth"
 	registerPath = "/api/v1/usuarios"
+	// El código del enlace de un plan (nv-38) es una credencial: tampoco se comprime.
+	plansPrefix = "/api/v1/planes/"
+	shareSuffix = "/compartir"
 )
 
 // Compress comprime las respuestas según Accept-Encoding: detrás de CloudFront sin caché y sin Caddy
@@ -23,5 +26,8 @@ func carriesTokens(c *fiber.Ctx) bool {
 	if strings.HasPrefix(path, authPrefix) {
 		return true
 	}
-	return c.Method() == fiber.MethodPost && path == registerPath
+	if c.Method() != fiber.MethodPost {
+		return false
+	}
+	return path == registerPath || (strings.HasPrefix(path, plansPrefix) && strings.HasSuffix(path, shareSuffix))
 }

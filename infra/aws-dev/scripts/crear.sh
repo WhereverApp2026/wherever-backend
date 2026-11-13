@@ -49,6 +49,8 @@ if tf show -no-color "$(basename "$plan")" | grep -q '^Plan:'; then
 fi
 
 url="$(tf output -raw cloudfront_url)"
+imagenes_url="$(tf output -raw imagenes_url)"
+imagenes_bucket="$(tf output -raw imagenes_bucket)"
 target_group="$(tf output -raw target_group_arn)"
 ips="$(tf output -json public_ips | python -I -c 'import json,sys; print(" y ".join(sorted(v + "/32" for v in json.load(sys.stdin).values())))')"
 nodes="$(tf output -json instance_ids | python -I -c 'import json,sys; [print(k, v) for k, v in sorted(json.load(sys.stdin).items())]' | tr -d '\r')"
@@ -79,6 +81,8 @@ crear: la infraestructura está lista. Falta lo que no se puede automatizar:
   2. Confirma el correo de AWS "Subscription Confirmation", si llegó uno nuevo.
   3. Si la URL cambió, actualiza el repositorio y avisa al equipo móvil:
        gh variable set API_URL --body "$url"
+  4. Imágenes (nv-44): si cambiaron, actualiza Parameter Store y vuelve a instalar la API:
+       IMAGENES_BUCKET=$imagenes_bucket  IMAGENES_URL=$imagenes_url
 
 crear: esperando hasta $((ready_wait / 60)) minutos a que $url/ready dé 200
 EOF

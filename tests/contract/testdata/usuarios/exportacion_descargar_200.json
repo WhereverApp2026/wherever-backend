@@ -6,6 +6,11 @@
     "consentimientos": [],
     "descartes_usuario": [],
     "grupos": [],
+    "moderacion": [],
+    "notificaciones": {
+      "avisos": [],
+      "dispositivos": []
+    },
     "planes": [],
     "sesiones": [
       {
@@ -83,6 +88,7 @@
       ],
       "telefono_registrado": "bool",
       "version": "number"
-    }
+    },
+    "votaciones": []
   }
 }
