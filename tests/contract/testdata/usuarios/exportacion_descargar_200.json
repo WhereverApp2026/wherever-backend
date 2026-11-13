@@ -8,6 +8,10 @@
     "favoritos": [],
     "grupos": [],
     "imagenes": [],
+    "mensajes": {
+      "mensajes": [],
+      "reacciones": []
+    },
     "moderacion": [],
     "notificaciones": {
       "avisos": [],

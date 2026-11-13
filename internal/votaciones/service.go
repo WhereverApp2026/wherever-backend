@@ -3,6 +3,7 @@ package votaciones
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -35,10 +36,16 @@ type Places interface {
 	FindCards(ctx context.Context, ids []bson.ObjectID, now time.Time) ([]negocios.PlaceItem, error)
 }
 
+// Chat publica avisos del sistema en el chat del grupo (nv-57).
+type Chat interface {
+	PublicarSistema(ctx context.Context, groupID bson.ObjectID, text string) error
+}
+
 // Service maneja las votaciones. Avisa `votacion_abierta` y `votacion_cerrada` a los
 // invitados y confirmados del grupo, menos a quien la abrió (nv-40).
 type Service struct {
 	notify  notificaciones.Notifier
+	chat    Chat
 	repo    *Repository
 	groups  Groups
 	plans   Plans
@@ -57,6 +64,41 @@ func NewService(repo *Repository, groups Groups, plans Plans, applier Applier, p
 func (s *Service) WithNotifier(n notificaciones.Notifier) *Service {
 	s.notify = n
 	return s
+}
+
+// WithChat publica «Ganó … con N votos» en el chat del grupo al cerrar (nv-57).
+func (s *Service) WithChat(c Chat) *Service {
+	s.chat = c
+	return s
+}
+
+// postResult deja el resultado en el chat. Un fallo solo se registra: la votación ya cerró.
+func (s *Service) postResult(ctx context.Context, v Vote) {
+	if s.chat == nil || v.Winner == nil {
+		return
+	}
+	text := "Se cerró la votación"
+	if cards, err := s.places.FindCards(ctx, []bson.ObjectID{*v.Winner}, s.now()); err == nil && len(cards) == 1 {
+		text = ResultText(cards[0].Name, v)
+	}
+	if err := s.chat.PublicarSistema(ctx, v.GroupID, text); err != nil {
+		s.log.WarnContext(ctx, "votacion_chat_fallo", slog.String("votacion_id", v.ID.Hex()))
+	}
+}
+
+// ResultText es el aviso del chat: «Ganó {lugar} con N votos» (1 voto en singular).
+func ResultText(place string, v Vote) string {
+	votes := 0
+	for i, opt := range v.Options {
+		if v.Winner != nil && opt == *v.Winner {
+			votes = v.Counts()[i]
+		}
+	}
+	unit := "votos"
+	if votes == 1 {
+		unit = "voto"
+	}
+	return fmt.Sprintf("Ganó %s con %d %s", place, votes, unit)
 }
 
 // announce avisa a los invitados y confirmados del grupo, menos a quien abrió la votación.
@@ -352,6 +394,7 @@ func (s *Service) closeOpen(ctx context.Context, v Vote, by string) (Vote, error
 			if g, err := s.groups.FindByID(ctx, v.GroupID); err == nil {
 				s.announce(ctx, g, v, notificaciones.KindVoteClosed)
 			}
+			s.postResult(ctx, v)
 			return v, nil
 		}
 	}
