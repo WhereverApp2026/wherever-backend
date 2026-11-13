@@ -69,7 +69,7 @@ func (e *Env) AltaCompleta(t testing.TB, u usuarios.User, nombre string) alta.Ne
 	require.NoError(t, err)
 	for i, tipo := range []string{"fachada", "interior", "producto"} {
 		id := b.ID + "-foto-" + string(rune('a'+i))
-		e.Imagenes.Publicar(u.ID, id)
+		e.ImagenesNegocio.Publicar(u.ID, id)
 		b, err = e.Alta.AgregarFoto(ctx, cl, b.ID, alta.FotoRequest{ImagenID: id, Tipo: tipo})
 		require.NoError(t, err)
 	}

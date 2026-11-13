@@ -33,6 +33,7 @@ import (
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
+	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
@@ -184,6 +185,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	voteRepo := votaciones.NewRepository(db)
 	chatRepo := chat.NewRepository(db)
 	modRepo := moderacion.NewRepository(db)
+	// Cola de revisión y reglas (nv-43): las fotos leen ahí sus umbrales y mandan lo dudoso.
+	modSvc := moderacion.NewService(modRepo, cursor, log)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
@@ -192,8 +195,12 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
+	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("imagenes: %w", err)
+	}
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), chat.NewPrivacy(chatRepo, groupRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), favoritos.NewPrivacy(favRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{imagePrivacy, auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), chat.NewPrivacy(chatRepo, groupRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), favoritos.NewPrivacy(favRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -214,15 +221,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, notifier, registry, log)
+	registry.RegisterExporter(imagePrivacy)
 
-	// Los pesos del recomendador se validan aquí: con un JSON inválido la API no arranca (nv-24).
-	pesos, err := recomendador.PesosPorDefecto()
+	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recomendador: %w", err)
-	}
-	recoSvc, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
-	if err != nil {
-		return nil, nil, fmt.Errorf("recomendaciones: %w", err)
+		return nil, nil, err
 	}
 
 	// Clima de Open-Meteo (nv-25): sin llave, caché en memoria por instancia, sin Redis.
@@ -259,6 +262,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
 		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
+		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
+		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
@@ -271,11 +276,57 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		clima.NewHandler(weather, citySvc, validator),
 		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
 		notificaciones.NewHandler(notifier, validator).WithActiveGuard(active),
+		imagenes.NewHandler(images, validator).WithActiveGuard(active),
 		sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), validator).
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion), nil
+}
+
+// buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no
+// arranca (nv-24).
+func buildRecomendaciones(repo *recomendaciones.Repository, users recomendaciones.Users, places recomendaciones.Places, log *slog.Logger) (*recomendaciones.Service, error) {
+	pesos, err := recomendador.PesosPorDefecto()
+	if err != nil {
+		return nil, fmt.Errorf("recomendador: %w", err)
+	}
+	svc, err := recomendaciones.NewService(repo, users, places, pesos, log)
+	if err != nil {
+		return nil, fmt.Errorf("recomendaciones: %w", err)
+	}
+	return svc, nil
+}
+
+// buildImagenes arma la subida de fotos (nv-45) con S3 y Rekognition por el rol de la
+// instancia. Sin IMAGENES_BUCKET e IMAGENES_URL (solo fuera de prod) no hay service: las rutas
+// responden 503 y ARCO igual borra las filas.
+func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, mods *moderacion.Service, log *slog.Logger) (*imagenes.Service, *imagenes.Privacy, error) {
+	repo := imagenes.NewRepository(db)
+	if !cfg.Enabled() {
+		log.Warn("sin IMAGENES_BUCKET e IMAGENES_URL: /api/v1/imagenes responde 503")
+		return nil, imagenes.NewPrivacy(repo, nil, ""), nil
+	}
+	ctx := context.Background()
+	almacen, err := imagenes.NewS3(ctx, imagenes.S3Config{Bucket: cfg.Bucket, Region: cfg.Region})
+	if err != nil {
+		return nil, nil, err
+	}
+	rek, err := moderacion.NewRekognition(ctx, moderacion.RekognitionConfig{Region: cfg.Region})
+	if err != nil {
+		return nil, nil, err
+	}
+	// Solo imágenes: el texto (reseñas, postales) lo cablea su spec con la ia.Guardia.
+	// Los umbrales salen de moderacion_reglas en cada evaluación (nv-43); lo dudoso va a la cola
+	// y la decisión del administrador publica o descarta la foto.
+	mod := moderacion.New(rek, nil, mods, log)
+	svc, err := imagenes.NewService(repo, almacen, mod, imagenes.Config{URLPublica: cfg.URL}, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	svc.WithCola(mods)
+	mods.WithDestino(imagenes.TipoCola, svc.Destino())
+	return svc, imagenes.NewPrivacy(repo, almacen, cfg.URL), nil
 }
 
 // buildBusinesses arma el service de negocios con el cursor firmado (nv-17), que también usa

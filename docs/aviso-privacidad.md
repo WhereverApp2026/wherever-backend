@@ -12,3 +12,6 @@ Para generar planes a partir de lo que escribes y para relacionar negocios por s
 
 ## Otros encargados
 - **Correo:** proveedor por elegir (nv-06). Se agrega aquí al elegirlo.
+- **Almacenamiento de fotos:** Amazon S3 de Amazon Web Services guarda las fotos que subes en un depósito privado; el original se borra al revisarse y, si no se confirma, en un día (nv-44, nv-45).
+- **Entrega de fotos:** Amazon CloudFront de Amazon Web Services sirve solo las fotos publicadas, ya sin metadatos como la ubicación GPS (nv-44, nv-45).
+- **Revisión automática de fotos:** Amazon Rekognition de Amazon Web Services analiza cada foto una vez para detectar desnudez, violencia, drogas u odio antes de publicarla; no recibe tu nombre ni datos de tu cuenta (nv-42, nv-45).
