@@ -692,14 +692,19 @@ func (i Imagenes) validate(env string) []error {
 	case (i.Bucket == "") != (i.URL == ""):
 		errs = append(errs, fmt.Errorf("%s y %s van juntas (o ninguna, y no hay imágenes)", KeyImagenesBucket, KeyImagenesURL))
 	}
-	if i.URL != "" {
-		u, err := url.Parse(i.URL)
-		okScheme := err == nil && (u.Scheme == "https" || (env == EnvDev && u.Scheme == "http"))
-		if !okScheme || u.Host == "" || u.Path != "" || u.RawQuery != "" {
-			errs = append(errs, fmt.Errorf("%s debe ser https://dominio, sin ruta", KeyImagenesURL))
-		}
+	if i.URL != "" && !urlImagenesValida(i.URL, env) {
+		errs = append(errs, fmt.Errorf("%s debe ser https://dominio, sin ruta", KeyImagenesURL))
 	}
 	return errs
+}
+
+// urlImagenesValida: https://dominio sin ruta ni consulta; http solo en dev.
+func urlImagenesValida(raw, env string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.Path != "" || u.RawQuery != "" {
+		return false
+	}
+	return u.Scheme == "https" || (env == EnvDev && u.Scheme == "http")
 }
 
 // validateDataKeys: en prod las llaves son obligatorias (sin ellas la API no arranca); fuera

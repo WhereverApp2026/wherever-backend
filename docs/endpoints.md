@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47; A5 diferida: nv-55, nv-56)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -106,6 +106,12 @@
 | POST | `/api/v1/amistades/{id}/bloquear` → la relación queda `bloqueada` sin avisar; quien bloquea y quien fue bloqueado dejan de verse en `GET /personas/buscar`; repetirlo no cambia nada | JWT, participante | global | 204/401/403/404 | nv-36 (J2) |
 | GET | `/api/v1/amistades/sugerencias` → `{resultados[{persona{id, nombre, nombre_usuario, foto_url}, amigos_en_comun}], degradado}`; amigos de mis amigos según Neo4j, por amigos en común (empate por id), hasta 20; sin amigos, solicitudes pendientes, bloqueos en cualquier sentido, cuentas inactivas ni quien apagó `buscable_por_usuario`; Neo4j caído o lento (3 s) = lista vacía con `degradado: true`; `Cache-Control: no-store` | JWT | global | 200/401/403 | nv-53 (J2) |
 | POST | `/api/v1/admin/negocios/importar` → multipart `archivo` `.csv` o `.json` o arreglo JSON de 1–100; idempotente por `slug`; responde `{creados, actualizados, errores[{fila,campo,mensaje}]}` y los válidos quedan `aprobado` | JWT administrador | admin 200/min | 200/400/401/403/413/422/503 | nv-20 (A2/A5) |
+| GET | `/api/v1/admin/moderacion` con `?estado=&tipo=&cursor=&limite=` → `{items[{id, tipo, referencia, estado, veredicto, falla, puntaje_max, creado_en}], siguiente_cursor, limite}`; `estado` es `pendiente` (por defecto), `aprobado` o `rechazado`; en orden de llegada; cursor firmado; `Cache-Control: no-store` | JWT administrador | admin 200/min | 200/401/403/422/429 | nv-43 (A7) |
+| GET | `/api/v1/admin/moderacion/{id}` → `{…resumen, texto, imagen_clave, puntajes{filtro: 0–100}, decision{estado, motivo, revisor_id, decidido_en} o null, version}` con `ETag` | JWT administrador | admin 200/min | 200/401/403/404/429 | nv-43 (A7) |
+| PATCH | `/api/v1/admin/moderacion/{id}` con `If-Match` y `{decision (aprobado o rechazado), motivo (obligatorio al rechazar, hasta 500)}` → el detalle con la decisión; guarda quién y cuándo; una segunda decisión o una versión vieja = 409; sin `If-Match` = 400 | JWT administrador | admin 200/min | 200/400/401/403/404/409/422/429 | nv-43 (A7) |
+| GET | `/api/v1/admin/moderacion/reglas` → `{cuarentena, rechazo, palabras[], version, por_defecto, actualizado_por, actualizado_en}`; sin reglas guardadas devuelve las por defecto (40, 80) con `version: 0` y `por_defecto: true` | JWT administrador | admin 200/min | 200/401/403/429 | nv-43 (A7) |
+| POST | `/api/v1/admin/moderacion/reglas` con `{cuarentena, rechazo, palabras[]}` → las reglas con `version: 1`; se pide 40 ≤ cuarentena < rechazo ≤ 100 y hasta 200 palabras de 1 a 60 caracteres (repetidas sin acentos ni mayúsculas se quitan); si ya existen = 409 | JWT administrador | admin 200/min | 201/400/401/403/409/422/429 | nv-43 (A7) |
+| PATCH | `/api/v1/admin/moderacion/reglas` con `If-Match` y cualquiera de `{cuarentena, rechazo, palabras[]}` (`palabras` reemplaza la lista) → las reglas; el Moderador las usa en la siguiente evaluación; sin reglas guardadas = 404; versión vieja = 409 | JWT administrador | admin 200/min | 200/400/401/403/404/409/422/429 | nv-43 (A7) |
 | POST | `/api/v1/planes/generar` con `{frase, lat, lng, fecha?, personas?, movilidad?}` → plan sin guardar `{fuente, aviso, parametros{compania, con_ninos, con_mascota, presupuesto_max, hora, animo?, palabras_clave[]}, plan{nombre, fecha, personas, presupuesto, movilidad, paradas[{id, negocio_id, llega, minutos, precio, nombre, categoria, por_que}], traslados[], costo_total, costo_por_persona, origen}}`; `frase` de 1 a 300 caracteres; `fecha` de ahora a 30 días; de 2 a 4 paradas que propone la IA y la API verifica contra los candidatos; si la IA tarda más de 7 s, falla, da 429, está apagada o se llegó al tope o a un límite, responde el motor de reglas con la misma forma, `fuente: reglas` y 3 paradas | JWT | global | 200/400/401/403/422/429/503 | nv-31, nv-32, nv-33 (A4) |
 | POST | `/api/v1/planes/generar/otra-idea` con el cuerpo de generar más `excluir` (de 1 a 30 ids de negocios ya propuestos) → otro plan sin guardar con la misma forma, sin esos lugares; con el mismo respaldo por reglas | JWT | global | 200/400/401/403/422/429/503 | nv-33 (A4) |
 
@@ -127,7 +133,42 @@ Lugares (nv-21): todo filtro (`estado=aprobado` sin `eliminado_en`, categoría, 
 
 Asistente (nv-31): la IA solo interpreta la frase (compañía, presupuesto por persona, hora, ánimo y palabras clave); el motor de nv-23 elige 15 candidatos abiertos y compatibles con alergias y dieta del perfil, y el plan se arma con hasta 3 paradas y `planes.Recalcular`. Al modelo van las instrucciones fijas, el día y la hora y la frase anonimizada; nunca ids, ubicación ni el perfil. `fuente` es `ia`; el respaldo `reglas` llega con nv-33. Proveedor sin cupo = 429 con `Retry-After`; IA apagada, lenta o con respuesta inválida = 503; ningún candidato cabe = 422. `animo` solo vuelve con `privacidad.estado_animo`. El plan no se guarda: la app usa `POST /planes` (nv-30).
 
+Moderación (nv-43): la cola (`moderacion_cola`) solo recibe lo que `Moderador.Evaluar` dejó en cuarentena, desde el paquete (`Service.Encolar`), sin endpoint interno HTTP: el `POST /interno/moderacion` de la hoja A7 no se expone en el monolito. Un recurso no entra dos veces mientras espera. Nada se publica hasta la decisión; el módulo dueño del recurso la recibe por `Destino` (nv-45). Las reglas viven en un solo documento de `moderacion_reglas`; el umbral de cuarentena no baja de 40 porque Rekognition no devuelve etiquetas con menos confianza. La cuenta borrada se lleva sus elementos de la cola; las decisiones guardan el id del administrador.
+
 ## Diferidos (sin ruta en código todavía)
 - `POST /api/v1/auth/google` (`{id_token, dispositivo{}}` → 200 con tokens, 201 si es cuenta nueva) — nv-04 T7, espera la decisión D-1 (cuenta sin `fecha_nacimiento`) y la excepción de stack `google.golang.org/api/idtoken`. Hoja J1.
 - `GET /metrics` (Prometheus, red interna) — spec de observabilidad. Hoja J9.
 - `POST /api/v1/errores` y `GET /api/v1/admin/errores` (colección `errores_app`) — spec de observabilidad. Hoja J9.
+
+### Hoja A5 — Negocios aliados (specs nv-55 y nv-56 en Borrador, sin código)
+Copiadas de A5 §6 y §7 antes de programar (AGENTS §5). Pasan a la tabla viva cuando su ruta exista. «Dueño» = rol `comerciante` y el negocio es suyo. Nada del expediente (INE, comprobante, datos fiscales, CLABE) sale en `/lugares` ni en el panel.
+- `POST /api/v1/negocios` (`{nombre, categoria, descripcion}` → 201 borrador; agrega el rol `comerciante`) — consumidor o comerciante — nv-55.
+- `PATCH /api/v1/negocios/{id}/alta/{paso}` (pasos 2–6, `If-Match`) → 200 con `paso_alta` — dueño — nv-55.
+- `POST /api/v1/negocios/{id}/enviar-revision` → 200 `en_revision` · 422 con lo que falta — dueño — nv-55.
+- `GET /api/v1/negocios/mios` — comerciante — nv-55.
+- `POST /api/v1/negocios/{id}/fotos` (`{tipo, content_type}` → 201 `{upload_url, foto}`, subida de nv-45) — dueño — nv-55.
+- `DELETE /api/v1/negocios/{id}/fotos/{foto_id}` → 204 · 422 si quedan menos de 3 — dueño — nv-55.
+- `PUT /api/v1/negocios/{id}/fotos/orden` (`{fotos_ids[], portada_id}`) — dueño — nv-55.
+- `POST /api/v1/negocios/{id}/documentos` (multipart `tipo`, `archivo`; cifrado, bucket privado) — dueño — nv-55 (no está en A5).
+- `GET /api/v1/negocios/{id}/documentos` y `GET /api/v1/negocios/{id}/documentos/{tipo}` — dueño — nv-55 (no están en A5).
+- `PUT /api/v1/negocios/{id}/datos-fiscales` (`{rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal}`; cifrado) · 422 RFC inválido — dueño — nv-55.
+- `PUT /api/v1/negocios/{id}/cuenta-deposito` (`{clabe, titular}`; cifrada) · 422 CLABE inválida — dueño — nv-55; el registro en Stripe y el depósito de prueba, nv-60.
+- `POST /api/v1/negocios/{id}/cuenta-deposito/verificar` (`{monto_centavos}`) — dueño — nv-60.
+- `GET /api/v1/admin/negocios?estado=en_revision|cambios_pendientes&cursor=` — administrador — nv-55 (A5 §7).
+- `GET /api/v1/admin/negocios/{id}/documentos/{tipo}?motivo=` (cada lectura queda en `accesos_expediente`) — administrador — nv-55 (no está en A5).
+- `PATCH /api/v1/admin/negocios/{id}/revision` (`{decision, motivo}`; notifica al dueño) — administrador — nv-55.
+- `GET /api/v1/negocios/{id}/panel` (P-47) — dueño — nv-56.
+- `PATCH /api/v1/negocios/{id}` (perfil P-52, `If-Match`; nombre y dirección a `cambios_pendientes`) — dueño — nv-56.
+- `POST /api/v1/negocios/{id}/pausa` (`{pausado, hasta, motivo}`) — dueño — nv-56.
+- `PUT /api/v1/negocios/{id}/reservas-config` (`{acepta_reservas, capacidad_por_horario, duracion_turno_min, anticipo{}, politica_cancelacion, confirmacion, permite_cambios}`) — dueño — nv-56; la lee nv-59.
+- `POST /api/v1/negocios/{id}/menu`, `PATCH /api/v1/negocios/{id}/menu/{item_id}` y `DELETE /api/v1/negocios/{id}/menu/{item_id}` — dueño — nv-56.
+- `GET /api/v1/lugares/{id}/menu?q=&seccion=` — público — nv-56.
+- `GET /api/v1/negocios/{id}/qr` → `image/png` — dueño — nv-56.
+- `DELETE /api/v1/negocios/{id}` (`{confirmacion}`) → 204 · 409 con reservas futuras — dueño — nv-56.
+- `PUT /api/v1/admin/negocios/{id}/sello` (`{otorgar, motivo}`) — administrador — nv-56.
+- `POST /api/v1/negocios/{id}/cobros/conectar`, `GET /api/v1/negocios/{id}/liquidaciones`, `GET /api/v1/negocios/{id}/saldo` y `GET /api/v1/negocios/{id}/estado-cuenta?mes=` — dueño — nv-60.
+- `GET /api/v1/negocios/{id}/estadisticas`, `GET /api/v1/negocios/{id}/consejo` y `GET /api/v1/negocios/{id}/reportes/mensual?mes=` — dueño — spec por definir (estadísticas).
+- `GET /api/v1/negocios/{id}/facturas` — dueño — spec por definir (CFDI y PAC).
+- `POST /api/v1/negocios/{id}/fotos/instagram`, `GET /api/v1/negocios/{id}/sello/insignia` y `POST /api/v1/negocios/{id}/ia/descripcion` — dueño — diferidos.
+- `GET /api/v1/geo/direcciones?q=` — dueño — diferido hasta elegir proveedor de mapas.
+- `POST /api/v1/admin/negocios/importar` ya está en la tabla viva (nv-20).

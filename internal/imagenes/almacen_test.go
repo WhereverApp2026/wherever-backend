@@ -40,28 +40,35 @@ func TestS3_FirmarSubidaLlevaLaPolitica(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &politica))
 	assert.WithinDuration(t, antes.Add(5*time.Minute), politica.Expiration, 5*time.Second)
 
-	var rango, tipo, clave bool
-	for _, c := range politica.Conditions {
-		switch v := c.(type) {
-		case []any:
-			if len(v) == 3 && v[0] == "content-length-range" {
-				rango = v[1] == float64(1) && v[2] == float64(5<<20)
-			}
-			if len(v) == 3 && v[0] == "eq" && v[1] == "$key" {
-				clave = v[2] == "cuarentena/abc"
-			}
-		case map[string]any:
-			if v["Content-Type"] == "image/png" {
-				tipo = true
-			}
-			if v["key"] == "cuarentena/abc" {
-				clave = true
-			}
-		}
-	}
+	rango, tipo, clave := condiciones(politica.Conditions)
 	assert.True(t, rango, "un archivo de 6 MB no pasa: content-length-range 1..5 MB")
 	assert.True(t, tipo, "el tipo es exacto")
 	assert.True(t, clave, "la clave es exacta, dentro de cuarentena/")
+}
+
+// condiciones dice si la política fija el rango 1..5 MB, el tipo image/png y la clave.
+func condiciones(conds []any) (rango, tipo, clave bool) {
+	for _, c := range conds {
+		switch v := c.(type) {
+		case []any:
+			r, k := condicionLista(v)
+			rango, clave = rango || r, clave || k
+		case map[string]any:
+			tipo = tipo || v["Content-Type"] == "image/png"
+			clave = clave || v["key"] == "cuarentena/abc"
+		}
+	}
+	return rango, tipo, clave
+}
+
+// condicionLista lee ["content-length-range", 1, 5 MB] o ["eq", "$key", clave].
+func condicionLista(v []any) (rango, clave bool) {
+	if len(v) != 3 {
+		return false, false
+	}
+	rango = v[0] == "content-length-range" && v[1] == float64(1) && v[2] == float64(5<<20)
+	clave = v[0] == "eq" && v[1] == "$key" && v[2] == "cuarentena/abc"
+	return rango, clave
 }
 
 func TestNewS3_SinBucketFalla(t *testing.T) {

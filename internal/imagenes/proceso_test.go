@@ -80,7 +80,7 @@ func conEXIF(t *testing.T, original []byte) []byte {
 	tiff = append(tiff, []byte("GPS-19.4326N-99.1332W")...)
 	seg := append([]byte("Exif\x00\x00"), tiff...)
 	app1 := []byte{0xFF, 0xE1}
-	app1 = binary.BigEndian.AppendUint16(app1, uint16(len(seg)+2))
+	app1 = binary.BigEndian.AppendUint16(app1, uint16(len(seg)+2)) //nolint:gosec // segmento de prueba de pocos bytes
 	app1 = append(app1, seg...)
 	out := append([]byte{0xFF, 0xD8}, app1...)
 	return append(out, original[2:]...)
@@ -91,7 +91,7 @@ func pngCabecera(w, h uint32, profundidad, tipoColor, entrelazado byte) []byte {
 	ihdr := binary.BigEndian.AppendUint32(nil, w)
 	ihdr = binary.BigEndian.AppendUint32(ihdr, h)
 	ihdr = append(ihdr, profundidad, tipoColor, 0, 0, entrelazado)
-	chunk := binary.BigEndian.AppendUint32(nil, uint32(len(ihdr)))
+	chunk := binary.BigEndian.AppendUint32(nil, uint32(len(ihdr))) //nolint:gosec // IHDR mide 13 bytes
 	cuerpo := append([]byte("IHDR"), ihdr...)
 	chunk = append(chunk, cuerpo...)
 	chunk = binary.BigEndian.AppendUint32(chunk, crc32.ChecksumIEEE(cuerpo))

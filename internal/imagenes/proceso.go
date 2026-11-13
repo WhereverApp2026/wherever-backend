@@ -79,17 +79,23 @@ func revisarDimensiones(cfg image.Config, formato string, datos []byte) error {
 	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > MaxLado || cfg.Height > MaxLado {
 		return ErrDimensiones
 	}
-	bpp := bytesPorPixel(cfg.ColorModel)
-	switch {
-	case formato == "jpeg" && jpegProgresivo(datos):
-		bpp = bytesJPEGProgresivo
-	case formato == "png" && len(datos) > 28 && datos[28] == 1:
-		bpp *= 2 // entrelazado: cada pasada se decodifica aparte antes de copiarse
-	}
-	if float64(cfg.Width)*float64(cfg.Height)*bpp > MaxBytesDecodificados {
+	if float64(cfg.Width)*float64(cfg.Height)*bytesAlDecodificar(cfg.ColorModel, formato, datos) > MaxBytesDecodificados {
 		return ErrDimensiones
 	}
 	return nil
+}
+
+// bytesAlDecodificar es lo que ocupa cada píxel al decodificar, con el costo extra de un JPEG
+// progresivo o un PNG entrelazado.
+func bytesAlDecodificar(m color.Model, formato string, datos []byte) float64 {
+	bpp := bytesPorPixel(m)
+	switch {
+	case formato == "jpeg" && jpegProgresivo(datos):
+		return bytesJPEGProgresivo
+	case formato == "png" && len(datos) > 28 && datos[28] == 1:
+		return bpp * 2 // entrelazado: cada pasada se decodifica aparte antes de copiarse
+	}
+	return bpp
 }
 
 // bytesPorPixel es lo que ocupa la imagen decodificada; YCbCr cuenta 3 (sin submuestreo, el
@@ -182,30 +188,44 @@ func recorrerJPEG(datos []byte, visitar func(marcador byte, segmento []byte) boo
 	if len(datos) < 4 || datos[0] != 0xFF || datos[1] != 0xD8 {
 		return
 	}
-	for i := 2; i+4 <= len(datos); {
-		if datos[i] != 0xFF {
-			return
-		}
+	for i := 2; i+4 <= len(datos) && datos[i] == 0xFF; {
 		marcador := datos[i+1]
-		switch {
-		case marcador == 0xFF: // relleno
-			i++
-			continue
-		case marcador == 0xDA || marcador == 0xD9:
-			return
-		case marcador >= 0xD0 && marcador <= 0xD7, marcador == 0x01:
-			i += 2
-			continue
-		}
-		largo := int(binary.BigEndian.Uint16(datos[i+2:]))
-		if largo < 2 || i+2+largo > len(datos) {
+		salto, conSegmento, fin := saltoJPEG(marcador)
+		if fin {
 			return
 		}
-		if !visitar(marcador, datos[i+4:i+2+largo]) {
-			return
+		if conSegmento {
+			seg, ok := segmentoJPEG(datos, i)
+			if !ok || !visitar(marcador, seg) {
+				return
+			}
+			salto = 4 + len(seg)
 		}
-		i += 2 + largo
+		i += salto
 	}
+}
+
+// segmentoJPEG devuelve el cuerpo del segmento que empieza en i; false si el largo no cabe.
+func segmentoJPEG(datos []byte, i int) ([]byte, bool) {
+	largo := int(binary.BigEndian.Uint16(datos[i+2:]))
+	if largo < 2 || i+2+largo > len(datos) {
+		return nil, false
+	}
+	return datos[i+4 : i+2+largo], true
+}
+
+// saltoJPEG clasifica un marcador: relleno (avanza 1), sin segmento (avanza 2), fin de la
+// cabecera (SOS o EOI) o con segmento de largo propio.
+func saltoJPEG(marcador byte) (salto int, conSegmento, fin bool) {
+	switch {
+	case marcador == 0xFF:
+		return 1, false, false
+	case marcador == 0xDA || marcador == 0xD9:
+		return 0, false, true
+	case marcador >= 0xD0 && marcador <= 0xD7, marcador == 0x01:
+		return 2, false, false
+	}
+	return 0, true, false
 }
 
 // jpegProgresivo dice si el primer SOF es progresivo (SOF2).
@@ -234,17 +254,23 @@ func orientacionEXIF(datos []byte) int {
 	return orientacion
 }
 
-func orientacionTIFF(t []byte) int {
+// ordenTIFF lee el orden de bytes de la cabecera TIFF; nil si es corta o no es TIFF.
+func ordenTIFF(t []byte) binary.ByteOrder {
 	if len(t) < 8 {
-		return 1
+		return nil
 	}
-	var orden binary.ByteOrder
 	switch string(t[:2]) {
 	case "II":
-		orden = binary.LittleEndian
+		return binary.LittleEndian
 	case "MM":
-		orden = binary.BigEndian
-	default:
+		return binary.BigEndian
+	}
+	return nil
+}
+
+func orientacionTIFF(t []byte) int {
+	orden := ordenTIFF(t)
+	if orden == nil {
 		return 1
 	}
 	inicio := int(orden.Uint32(t[4:8]))

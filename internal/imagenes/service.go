@@ -112,30 +112,13 @@ func (s *Service) Confirmar(ctx context.Context, sujeto, id string) (*ImagenResp
 	if err != nil {
 		return nil, err
 	}
-	ahora := s.ahora().UTC()
-	img, err := s.repo.Tomar(ctx, id, dueno, ahora, ahora.Add(-s.cfg.Abandono))
-	if errors.Is(err, ErrNoTomable) {
-		if _, err := s.repo.Buscar(ctx, id, dueno); errors.Is(err, ErrNotFound) {
-			return nil, apperr.NotFound("imagen no encontrada")
-		} else if err != nil {
-			return nil, err
-		}
-		return nil, apperr.Conflict("la imagen ya se procesó o se está procesando")
-	}
+	img, err := s.tomar(ctx, id, dueno)
 	if err != nil {
 		return nil, err
 	}
 	datos, err := s.almacen.Leer(ctx, claveOriginal(id), s.cfg.MaxBytes)
-	switch {
-	case errors.Is(err, ErrSinObjeto):
-		s.soltar(ctx, img)
-		return nil, apperr.Conflict("la imagen no se ha subido o ya venció")
-	case errors.Is(err, ErrObjetoGrande):
-		return s.rechazarArchivo(ctx, img)
-	case err != nil:
-		s.soltar(ctx, img)
-		s.log.ErrorContext(ctx, "imagenes: no se pudo leer el original", slog.String("error", err.Error()))
-		return nil, apperr.Unavailable("almacén de imágenes no disponible")
+	if err != nil {
+		return s.fallaLectura(ctx, img, err)
 	}
 	proc, err := s.procesar(ctx, datos, img.Tipo)
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -150,6 +133,37 @@ func (s *Service) Confirmar(ctx context.Context, sujeto, id string) (*ImagenResp
 		img.Moderacion = &Moderacion{Veredicto: string(res.Veredicto), Puntajes: res.Puntajes, Falla: res.Falla}
 	}
 	return s.decidir(ctx, img, proc)
+}
+
+// tomar marca la imagen como en proceso; 404 si no es del dueño, 409 si ya se procesó o se
+// está procesando.
+func (s *Service) tomar(ctx context.Context, id string, dueno bson.ObjectID) (*Imagen, error) {
+	ahora := s.ahora().UTC()
+	img, err := s.repo.Tomar(ctx, id, dueno, ahora, ahora.Add(-s.cfg.Abandono))
+	if !errors.Is(err, ErrNoTomable) {
+		return img, err
+	}
+	if _, err := s.repo.Buscar(ctx, id, dueno); errors.Is(err, ErrNotFound) {
+		return nil, apperr.NotFound("imagen no encontrada")
+	} else if err != nil {
+		return nil, err
+	}
+	return nil, apperr.Conflict("la imagen ya se procesó o se está procesando")
+}
+
+// fallaLectura responde cuando no se pudo leer el original: 409 si no se subió, 422 si es
+// demasiado grande y 503 si el almacén falla.
+func (s *Service) fallaLectura(ctx context.Context, img *Imagen, err error) (*ImagenResponse, error) {
+	switch {
+	case errors.Is(err, ErrSinObjeto):
+		s.soltar(ctx, img)
+		return nil, apperr.Conflict("la imagen no se ha subido o ya venció")
+	case errors.Is(err, ErrObjetoGrande):
+		return s.rechazarArchivo(ctx, img)
+	}
+	s.soltar(ctx, img)
+	s.log.ErrorContext(ctx, "imagenes: no se pudo leer el original", slog.String("error", err.Error()))
+	return nil, apperr.Unavailable("almacén de imágenes no disponible")
 }
 
 // procesar decodifica con turno: una decodificación a la vez por instancia (memoria).
