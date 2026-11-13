@@ -131,8 +131,8 @@ func pointOf(l Location) Point {
 	return Point{Lat: l.Coordinates[1], Lng: l.Coordinates[0]}
 }
 
-// cover es la primera foto por `orden`.
-func cover(photos []Foto) string {
+// Cover es la primera foto por `orden`.
+func Cover(photos []Foto) string {
 	if len(photos) == 0 {
 		return ""
 	}
@@ -156,7 +156,7 @@ func toItem(row placeRow, now time.Time) PlaceItem {
 		PriceLevel:   row.PriceLevel,
 		AveragePrice: row.AveragePrice,
 		Rating:       RatingSummary{Average: row.Rating.Promedio, Reviews: row.Rating.TotalResenas},
-		Cover:        cover(row.Photos),
+		Cover:        Cover(row.Photos),
 		Location:     pointOf(row.Location),
 		DistanceM:    row.DistanceM,
 		OpenNow:      OpenAt(row.ScheduleMin, now),
