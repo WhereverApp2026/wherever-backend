@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -71,6 +71,10 @@
 | PATCH | `/api/v1/grupos/{id}/integrantes/yo` con `{estado}` (`confirmado` o `declinado`) → grupo; confirmar después de declinar exige cupo (409); el organizador no responde (422) | JWT, integrante | global | 200/400/401/403/404/409/422 | nv-37 (J3) |
 | DELETE | `/api/v1/grupos/{id}/integrantes/yo` → sale del grupo y libera su lugar; el organizador no sale (422) | JWT, integrante | global | 204/401/403/404/422 | nv-37 (J3) |
 | DELETE | `/api/v1/grupos/{id}/integrantes/{usuario_id}` → saca a un integrante; a sí mismo = 422; quien no está = 404 | JWT, organizador (integrante = 403) | global | 204/401/403/404/422 | nv-37 (J3) |
+| POST | `/api/v1/planes/{id}/compartir` → `{codigo, enlace, grupo_id, vence_en}`; código aleatorio de 128 bits (base64url) que vence en 7 días; crea el grupo si falta y reemplaza (revoca) el enlace anterior; `enlace` = `{APP_LINK_BASE}/plan#codigo=…` (el código va en el fragmento); en la base solo queda su SHA-256; sin compresión y `Cache-Control: no-store` | JWT, dueño del plan | global | 201/401/403/404 | nv-38 (J3/A4) |
+| DELETE | `/api/v1/planes/{id}/compartir` → revoca el enlace; sin enlace = 404 | JWT, dueño del plan | global | 204/401/403/404 | nv-38 (J3/A4) |
+| POST | `/api/v1/planes/compartidos` con `{codigo}` → vista pública `{nombre, fecha, personas, movilidad, costo_por_persona, paradas[{lugar?{tarjeta de GET /lugares}, llega, minutos}], cupo{max, ocupados}, vence_en}`; sin personas, ids de cuentas, notas ni presupuesto; código inexistente, revocado, vencido o de un plan borrado = 404 igual; el código nunca va en la ruta | no | 30 por minuto por IP | 200/400/404/422/429 | nv-38 (J3/A4) |
+| POST | `/api/v1/grupos/unirse` con `{codigo}` → grupo; entra confirmado (o pasa de invitado/declinado a confirmado) sin pedir amistad; inexistente, revocado, plan borrado o bloqueo entre organizador y quien entra = 404; vencido = 410; sin cupo = 409; el organizador recibe su grupo | JWT | 30 por hora por usuario | 200/400/401/403/404/409/410/422/429 | nv-38 (J3) |
 | GET | `/api/v1/busquedas/recientes` → `{items[{texto, buscado_en}]}`; las 10 más nuevas del usuario (repetir una solo la sube); cada una vive 90 días; `Cache-Control: no-store` | JWT | global | 200/401/403 | nv-22 (A2) |
 | DELETE | `/api/v1/busquedas/recientes` → borra todas las búsquedas recientes del usuario | JWT | global | 204/401/403 | nv-22 (A2) |
 | GET | `/api/v1/recomendaciones` con `?lat=&lng=&radio_m=&compania=&hora=&limite=` → `{items[tarjeta de GET /lugares + puntaje, razones[], por_que], compania?, momento}`; `lat` y `lng` obligatorios; `compania` solo, pareja, amigos o familia; `hora` HH:MM de hoy en `America/Mexico_City`; `limite` 10 por defecto y 50 máx.; sin los descartes del usuario; `Cache-Control: no-store` | JWT | global | 200/401/403/422/503 | nv-24 (A2) |

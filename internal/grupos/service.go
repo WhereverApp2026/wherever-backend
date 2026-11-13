@@ -15,9 +15,11 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
-// Plans es lo que grupos lee de planes: el plan propio y cuáles siguen activos.
+// Plans es lo que grupos lee de planes: el plan propio, el plan activo (vista pública, nv-38)
+// y cuáles siguen activos.
 type Plans interface {
 	FindOwned(ctx context.Context, owner, id bson.ObjectID) (planes.Plan, error)
+	FindActive(ctx context.Context, id bson.ObjectID) (planes.Plan, error)
 	ActiveIDs(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]bool, error)
 }
 
@@ -38,6 +40,7 @@ type Service struct {
 	friends Friends
 	users   Users
 	cursor  *pagination.Signer
+	share   shareDeps
 	now     func() time.Time
 }
 
@@ -107,17 +110,24 @@ func (s *Service) InviteToPlan(ctx context.Context, subject, rawPlanID string, r
 	if err != nil {
 		return View{}, err
 	}
-	g, err := s.repo.FindByPlan(ctx, planID)
-	if errors.Is(err, ErrNotFound) {
-		g, err = s.newGroup(ctx, me, planID)
-		if errors.Is(err, ErrDuplicate) { // otra petición lo creó primero
-			g, err = s.repo.FindByPlan(ctx, planID)
-		}
-	}
+	g, err := s.groupForPlan(ctx, me, planID)
 	if err != nil {
 		return View{}, errStore()
 	}
 	return s.invite(ctx, g, me, invitees)
+}
+
+// groupForPlan trae el grupo del plan o lo crea; si otra petición lo creó primero, lo relee.
+func (s *Service) groupForPlan(ctx context.Context, me, planID bson.ObjectID) (Group, error) {
+	g, err := s.repo.FindByPlan(ctx, planID)
+	if !errors.Is(err, ErrNotFound) {
+		return g, err
+	}
+	g, err = s.newGroup(ctx, me, planID)
+	if errors.Is(err, ErrDuplicate) {
+		return s.repo.FindByPlan(ctx, planID)
+	}
+	return g, err
 }
 
 // Invite invita a amigos a un grupo; solo el organizador.

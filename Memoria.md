@@ -508,6 +508,15 @@
 - Límite nuevo: 30 invitaciones por hora por usuario (`rate:grupos_invitacion:{usuario}`), +3 comandos de Redis por invitación (limitador).
 - A evitar: probar la concurrencia del tope por HTTP con un solo organizador; el límite de 10 escrituras simultáneas da 429 antes.
 
+## NV-38 — Enlace de invitación y vista pública (2026-11-12)
+- Estado: rama `nv-38` desde `nv-37`, PR contra `main` (trae nv-37 hasta que se fusione #69). Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (87 rutas). Falta la firma.
+- Corrección de drift: el código iba en la ruta (`/planes/compartidos/{codigo}`, `/grupos/unirse/{codigo}`), pero `Errors` registra `ruta` en cada línea de acceso (y CloudFront también). Ahora va en el cuerpo (`POST {codigo}`) y en el fragmento del enlace (`{APP_LINK_BASE}/plan#codigo=…`), como los tokens de correo de nv-06. Se agregó `DELETE /planes/{id}/compartir` para revocar.
+- Decisión: un código por grupo en `grupos.codigo_hash` (SHA-256, `ux_codigo_hash` único parcial) y `codigo_vence`; crear otro reemplaza al anterior. Compartir crea el grupo si falta.
+- Decisión: unirse no pide amistad (el enlace es la invitación) pero sí cuenta activa y que no haya bloqueo con el organizador (404). Entra o vuelve confirmado con `ocupados < 12` en la misma operación. Vencido: vista 404, unirse 410.
+- Decisión: `POST /planes/{id}/compartir` va en `carriesTokens` (sin compresión): responde el código.
+- Límites nuevos: vista pública 30/min por IP y unirse 30/h por usuario; +3 comandos de Redis por petición (limitador).
+- Para la app: leer `codigo` de `location.hash` y mandarlo por `POST`; no ponerlo en la URL. `APP_LINK_BASE` cambia si se recrea CloudFront.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

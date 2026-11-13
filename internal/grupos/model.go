@@ -1,6 +1,6 @@
 // Package grupos reúne hasta 12 personas alrededor de un plan (nv-37, hojas J3 y A4):
-// modelo, repositorio, service, handler y ARCO. El enlace de invitación es de nv-38 y las
-// votaciones de nv-39.
+// modelo, repositorio, service, handler y ARCO, y el enlace de invitación con su vista
+// pública (nv-38). Las votaciones son de nv-39.
 package grupos
 
 import (
@@ -45,8 +45,11 @@ type Group struct {
 	OrganizerID bson.ObjectID `bson:"organizador_id"`
 	Members     []Member      `bson:"integrantes"`
 	Occupied    int           `bson:"ocupados"`
-	CreatedAt   time.Time     `bson:"creado_en"`
-	UpdatedAt   time.Time     `bson:"actualizado_en"`
+	// CodeHash es el SHA-256 del código del enlace (nv-38); el código nunca se guarda.
+	CodeHash    string     `bson:"codigo_hash,omitempty"`
+	CodeExpires *time.Time `bson:"codigo_vence,omitempty"`
+	CreatedAt   time.Time  `bson:"creado_en"`
+	UpdatedAt   time.Time  `bson:"actualizado_en"`
 }
 
 // Member devuelve al integrante userID, si está.
