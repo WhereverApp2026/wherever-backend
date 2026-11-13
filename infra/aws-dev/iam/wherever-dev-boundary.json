@@ -101,6 +101,17 @@
       "Resource": "arn:aws:elasticloadbalancing:us-east-2:816101201001:targetgroup/wherever-dev-*/*"
     },
     {
+      "Sid": "ModerarImagenes",
+      "Effect": "Allow",
+      "Action": "rekognition:DetectModerationLabels",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2"
+        }
+      }
+    },
+    {
       "Sid": "LeerSaludDeDestinos",
       "Effect": "Allow",
       "Action": "elasticloadbalancing:DescribeTargetHealth",
