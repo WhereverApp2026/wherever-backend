@@ -61,7 +61,8 @@ func (h *Handler) report(c *fiber.Ctx) error {
 	if err := h.svc.Report(c.UserContext(), req); err != nil {
 		return err
 	}
-	return c.SendStatus(fiber.StatusAccepted)
+	c.Status(fiber.StatusAccepted) // sin cuerpo: SendStatus escribiría "Accepted" como texto
+	return nil
 }
 
 func (h *Handler) list(c *fiber.Ctx) error {

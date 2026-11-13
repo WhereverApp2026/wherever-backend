@@ -15,6 +15,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
@@ -45,6 +46,7 @@ var expected = map[string][]string{
 	grafo.Collection:                    {"_id_", "ix_disponible_en"},
 	busquedas.Collection:                {"_id_", "ux_usuario_texto", "ix_usuario_fecha", "ttl_buscado_en"},
 	usuarios.ConsentsCollection:         {"_id_", "ix_usuario_fecha"},
+	favoritos.Collection:                {"_id_", "ux_favorito", "ix_lista", "ix_objetivo"},
 	grupos.Collection:                   {"_id_", "ux_plan", "ix_integrante_actualizado", "ux_codigo_hash"},
 	votaciones.Collection:               {"_id_", "ux_parada_abierta", "ix_grupo_creada", "ix_estado_cierra"},
 	sincronizacion.TombstonesCollection: {"_id_", "ix_usuario_seq", "ttl_borrado"},
@@ -108,6 +110,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		auth.TokensCollection:            {"ux_token_hash"},
 		negocios.Collection:              {"ux_slug", "ux_qr_checkin"},
 		recomendaciones.Collection:       {"ux_usuario_negocio"},
+		favoritos.Collection:             {"ux_favorito"},
 		grupos.Collection:                {"ux_plan", "ux_codigo_hash"},
 		votaciones.Collection:            {"ux_parada_abierta"},
 		notificaciones.DevicesCollection: {"ux_token_hash"},

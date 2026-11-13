@@ -1,9 +1,9 @@
 # plan.md — NV-54 Favoritos de negocios y planes
 
 1. Mapeo
-- Crear: `internal/favoritos/{model,repository,service,handler,dto,privacy}.go`, `internal/testutil/favoritostest`, pruebas de las cuatro suites.
-- Modificar: `scripts/indexes` y los índices declarados de `/ready`; registro de rutas en `internal/http`; registro de `Privacy` en `internal/privacidad`; `docs/endpoints.md` (filas de A3).
-- Sin cambios: negocios y planes (se leen por interfaz), Redis y variables.
+- Crear: `internal/favoritos/{model,repository,service,handler,dto,privacy}.go`, pruebas de las cuatro suites (el módulo se arma en `internal/testutil/authtest`, sin paquete `favoritostest`).
+- Modificar: `internal/indexes` (lo usan `scripts/indexes` y `/ready`); lista de módulos y registro de `Privacy` en `cmd/api`, `authtest` y `scripts/routes`; `docs/endpoints.md` (filas de A3); contrato de la exportación ARCO.
+- `negocios`: `Cover` exportada y `FindFavoriteCards` (solo lectura). Sin cambios: planes (se leen por interfaz), Redis y variables.
 
 2. Guardarraíles
 - Servicios reales en las pruebas, sin secretos en Git, sin datos personales en logs, rol validado en cada endpoint y cada ruta nueva en `docs/endpoints.md`.
