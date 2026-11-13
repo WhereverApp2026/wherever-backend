@@ -40,12 +40,13 @@ const (
 const pushTitle = "Wherever"
 
 var pushText = map[string]string{
+	KindBusinessReviewed: "Ya revisamos tu negocio",
 	KindFriendRequest:    "Tienes una nueva solicitud de amistad",
 	KindFriendAccepted:   "Aceptaron tu solicitud de amistad",
 	KindPlanInvite:       "Te invitaron a un plan",
 	KindVoteOpened:       "Hay una votación abierta en tu plan",
 	KindVoteClosed:       "Se cerró una votación de tu plan",
-	KindBusinessReviewed: "Ya revisamos tu negocio",
+	KindGroupMessage:     "Tienes mensajes nuevos en un grupo",
 }
 
 type pushJob struct {
@@ -179,7 +180,7 @@ func resultOf(err error) string {
 
 // Kinds que siguen el interruptor «grupos» de las preferencias; los de amistad no tienen
 // interruptor propio en nv-05 y siempre se envían (fuera del horario silencioso).
-var groupKinds = map[string]bool{KindPlanInvite: true, KindVoteOpened: true, KindVoteClosed: true}
+var groupKinds = map[string]bool{KindPlanInvite: true, KindVoteOpened: true, KindVoteClosed: true, KindGroupMessage: true}
 
 // Wanted dice si el aviso debe sonar: el tipo está encendido y no es horario silencioso (en
 // la hora de México, la zona por defecto de la constitución §5).
