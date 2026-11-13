@@ -83,6 +83,7 @@
       ],
       "telefono_registrado": "bool",
       "version": "number"
-    }
+    },
+    "votaciones": []
   }
 }

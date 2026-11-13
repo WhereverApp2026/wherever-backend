@@ -218,6 +218,33 @@ func (s *Service) edit(ctx context.Context, subject, rawID string, version int, 
 	return p, nil
 }
 
+// ReplaceBusiness cambia el negocio de una parada del plan del dueño y lo recalcula. Lo usa
+// el cierre de una votación (nv-39), que no tiene la versión: la lee y, si otra edición
+// gana la carrera, reintenta una vez.
+func (s *Service) ReplaceBusiness(ctx context.Context, ownerID, planID, stopID, businessID bson.ObjectID) (Plan, error) {
+	var err error
+	for range 2 {
+		var p Plan
+		p, err = s.repo.FindOwned(ctx, ownerID, planID)
+		if err != nil {
+			return Plan{}, storeError(err)
+		}
+		p, err = s.edit(ctx, ownerID.Hex(), planID.Hex(), p.Version, func(p *Plan) error {
+			i, err := stopIndex(p, stopID.Hex())
+			if err != nil {
+				return err
+			}
+			p.Paradas[i].NegocioID = businessID
+			return nil
+		})
+		var appErr *apperr.Error
+		if err == nil || !errors.As(err, &appErr) || appErr.Kind != apperr.KindConflict {
+			return p, err
+		}
+	}
+	return Plan{}, err
+}
+
 // Patch cambia nombre, fecha, personas, presupuesto o movilidad.
 func (s *Service) Patch(ctx context.Context, subject, rawID string, version int, req PatchRequest) (Plan, error) {
 	return s.edit(ctx, subject, rawID, version, req.apply)
