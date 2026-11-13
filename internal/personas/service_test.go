@@ -45,19 +45,37 @@ func TestParseQuery_Invalid422(t *testing.T) {
 
 // fakeUsers registra qué consulta hizo el service; no simula la base (eso es Integration).
 type fakeUsers struct {
-	prefix, hash string
-	exclude      []bson.ObjectID
-	err          error
+	prefix, hash, code string
+	exclude            []bson.ObjectID
+	byCode             usuarios.User
+	err                error
+}
+
+func (f *fakeUsers) FindByFriendCode(_ context.Context, code string) (usuarios.User, error) {
+	f.code = code
+	if f.err != nil {
+		return usuarios.User{}, f.err
+	}
+	if f.byCode.ID.IsZero() {
+		return usuarios.User{}, usuarios.ErrNotFound
+	}
+	return f.byCode, nil
 }
 
 // fakeBlocks devuelve bloqueos fijos o un error.
 type fakeBlocks struct {
-	ids []bson.ObjectID
-	err error
+	ids    []bson.ObjectID
+	status string
+	mine   bool
+	err    error
 }
 
 func (f fakeBlocks) BlockedWith(context.Context, bson.ObjectID) ([]bson.ObjectID, error) {
 	return f.ids, f.err
+}
+
+func (f fakeBlocks) Relation(context.Context, bson.ObjectID, bson.ObjectID) (string, bool, error) {
+	return f.status, f.mine, f.err
 }
 
 func (f *fakeUsers) SearchByUsernamePrefix(_ context.Context, prefix string, exclude []bson.ObjectID, _ int64) ([]usuarios.User, error) {

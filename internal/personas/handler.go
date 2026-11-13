@@ -13,6 +13,10 @@ const (
 	searchPolicy = "personas_buscar"
 	searchLimit  = 30
 	searchWindow = time.Hour
+	// Contra la enumeración de códigos de amigo (nv-64).
+	codePolicy = "personas_codigo"
+	codeLimit  = 30
+	codeWindow = time.Hour
 )
 
 // Handler traduce HTTP ↔ service.
@@ -39,18 +43,35 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	if h.active != nil {
 		chain = append(chain, h.active)
 	}
-	if limiter != nil {
-		chain = append(chain, limiter.WindowUser(searchPolicy, searchLimit, searchWindow))
+	limited := func(policy string, limit int, window time.Duration, handler fiber.Handler) []fiber.Handler {
+		out := append([]fiber.Handler{}, chain...)
+		if limiter != nil {
+			out = append(out, limiter.WindowUser(policy, limit, window))
+		}
+		return append(out, handler)
 	}
-	v1.Get("/personas/buscar", append(chain, h.search)...)
+	v1.Get("/personas/buscar", limited(searchPolicy, searchLimit, searchWindow, h.search)...)
+	v1.Get("/personas/codigo/:codigo", limited(codePolicy, codeLimit, codeWindow, h.byCode)...)
+}
+
+func subject(c *fiber.Ctx) string {
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		return claims.Subject
+	}
+	return ""
+}
+
+func (h *Handler) byCode(c *fiber.Ctx) error {
+	out, err := h.svc.ByFriendCode(c.UserContext(), subject(c), c.Params("codigo"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
 }
 
 func (h *Handler) search(c *fiber.Ctx) error {
-	subject := ""
-	if claims, ok := middleware.ClaimsFrom(c); ok {
-		subject = claims.Subject
-	}
-	out, err := h.svc.Search(c.UserContext(), subject, c.Query("q"))
+	out, err := h.svc.Search(c.UserContext(), subject(c), c.Query("q"))
 	if err != nil {
 		return err
 	}

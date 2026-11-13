@@ -15,6 +15,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/chat"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -58,6 +59,7 @@ var expected = map[string][]string{
 	notificaciones.DevicesCollection:    {"_id_", "ux_token_hash", "ix_usuario_uso"},
 	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
 	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
+	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -121,6 +123,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		notificaciones.DevicesCollection: {"ux_token_hash"},
 		vaca.ExpensesCollection:          {"ux_id_cliente"},
 		vaca.DebtsCollection:             {"ux_deuda_corte"},
+		errores.Collection:               {"ux_huella"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
@@ -133,6 +136,10 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)
 	}
+	// errores_app (nv-64): se borra 30 días después de la última aparición.
+	ttl := specs(t, db, errores.Collection)["ttl_errores"]
+	require.NotNil(t, ttl.ExpireAfterSeconds)
+	assert.Equal(t, int32(30*24*3600), *ttl.ExpireAfterSeconds)
 }
 
 func TestIndexes_NegociosTextAndPartial(t *testing.T) {
