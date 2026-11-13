@@ -5,7 +5,7 @@
 | critic B1 | Sin secretos nuevos en Git ni Terraform | `critic-guardrails.sh` local (2026-11-13) | OK |
 | critic B2 | Sin tokens, RFC, CLABE ni documentos en logs | `critic` local; el logger oculta `clabe`, `rfc`, `razon_social`, `archivo` (`logger_test`) | OK |
 | critic B3 | Cambios de infraestructura o pipeline aprobados por el revisor (si aplica) | sin cambios de infraestructura ni pipeline | N/A |
-| critic B4 | Endpoints coinciden con `docs/endpoints.md` | `check_endpoints: OK (121 rutas)` en Docker (en Windows la política de aplicaciones bloquea el binario de `scripts/routes`) | OK |
+| critic B4 | Endpoints coinciden con `docs/endpoints.md` | `check_endpoints: OK (126 rutas, tras fusionar main con nv-54)` en Docker (en Windows la política de aplicaciones bloquea el binario de `scripts/routes`) | OK |
 | Build y lint | `go build`, `go vet`, Unit, `golangci-lint` | Docker `golang:1.27.3` y `golangci-lint v2.15.0`: 0 issues, Unit verdes (2026-11-13) | OK |
 | Pruebas | Integration, Security, Database y Contract con servicios reales | CI del PR | pendiente |
 | Cobertura | Mínimo 45 % | `check_coverage` en el CI del PR | pendiente |

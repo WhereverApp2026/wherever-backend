@@ -22,6 +22,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
@@ -172,6 +173,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	planPrivacy := planes.NewPrivacy(planRepo)
 	graph := grafo.NewQueue(client.DB(), log)
 	groupRepo := grupos.NewRepository(client.DB())
+	favRepo := favoritos.NewRepository(client.DB())
 	syncRepo := sincronizacion.NewRepository(client.DB())
 	syncActions := sincronizacion.NewActions(client.DB())
 	voteRepo := votaciones.NewRepository(client.DB())
@@ -181,7 +183,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), favoritos.NewPrivacy(favRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), moderacion.NewPrivacy(modRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -192,6 +194,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
@@ -242,6 +245,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos
 			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
+			favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			clima.NewHandler(weather, cities, v),
