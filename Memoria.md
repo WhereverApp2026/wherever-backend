@@ -581,6 +581,7 @@
   - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma).** nv-55 implementada (2026-11-13, PR contra `main`); nv-56 espera a que nv-55 esté en `main` y sus decisiones E1–E9.
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
+- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local; nv-58 ya se trajo a `main` en su PR). Traerles `main` antes de seguir.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54` y `claude/nv-58-vaca` (solo local); `origin/nv-64` ya trae `main` (2026-11-13). Traerles `main` antes de seguir.
 - Pendiente del operador antes de desplegar: `/wherever/dev/DATA_KEYS` (nv-48/49) y después `make migrar-cifrado APLICAR=1` en ese entorno; `/wherever/dev/FCM_PROJECT_ID` y `FCM_CREDENCIALES_B64` (nv-41, van juntas o ninguna). Ninguna es obligatoria en staging: sin ellas la API arranca, guarda en claro y no manda push. `deploy-env.sh` lee todo `/wherever/dev/`, así que basta con instalar la siguiente imagen.
 - A evitar: fiarse del `main` local; el 2026-11-13 iba 21 commits atrás de `origin/main`. Hacer `git fetch` antes de revisar el estado.
@@ -657,6 +658,14 @@
 - Decisión: la retención corre como `privacidad.Tarea` dentro del trabajo nocturno, con su candado.
 - Pendiente: al fusionar nv-45, conectar su S3 a `expediente.NewService` y una implementación de `alta.Imagenes` en `cmd/api/alta.go` (hoy las dos van nil: fotos y documentos dan 503). El aviso con estos datos y `AVISO_VERSION` nueva antes de desplegar. Avisar a nv-60 de D3 (la CLABE cifrada es la única copia hasta Stripe).
 - A evitar: un `bson.D` con `ubicacion` vacía en `negocios` rompe el índice 2dsphere: el borrador se inserta sin ese campo. En Go 1.26 no se puede poner `Subject` en el literal de `middleware.Claims` (campo promovido): usar `authtest.ClaimsDe`. En Windows, Python en modo texto escribe CRLF: abrir con `newline=""`. En Windows la política de aplicaciones bloquea el binario de `go run ./scripts/routes`: correr `check_endpoints` en Docker con un `GIT_DIR` temporal.
+
+## NV-58 — La Vaca (2026-11-13)
+- Estado: rama `claude/heuristic-diffie-a733bc` (WIP `ef2d91e` + `origin/main`), PR contra `main`. Paquete `internal/vaca` (corte puro, repositorio, service, handler, Privacy), colecciones `gastos` y `deudas_vaca`, siete rutas. Local: build, vet, Unit (en Docker), lint, critic, `check_sdd`, `check_endpoints`. Integration, Security, Database y Contract en el CI. Falta la firma.
+- Decisión: el corte se recalcula entero en cada escritura dentro de `lock:vaca:{grupo}` (SET NX + EVALSHA, 2 comandos); las deudas `pendiente` se reemplazan con `version_corte + 1` y las `pagada` cuentan como transferencias hechas. Porqué: un solo juego vigente aunque lleguen altas a la vez, sin contador en Mongo.
+- Decisión: residuo de la división igual a quien pagó si participa; si no, al primero por id. Empates por id: el corte es determinista y todos ven el mismo.
+- Decisión: borrar la cuenta conserva gastos y deudas (son del grupo); el nombre sale «Cuenta eliminada» porque se resuelve en cada respuesta. Exporta `gastos` y `deudas_vaca` sin ids de los demás.
+- Operador: nada. Sin variables ni Terraform; los índices los crea `/indexes` al instalar la imagen.
+- A evitar: escribir `?query` dentro de la ruta en `docs/endpoints.md` (`check_endpoints` la toma como parte del path). Correr Unit fuera de Docker: Control de aplicaciones bloquea los `.test.exe`.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

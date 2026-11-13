@@ -59,6 +59,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
+	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
@@ -203,6 +204,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(busquedas.NewPrivacy(searchRepo))
 	registry.RegisterExporter(amistades.NewPrivacy(friendRepo))
 	registry.RegisterExporter(grupos.NewPrivacy(groupRepo))
+	vacaRepo := vaca.NewRepository(db)
+	registry.RegisterExporter(vaca.NewExpensesPrivacy(vacaRepo))
+	registry.RegisterExporter(vaca.NewDebtsPrivacy(vacaRepo))
 	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(chat.NewPrivacy(chatRepo, groupRepo))
@@ -260,6 +264,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
+		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
