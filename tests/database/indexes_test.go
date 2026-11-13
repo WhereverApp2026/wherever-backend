@@ -47,6 +47,7 @@ var expected = map[string][]string{
 	grupos.Collection:                   {"_id_", "ux_plan", "ix_integrante_actualizado", "ux_codigo_hash"},
 	votaciones.Collection:               {"_id_", "ux_parada_abierta", "ix_grupo_creada", "ix_estado_cierra"},
 	sincronizacion.TombstonesCollection: {"_id_", "ix_usuario_seq", "ttl_borrado"},
+	sincronizacion.ActionsCollection:    {"_id_", "ux_usuario_cliente", "ttl_accion"},
 	notificaciones.Collection:           {"_id_", "ix_usuario_creada", "ttl_notificacion"},
 	notificaciones.DevicesCollection:    {"_id_", "ux_token_hash", "ix_usuario_uso"},
 }

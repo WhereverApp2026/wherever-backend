@@ -106,11 +106,14 @@ func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) err
 // Privacy borra lo de sincronización al borrar la cuenta. No exporta nada: son números
 // técnicos sin datos de la persona.
 type Privacy struct {
-	repo *Repository
+	repo    *Repository
+	actions *Actions
 }
 
-// NewPrivacy recibe el repositorio por constructor.
-func NewPrivacy(repo *Repository) *Privacy { return &Privacy{repo: repo} }
+// NewPrivacy recibe los repositorios por constructor.
+func NewPrivacy(repo *Repository, actions *Actions) *Privacy {
+	return &Privacy{repo: repo, actions: actions}
+}
 
 // Name identifica al módulo en el registro.
 func (p *Privacy) Name() string { return TombstonesCollection }
@@ -118,7 +121,10 @@ func (p *Privacy) Name() string { return TombstonesCollection }
 // PurgeHistory no borra nada: sin contador, la app perdería cambios.
 func (p *Privacy) PurgeHistory(context.Context, bson.ObjectID) error { return nil }
 
-// PurgeAccount borra el contador y los borrados.
+// PurgeAccount borra el contador, los borrados y el registro de acciones sin conexión.
 func (p *Privacy) PurgeAccount(ctx context.Context, userID bson.ObjectID) error {
+	if err := p.actions.DeleteByUser(ctx, userID); err != nil {
+		return err
+	}
 	return p.repo.DeleteByUser(ctx, userID)
 }
