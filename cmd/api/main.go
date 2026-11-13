@@ -37,6 +37,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cifrado"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/logger"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
@@ -117,7 +118,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
-	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, log)
+	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, cfg.DataKeys, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -146,7 +147,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		return nil, nil, err
 	}
 	db := mongoClient.DB()
-	users := usuarios.NewRepository(db)
+	users := usuarios.NewRepository(db).WithCipher(fieldCipher(cfg.DataKeys, log))
 	authRepo := auth.NewRepository(db)
 	authSvc, err := auth.NewService(users, authRepo, redisClient, mail.requests, auth.Config{
 		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
@@ -410,12 +411,12 @@ func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 
 // startVotes cierra cada minuto las votaciones vencidas y aplica su ganadora al plan (nv-39)
 // hasta que ctx termina. Solo usa MongoDB; la función devuelta espera a que termine.
-func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, fcm config.FCM, log *slog.Logger) func() {
+func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, fcm config.FCM, dataKeys string, log *slog.Logger) func() {
 	planRepo := planes.NewRepository(db)
 	places := negocios.NewRepository(db)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue).WithSync(sincronizacion.NewRepository(db))
 	notifRepo := notificaciones.NewRepository(db)
-	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db), notifRepo, log))
+	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
 	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log).WithNotifier(notifier)
 	closer := votaciones.NewCloser(svc, log)
 	done := make(chan struct{})
@@ -424,4 +425,19 @@ func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 		close(done)
 	}()
 	return func() { <-done }
+}
+
+// fieldCipher arma el llavero de DATA_KEYS (nv-48). config.Load ya lo validó; sin llaves
+// (solo fuera de prod) avisa y los datos sensibles se guardan en claro.
+func fieldCipher(keys string, log *slog.Logger) *cifrado.Llavero {
+	if keys == "" {
+		log.Warn("sin DATA_KEYS: alergias y fecha de nacimiento se guardan en claro", "evento", "cifrado_apagado")
+		return nil
+	}
+	l, err := cifrado.CargarLlavero(keys)
+	if err != nil {
+		log.Warn("DATA_KEYS inválido: alergias y fecha de nacimiento se guardan en claro", "evento", "cifrado_apagado")
+		return nil
+	}
+	return l
 }

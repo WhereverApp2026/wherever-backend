@@ -5,7 +5,7 @@ GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 COMPOSE := docker compose -f deployments/docker-compose.yml
 VERSION ?= dev
 
-.PHONY: deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades embeddings mail-dev lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
+.PHONY: migrar-cifrado deps build vet test test-unit test-integration test-security test-database test-contract contract-capture indexes importar-ciudades embeddings mail-dev lint vuln critic endpoints sdd cover delta mutate mutate-full run infra-up infra-down image check
 
 deps:
 	go mod download
@@ -72,6 +72,10 @@ mutate-full:
 # Índices de MongoDB (constitución §5): idempotente, lee MONGO_URI de .env.
 indexes:
 	go run ./scripts/indexes
+
+# Cifra alergias y fecha de nacimiento (nv-49); sin APLICAR=1 solo cuenta. También rota la llave.
+migrar-cifrado:
+	go run ./scripts/migrar-cifrado $(if $(APLICAR),-aplicar,)
 
 # Esquema y datos de demostración de Neo4j (nv-11): idempotente, lee NEO4J_URI de .env.
 siembra:

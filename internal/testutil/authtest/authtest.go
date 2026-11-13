@@ -34,6 +34,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cifrado"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
@@ -123,7 +124,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	if factory != nil {
 		requests, sync = factory(log)
 	}
-	users := usuarios.NewRepository(client.DB())
+	users := usuarios.NewRepository(client.DB()).WithCipher(testCipher(t, cfg.DataKeys))
 	svc, err := auth.NewService(users, auth.NewRepository(client.DB()), rdb, requests, auth.Config{
 		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
 		AccessTTL:  cfg.AccessTTL,
@@ -341,4 +342,15 @@ func (e *Env) AgeLinks(t *testing.T, userID bson.ObjectID) {
 		bson.D{{Key: "usuario_id", Value: userID}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "creado_en", Value: time.Now().UTC().Add(-2 * time.Minute)}}}})
 	require.NoError(t, err)
+}
+
+// testCipher arma el llavero de la configuración de prueba (nil si la prueba lo quitó).
+func testCipher(t testing.TB, keys string) *cifrado.Llavero {
+	t.Helper()
+	if keys == "" {
+		return nil
+	}
+	l, err := cifrado.CargarLlavero(keys)
+	require.NoError(t, err)
+	return l
 }

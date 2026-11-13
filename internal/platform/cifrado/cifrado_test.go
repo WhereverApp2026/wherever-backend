@@ -49,14 +49,14 @@ func TestCifrado_AlteradoCopiadoYLlaveEquivocada(t *testing.T) {
 	valor, err := l.Cifrar(aqui, "dato")
 	require.NoError(t, err)
 
-	// Un carácter cambiado en el texto cifrado.
-	last := valor[len(valor)-1]
-	swap := byte('A')
-	if last == 'A' {
-		swap = 'B'
-	}
-	_, err = l.Descifrar(aqui, valor[:len(valor)-1]+string(swap))
-	assert.Error(t, err)
+	// Un byte cambiado en el texto cifrado (se cambia el byte y se vuelve a codificar: el
+	// último carácter base64 puede llevar solo bits de relleno que se ignoran).
+	cut := strings.LastIndex(valor, ":")
+	sealed, err := base64.RawURLEncoding.DecodeString(valor[cut+1:])
+	require.NoError(t, err)
+	sealed[0] ^= 0xFF
+	_, err = l.Descifrar(aqui, valor[:cut+1]+base64.RawURLEncoding.EncodeToString(sealed))
+	assert.ErrorIs(t, err, ErrNoAbre)
 
 	// Copiado a otro documento o a otro campo.
 	otro := aqui
