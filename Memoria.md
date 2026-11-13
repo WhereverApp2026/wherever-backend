@@ -578,7 +578,7 @@
 - Sin ejecutar: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
 - Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
   - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
-  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-44/45 en `main`.
+  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-45 en `main` (nv-44 ya está).
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
@@ -603,6 +603,16 @@
 - Decisión: el módulo HTTP se arma en `cmd/api` sin variables nuevas; el `Moderador` y los destinos los arma nv-45. Si el destino falla, la decisión queda y el recurso sigue sin publicarse. ARCO borra y exporta lo del autor; el id del administrador en la decisión se conserva.
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
 - A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
+
+## NV-44 — Bucket de imágenes y CloudFront (2026-11-13)
+- Estado: rama `claude/nv-44-0bfc9a` desde `origin/main`, PR contra `main`. `infra/aws-dev/imagenes.tf` (bucket privado, OAC, caché de un año, segunda distribución), política en línea `imagenes` en el rol, `ImagenesDelProyecto` en el boundary y política nueva `wherever-dev-deployer-imagenes`. Local: `fmt`, `validate`, Trivy en 0, critic, `check_sdd`, `check_endpoints`. Sin Go. Falta la firma y que el operador aplique.
+- Decisión: `force_destroy` en el bucket. Porqué: `destruir.sh` fallaba con un bucket con objetos; las imágenes del entorno de desarrollo no se respaldan.
+- Decisión: CloudFront solo lee `i/*` (política del bucket con `AWS:SourceArn`); `cuarentena/` se vence a 1 día. Sin `s3:ListBucket` en el rol: una clave inexistente da 403.
+- Decisión: SSE-S3 y no KMS, sin versiones ni registros de acceso (costo; excepciones de Trivy con motivo). Política de caché propia con TTL mínimo de un año: los nombres son inmutables.
+- Decisión: los permisos de CloudFront y S3 del deployer van en `iam/wherever-dev-deployer-imagenes.json`, porque la del deployer ya no admite más (6144). Drift: los permisos de balanceador y CloudFront que crearon nv-12 no están en el repo; esta política solo agrega lo de imágenes.
+- Costo: CloudFront en capa gratuita; S3 unos US$0.05 al mes. Total estimado unos US$41.35 de US$50 (infraestructura US$41 + Rekognition US$0.30).
+- Operación, en orden (antes de nv-45 en AWS, no bloquea este PR): 1) administrador: versión nueva de `wherever-dev-boundary` (JSON del repo) y política nueva `wherever-dev-deployer-imagenes` adjunta a `wherever-deployer`; esperar a que IAM propague. 2) `crear.sh --solo-plan`: solo recursos nuevos, sin reemplazar instancias. 3) `crear.sh`. 4) `verificar.sh` (salida `verificar`, ya con `--imagenes`). 5) Al fusionar nv-45: `/wherever/dev/IMAGENES_BUCKET` e `IMAGENES_URL` (salidas de Terraform) e `instalar-actualizador.sh` en las dos instancias.
+- A evitar: guardar algo que no se pueda perder en el bucket de desarrollo (`destruir.sh` lo vacía). Publicar en otra ruta que no sea `i/`: CloudFront no la sirve.
 
 ## Specs nv-55 y nv-56 — Negocios aliados (2026-11-13)
 - Estado: specs en Borrador (sin código) desde la hoja A5 del Excel v3, leída con `openpyxl` en solo lectura. `SDD-OK` y `check_endpoints` OK.

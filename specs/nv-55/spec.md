@@ -75,7 +75,7 @@ La persona da de alta su negocio en pasos con guardado automático (datos del ne
 - Sin edición del perfil aprobado ni pausa: nv-56.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola 9; requiere nv-44 y nv-45 en `main` para las fotos y los documentos
+- **Estado:** 🚧 Borrador (2026-11-13), ola 9; requiere nv-45 en `main` para las fotos (nv-44 ya está: CloudFront solo sirve `i/*`, así que `privado/` queda fuera)
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor antes de ejecutar:** D1 documentos subidos a la API y cifrados con `DATA_KEYS` (no URL firmada); D2 colección aparte `negocios_documentos` en lugar de `negocios.documentos`; D3 `PUT /cuenta-deposito` en nv-55 con CLABE cifrada hasta que nv-60 la mande a Stripe (nv-60 la reclama hoy); D4 fiscales y CLABE no frenan la revisión; D5 el comprobante se borra a los 90 días como la INE; D6 el rol `comerciante` se agrega sin quitar `consumidor` y con `requiere_refresh`; D7 tope de 3 altas abiertas; D8 `motivo` obligatorio en cada lectura del admin y bitácora de 5 años; D9 sin `DATA_KEYS` = 503 (no guardar en claro); D10 política nueva «Expediente del negocio» de 10 por hora; D11 avisar a nv-60 del cambio de D3 si se aprueba.

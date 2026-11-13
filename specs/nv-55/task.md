@@ -1,7 +1,7 @@
 # task.md — NV-55 Alta de negocio por pasos y revisión del administrador
 
 ## Fase 0 — Preparación
-- [ ] T01 Decisiones D1–D11 resueltas; nv-44 y nv-45 en `main`; rama contra `main`.
+- [ ] T01 Decisiones D1–D11 resueltas; nv-45 en `main`; rama contra `main`.
 - [ ] T02 Aviso de privacidad con INE, comprobante, fiscales y CLABE (finalidades, 90 días, 5 años) y `AVISO_VERSION` nueva; tipo de consentimiento `datos_negocio`.
 - [ ] T03 Colecciones `negocios_documentos` y `accesos_expediente` con `ux_documento`, `ix_borrar`, `ix_acceso_negocio` (TTL) en `scripts/indexes` y `/ready`.
 
