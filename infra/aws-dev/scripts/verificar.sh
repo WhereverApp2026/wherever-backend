@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Verificación de SOLO LECTURA del entorno de desarrollo (spec nv-07). Falla (exit 1) si algo
 # sale del Free Tier o queda expuesto. No crea, cambia ni borra nada.
-#   uso: verificar.sh --profile wherever-dev --region us-east-2 --instance i-… [--url https://…]
+#   uso: verificar.sh --profile wherever-dev --region us-east-2 --instance i-… [--url https://…] [--imagenes https://…]
 set -uo pipefail
 
-profile="" region="" instance="" url=""
+profile="" region="" instance="" url="" imagenes=""
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--profile) profile="$2"; shift 2 ;;
 		--region) region="$2"; shift 2 ;;
 		--instance) instance="$2"; shift 2 ;;
 		--url) url="$2"; shift 2 ;;
+		--imagenes) imagenes="$2"; shift 2 ;;
 		*) echo "opción desconocida: $1" >&2; exit 2 ;;
 	esac
 done
@@ -103,6 +104,16 @@ fi
 check "retención del grupo de logs" "$(aws_q logs describe-log-groups --log-group-name-prefix /wherever/dev/api --query 'logGroups[0].retentionInDays')" "14"
 alarms="$(aws_q cloudwatch describe-alarms --alarm-name-prefix wherever-dev- --query 'length(MetricAlarms)')"
 if (( alarms >= 1 && alarms <= 10 )); then ok "$alarms alarmas (máximo 10)"; else bad "$alarms alarmas (deben ser de 1 a 10)"; fi
+
+# Imágenes (nv-44): bucket privado, sin ACL y servido solo por CloudFront.
+bucket="wherever-dev-imagenes-$account"
+check "bucket $bucket con todo el acceso público bloqueado" 	"$(aws_q s3api get-public-access-block --bucket "$bucket" --query 'PublicAccessBlockConfiguration.[BlockPublicAcls,IgnorePublicAcls,BlockPublicPolicy,RestrictPublicBuckets]' 2>/dev/null | tr -s '	' ' ')" "True True True True"
+check "bucket sin ACL" "$(aws_q s3api get-bucket-ownership-controls --bucket "$bucket" --query 'OwnershipControls.Rules[0].ObjectOwnership' 2>/dev/null || echo FALTA)" "BucketOwnerEnforced"
+check "bucket sin acceso directo" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$bucket.s3.$region.amazonaws.com/i/x.jpg" || true)" "403"
+if [[ -n "$imagenes" ]]; then
+	# La clave no existe: sin s3:ListBucket, S3 responde 403 en las dos; lo que importa es que no sea 200.
+	check "cuarentena fuera de CloudFront" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$imagenes/cuarentena/x.jpg" || true)" "403"
+fi
 
 if (( fails > 0 )); then
 	echo "verificar: FALLA ($fails)"
