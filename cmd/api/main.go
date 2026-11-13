@@ -172,6 +172,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// Los integrantes del grupo leen el plan (nv-37); cada cambio se numera para la sincronización (nv-46).
 	groupRepo := grupos.NewRepository(db)
 	syncRepo := sincronizacion.NewRepository(db)
+	syncActions := sincronizacion.NewActions(db)
 	voteRepo := votaciones.NewRepository(db)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
@@ -182,7 +183,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friendRepo := amistades.NewRepository(db)
 	consentRepo := usuarios.NewConsentRepository(db)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph.queue), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -244,7 +245,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		clima.NewHandler(weather, citySvc, validator),
 		inicio.NewHandler(inicio.NewService(recoSvc, weather), validator),
 		notificaciones.NewHandler(notifier, validator).WithActiveGuard(active),
-		sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), validator),
+		sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), validator).
+			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
 	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log), nil

@@ -1,7 +1,10 @@
 package sincronizacion
 
 import (
+	"encoding/json"
+
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
+	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 )
@@ -49,4 +52,47 @@ type ChangesResponse struct {
 func newSettings(u usuarios.User) Settings {
 	tastes, prefs, privacy := account.SettingsOf(u)
 	return Settings{Version: u.Version, Preferences: prefs, Privacy: privacy, Tastes: tastes}
+}
+
+// MaxActions es el tamaño máximo de un lote (spec nv-47).
+const MaxActions = 100
+
+// Action es algo que la persona hizo sin conexión. `id_cliente` lo genera la app y es único
+// por persona: repetirlo no repite la acción. `version` es la que la app tenía (If-Match).
+type Action struct {
+	ClientID string          `json:"id_cliente" validate:"required,min=8,max=64"`
+	Type     string          `json:"tipo" validate:"required,oneof=plan.crear plan.editar plan.borrar parada.agregar parada.editar parada.quitar preferencias.editar privacidad.editar"`
+	PlanID   string          `json:"plan_id" validate:"required_unless=Type plan.crear Type preferencias.editar Type privacidad.editar,omitempty,len=24,hexadecimal"`
+	StopID   string          `json:"parada_id" validate:"required_if=Type parada.editar,required_if=Type parada.quitar,omitempty,len=24,hexadecimal"`
+	Version  int             `json:"version" validate:"omitempty,min=1"`
+	Data     json.RawMessage `json:"datos"`
+}
+
+// PendingRequest es el cuerpo de POST /sync/pendientes.
+type PendingRequest struct {
+	Actions []Action `json:"acciones" validate:"required,min=1,max=100,dive"`
+}
+
+// ActionError explica una acción rechazada, con el formato de los errores de la API.
+type ActionError struct {
+	Code    string              `json:"codigo"`
+	Message string              `json:"mensaje"`
+	Fields  []apperr.FieldError `json:"campos,omitempty"`
+}
+
+// ActionResult es el resultado de una acción, en el mismo orden del lote. En un conflicto
+// viaja la copia del servidor (`plan` o `ajustes`) y la app decide.
+type ActionResult struct {
+	ClientID string       `json:"id_cliente"`
+	Result   string       `json:"resultado"`
+	Original string       `json:"resultado_original,omitempty"`
+	PlanID   string       `json:"plan_id,omitempty"`
+	Plan     *planes.Plan `json:"plan,omitempty"`
+	Settings *Settings    `json:"ajustes,omitempty"`
+	Error    *ActionError `json:"error,omitempty"`
+}
+
+// PendingResponse es la respuesta de POST /sync/pendientes.
+type PendingResponse struct {
+	Results []ActionResult `json:"resultados"`
 }

@@ -551,6 +551,12 @@
 - Límite aceptado: dos ediciones del mismo usuario en el mismo milisegundo pueden confirmarse fuera de orden; quien sincroniza en medio puede saltarse una hasta la siguiente edición.
 - Para nv-47: aplicar acciones con los mismos `planes.Service` (ya numeran) y `account` (ya sube la versión).
 
+## NV-47 — Acciones sin conexión (2026-11-12)
+- Estado: rama `nv-47` desde `nv-46`, PR contra `main`. Local: build, vet, Unit, lint 0, critic, `check_sdd`, `check_endpoints` (100 rutas) e Integration de sincronización en verde. Falta la firma.
+- Decisión: cada acción se reclama insertando en `sync_acciones` (`ux_usuario_cliente`, TTL 7 días) antes de aplicarla; repetir responde `duplicada` con `resultado_original`. Se aplica con los mismos `planes.Service` y `account.Service` de la API.
+- Decisión: si la base falla a la mitad, lo aplicado queda y la acción que falló se suelta (`Release`): 503 y reintentar es seguro.
+- Corrección de drift: 101 acciones = 422 (no 413); conflicto de ajustes por `usuarios.version` (sus PATCH no llevan If-Match).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
