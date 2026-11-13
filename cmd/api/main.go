@@ -26,6 +26,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
+	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -231,7 +232,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildSocial(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, log)
+	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, db, cursor, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -434,6 +435,20 @@ type socialDeps struct {
 	phoneKey  []byte
 	validator *validation.Validator
 	active    fiber.Handler
+}
+
+// buildExtras arma los módulos sociales y los errores de la app (nv-64: agrupados por huella,
+// sin datos personales). Va aparte porque buildModules está al límite de gocyclo.
+func buildExtras(d socialDeps, db *mongodriver.Database, cursor *pagination.Signer, log *slog.Logger) ([]httpapi.Module, error) {
+	social, err := buildSocial(d, log)
+	if err != nil {
+		return nil, err
+	}
+	appErrors, err := errores.NewService(errores.NewRepository(db), cursor)
+	if err != nil {
+		return nil, fmt.Errorf("errores: %w", err)
+	}
+	return append([]httpapi.Module{errores.NewHandler(appErrors, d.validator)}, social...), nil
 }
 
 // buildSocial arma la búsqueda de personas (nv-35), las sugerencias y la señal social del

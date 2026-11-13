@@ -10,11 +10,13 @@
 | Correo disponible | 20 | 1 min | `GET /api/v1/usuarios/correo-disponible` por IP; provisional | nv-05 |
 | Descarga de exportación | 10 | 1 min | `POST /api/v1/usuarios/exportaciones/descargar` por IP; provisional | nv-05 |
 | Auth enlaces | 10 | 1 min | `refresh`, `recuperar`, `restablecer`, `verificar-correo`, cada una con su llave (`rate:auth_{ruta}:{ip}`) por IP; valor provisional, se mide antes de endurecer | nv-04 |
-| Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar` y `/api/v1/admin/moderacion/*` por IP, en la misma cuenta (`rate:admin:{ip}`) | nv-20, nv-43 |
+| Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar`, `/api/v1/admin/moderacion/*` y `GET /api/v1/admin/errores` por IP, en la misma cuenta (`rate:admin:{ip}`) | nv-20, nv-43, nv-64 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |
 | Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |
 | Solicitudes de amistad | 20 | 1 h | `POST /api/v1/amistades` por usuario (`rate:amistades_solicitud:{usuario}`, ventana fija); cuenta toda solicitud, también las rechazadas con 404, 409 o 422 | nv-36 |
+| Buscar por código de amigo | 30 | 1 h | `GET /api/v1/personas/codigo/{codigo}` por usuario (`rate:personas_codigo:{usuario}`, ventana fija); contra la enumeración de códigos | nv-64 |
+| Reporte de errores de la app | 30 | 1 h | `POST /api/v1/errores` por usuario (`rate:errores_reporte:{usuario}`, ventana fija) | nv-64 |
 | Invitaciones a grupos | 30 | 1 h | `POST /api/v1/grupos`, `POST /api/v1/grupos/{id}/integrantes` y `POST /api/v1/planes/{id}/invitaciones` por usuario (`rate:grupos_invitacion:{usuario}`, ventana fija); cuenta cada petición, también las rechazadas | nv-37 |
 | Plan compartido | 30 | 1 min | `POST /api/v1/planes/compartidos` por IP (`rate:plan_compartido:{ip}`, ventana fija); vista pública sin sesión | nv-38 |
 | Unirse por enlace | 30 | 1 h | `POST /api/v1/grupos/unirse` por usuario (`rate:grupos_unirse:{usuario}`, ventana fija) | nv-38 |
