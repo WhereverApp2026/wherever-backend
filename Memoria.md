@@ -543,6 +543,14 @@
 - Decisión: los tipos de grupo siguen `preferencias.notificaciones.grupos`; los de amistad no tienen interruptor en nv-05 y siempre suenan fuera del horario silencioso (hora de México).
 - Operación: PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("llave.json"))`; en AWS, `/wherever/dev/FCM_PROJECT_ID` (String) y `/wherever/dev/FCM_CREDENCIALES_B64` (SecureString); la siguiente instalación de imagen los toma.
 
+## NV-46 — Descarga de cambios (2026-11-12)
+- Estado: rama `nv-46` desde `nv-41`, PR contra `main`. Local: build, vet, Unit, critic, `check_sdd` y `check_endpoints` (99 rutas). Falta la firma.
+- Decisión: contador `sync_estado.seq` por usuario con `$inc` atómico; `planes.Service.WithSync` numera alta, edición y borrado (`planes.sync_seq`, `ix_dueno_sync`). `startVotes` también lo usa: la ganadora de una votación cambia el plan.
+- Decisión: los ajustes no se numeran; viajan cuando cambia `usuarios.version` (todas las ediciones del perfil pasan por `apply`, que la sube). `account.SettingsOf` da la misma forma que `GET /usuarios/yo`.
+- Decisión: cursor `desde` firmado (nv-17) con `seq:version:emitido_unix` (hora del servidor). Más de 30 días = 410 con `campos[{desde: requiere_completa}]`.
+- Límite aceptado: dos ediciones del mismo usuario en el mismo milisegundo pueden confirmarse fuera de orden; quien sincroniza en medio puede saltarse una hasta la siguiente edición.
+- Para nv-47: aplicar acciones con los mismos `planes.Service` (ya numeran) y `account` (ya sube la versión).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
