@@ -112,6 +112,19 @@
       }
     },
     {
+      "Sid": "ImagenesDelProyecto",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001/cuarentena/*",
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001/i/*"
+      ]
+    },
+    {
       "Sid": "LeerSaludDeDestinos",
       "Effect": "Allow",
       "Action": "elasticloadbalancing:DescribeTargetHealth",

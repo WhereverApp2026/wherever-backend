@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47; A5 diferida: nv-55, nv-56)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -138,3 +138,35 @@ Moderación (nv-43): la cola (`moderacion_cola`) solo recibe lo que `Moderador.E
 ## Diferidos (sin ruta en código todavía)
 - `POST /api/v1/auth/google` (`{id_token, dispositivo{}}` → 200 con tokens, 201 si es cuenta nueva) — nv-04 T7, espera la decisión D-1 (cuenta sin `fecha_nacimiento`) y la excepción de stack `google.golang.org/api/idtoken`. Hoja J1.
 - `GET /metrics` (Prometheus, red interna) — spec de observabilidad. Hoja J9.
+### Hoja A5 — Negocios aliados (specs nv-55 y nv-56 en Borrador, sin código)
+Copiadas de A5 §6 y §7 antes de programar (AGENTS §5). Pasan a la tabla viva cuando su ruta exista. «Dueño» = rol `comerciante` y el negocio es suyo. Nada del expediente (INE, comprobante, datos fiscales, CLABE) sale en `/lugares` ni en el panel.
+- `POST /api/v1/negocios` (`{nombre, categoria, descripcion}` → 201 borrador; agrega el rol `comerciante`) — consumidor o comerciante — nv-55.
+- `PATCH /api/v1/negocios/{id}/alta/{paso}` (pasos 2–6, `If-Match`) → 200 con `paso_alta` — dueño — nv-55.
+- `POST /api/v1/negocios/{id}/enviar-revision` → 200 `en_revision` · 422 con lo que falta — dueño — nv-55.
+- `GET /api/v1/negocios/mios` — comerciante — nv-55.
+- `POST /api/v1/negocios/{id}/fotos` (`{tipo, content_type}` → 201 `{upload_url, foto}`, subida de nv-45) — dueño — nv-55.
+- `DELETE /api/v1/negocios/{id}/fotos/{foto_id}` → 204 · 422 si quedan menos de 3 — dueño — nv-55.
+- `PUT /api/v1/negocios/{id}/fotos/orden` (`{fotos_ids[], portada_id}`) — dueño — nv-55.
+- `POST /api/v1/negocios/{id}/documentos` (multipart `tipo`, `archivo`; cifrado, bucket privado) — dueño — nv-55 (no está en A5).
+- `GET /api/v1/negocios/{id}/documentos` y `GET /api/v1/negocios/{id}/documentos/{tipo}` — dueño — nv-55 (no están en A5).
+- `PUT /api/v1/negocios/{id}/datos-fiscales` (`{rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal}`; cifrado) · 422 RFC inválido — dueño — nv-55.
+- `PUT /api/v1/negocios/{id}/cuenta-deposito` (`{clabe, titular}`; cifrada) · 422 CLABE inválida — dueño — nv-55; el registro en Stripe y el depósito de prueba, nv-60.
+- `POST /api/v1/negocios/{id}/cuenta-deposito/verificar` (`{monto_centavos}`) — dueño — nv-60.
+- `GET /api/v1/admin/negocios?estado=en_revision|cambios_pendientes&cursor=` — administrador — nv-55 (A5 §7).
+- `GET /api/v1/admin/negocios/{id}/documentos/{tipo}?motivo=` (cada lectura queda en `accesos_expediente`) — administrador — nv-55 (no está en A5).
+- `PATCH /api/v1/admin/negocios/{id}/revision` (`{decision, motivo}`; notifica al dueño) — administrador — nv-55.
+- `GET /api/v1/negocios/{id}/panel` (P-47) — dueño — nv-56.
+- `PATCH /api/v1/negocios/{id}` (perfil P-52, `If-Match`; nombre y dirección a `cambios_pendientes`) — dueño — nv-56.
+- `POST /api/v1/negocios/{id}/pausa` (`{pausado, hasta, motivo}`) — dueño — nv-56.
+- `PUT /api/v1/negocios/{id}/reservas-config` (`{acepta_reservas, capacidad_por_horario, duracion_turno_min, anticipo{}, politica_cancelacion, confirmacion, permite_cambios}`) — dueño — nv-56; la lee nv-59.
+- `POST /api/v1/negocios/{id}/menu`, `PATCH /api/v1/negocios/{id}/menu/{item_id}` y `DELETE /api/v1/negocios/{id}/menu/{item_id}` — dueño — nv-56.
+- `GET /api/v1/lugares/{id}/menu?q=&seccion=` — público — nv-56.
+- `GET /api/v1/negocios/{id}/qr` → `image/png` — dueño — nv-56.
+- `DELETE /api/v1/negocios/{id}` (`{confirmacion}`) → 204 · 409 con reservas futuras — dueño — nv-56.
+- `PUT /api/v1/admin/negocios/{id}/sello` (`{otorgar, motivo}`) — administrador — nv-56.
+- `POST /api/v1/negocios/{id}/cobros/conectar`, `GET /api/v1/negocios/{id}/liquidaciones`, `GET /api/v1/negocios/{id}/saldo` y `GET /api/v1/negocios/{id}/estado-cuenta?mes=` — dueño — nv-60.
+- `GET /api/v1/negocios/{id}/estadisticas`, `GET /api/v1/negocios/{id}/consejo` y `GET /api/v1/negocios/{id}/reportes/mensual?mes=` — dueño — spec por definir (estadísticas).
+- `GET /api/v1/negocios/{id}/facturas` — dueño — spec por definir (CFDI y PAC).
+- `POST /api/v1/negocios/{id}/fotos/instagram`, `GET /api/v1/negocios/{id}/sello/insignia` y `POST /api/v1/negocios/{id}/ia/descripcion` — dueño — diferidos.
+- `GET /api/v1/geo/direcciones?q=` — dueño — diferido hasta elegir proveedor de mapas.
+- `POST /api/v1/admin/negocios/importar` ya está en la tabla viva (nv-20).
