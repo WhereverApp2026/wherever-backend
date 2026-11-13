@@ -573,6 +573,16 @@
 - Migración: `make migrar-cifrado` (cuenta) y `make migrar-cifrado APLICAR=1`; idempotente, también rota, y no sube `version`.
 - A evitar: construir un `usuarios.Repository` de producción sin `WithCipher` (leería el texto cifrado como alergias y el filtro de nv-23 dejaría solo `["ninguno"]`); hoy son `cmd/api` (`users` y `startVotes`) y `authtest`.
 
+## NV-42 — Evaluación de imágenes y texto (2026-11-13)
+- Estado: rama `nv-42` desde `main`, PR contra `main`. Paquete `internal/moderacion` (`Moderador.Evaluar`, `Rekognition`, `TextoIA`, reglas) y doble `internal/testutil/rekognitiontest`. Local: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints`. Falta la firma y la prueba en vivo (`MODERACION_LIVE=1`), que espera el permiso del deployer.
+- Decisión: `Evaluar` no devuelve error; cualquier falla (adaptador, reglas, contenido vacío, imagen > 5 MB, texto > 4000) deja `cuarentena` con `Falla`. Si otra parte rechaza, gana el rechazo.
+- Decisión: sin Comprehend. Los datos personales salen de los patrones de `ia.Anonimizar` (puntaje 60, cuarentena); una palabra bloqueada rechaza sin gastar llamada al modelo.
+- Decisión: AWS SDK v2 para Rekognition (firma, IMDSv2, un reintento) en lugar de un cliente propio. Solo cuentan desnudez, violencia, drogas y odio; alcohol y traje de baño no, por bares y balnearios. Se sube cada etiqueta a su raíz por `ParentName`.
+- Decisión: sin cableado ni variables nuevas; lo arma nv-45 con la `ia.Guardia` para el texto. Umbrales fijos (`Fijas`) hasta que nv-43 los lea de `moderacion_reglas`. Pruebas en Unit: el paquete no usa bases.
+- Costo: US$0.001 por imagen; con unas 300 fotos al mes, US$0.30 sobre unos US$41 de infraestructura. nv-45 modera una vez por original y pone límite de subidas.
+- Operación (antes de nv-45 en AWS, no bloquea este PR): un administrador sube versiones nuevas de `wherever-dev-boundary` y `wherever-dev-deployer-policy` (el deployer no puede cambiar el boundary) y luego `terraform apply`. Recomendado: exclusión de servicios de IA de AWS Organizations.
+- A evitar: bajar el umbral de cuarentena por debajo de 40 sin bajar `confianzaMinima` (Rekognition no devuelve etiquetas menores). Publicar contenido de usuarios con moderación sin antes agregarla al aviso y subir `AVISO_VERSION` (nv-45).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
