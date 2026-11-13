@@ -134,8 +134,8 @@ func TestLugares_CoverAndDetailHideControlFields(t *testing.T) {
 		Location: Location{Type: "Point", Coordinates: []float64{-99.1, 19.4}},
 		Photos:   []Foto{{URL: "b", Orden: 2}, {URL: "a", Orden: 1}},
 	}
-	assert.Equal(t, "a", cover(b.Photos))
-	assert.Empty(t, cover(nil))
+	assert.Equal(t, "a", Cover(b.Photos))
+	assert.Empty(t, Cover(nil))
 	d := toDetail(b, time.Now())
 	assert.Equal(t, Point{Lat: 19.4, Lng: -99.1}, d.Location)
 	assert.NotNil(t, d.Tags)
