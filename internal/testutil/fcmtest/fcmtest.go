@@ -52,8 +52,8 @@ func New(t testing.TB) *Server {
 	t.Cleanup(srv.Close)
 	s.URL = srv.URL
 	creds, err := json.Marshal(map[string]string{
-		"type": "service_account", "client_email": "push@" + Project + ".iam.gserviceaccount.com",
-		"private_key": string(pemKey), "token_uri": srv.URL + "/token",
+		"client_email": "push@fcmtest.invalid",
+		"private_key":  string(pemKey), "token_uri": srv.URL + "/token",
 	})
 	require.NoError(t, err)
 	s.Credentials = base64.StdEncoding.EncodeToString(creds)
