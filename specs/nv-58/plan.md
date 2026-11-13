@@ -1,8 +1,8 @@
 # plan.md — NV-58 La Vaca: gastos compartidos del grupo
 
 1. Mapeo
-- Crear: `internal/vaca/` (model, repository, service, handler, dto, `corte.go`, privacy), `internal/testutil/vacatest`, `tests/integration/vaca_test.go`, `tests/security/vaca_security_test.go`.
-- Modificar: `scripts/indexes` (`gastos`, `deudas_vaca`), `internal/http` (registro de rutas), `internal/privacidad` (registro de `Purger`/`Exporter`), `docs/endpoints.md` (7 filas), `tests/database/indexes_test.go`, fixtures de contrato de la exportación.
+- Crear: `internal/vaca/` (model, repository, service, handler, dto, `corte.go`, privacy), `tests/integration/vaca_test.go`, `tests/security/vaca_security_test.go`.
+- Modificar: `scripts/indexes` (`gastos`, `deudas_vaca`), `cmd/api/main.go`, `internal/testutil/authtest` y `scripts/routes` (rutas y `Exporter`), `docs/endpoints.md` (7 filas), `tests/database/indexes_test.go`, fixtures de contrato de la exportación.
 - Sin cambios: `grupos` (nv-37) solo se lee por la interfaz `Members`; `/sync/pendientes` es de nv-47.
 
 2. Guardarraíles

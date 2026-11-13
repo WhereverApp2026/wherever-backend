@@ -103,18 +103,9 @@ func CheckSplit(e Expense, members map[bson.ObjectID]bool) error {
 	if !members[e.PaidBy] {
 		return invalid("pagado_por", "quien pagó no es integrante confirmado del grupo")
 	}
-	if len(e.SplitAmong) < MinSplit || len(e.SplitAmong) > MaxSplit {
-		return invalid("dividir_entre", "se divide entre 2 y 12 personas")
-	}
-	seen := map[bson.ObjectID]bool{}
-	for _, id := range e.SplitAmong {
-		if seen[id] {
-			return invalid("dividir_entre", "hay personas repetidas")
-		}
-		seen[id] = true
-		if !members[id] {
-			return invalid("dividir_entre", "todas las personas deben ser integrantes confirmados")
-		}
+	seen, err := checkPeople(e.SplitAmong, members)
+	if err != nil {
+		return err
 	}
 	if e.Division != DivisionCustom {
 		if len(e.Custom) > 0 {
@@ -122,6 +113,29 @@ func CheckSplit(e Expense, members map[bson.ObjectID]bool) error {
 		}
 		return nil
 	}
+	return checkCustom(e, seen)
+}
+
+// checkPeople valida `dividir_entre`: 2 a 12 integrantes confirmados sin repetir.
+func checkPeople(among []bson.ObjectID, members map[bson.ObjectID]bool) (map[bson.ObjectID]bool, error) {
+	if len(among) < MinSplit || len(among) > MaxSplit {
+		return nil, invalid("dividir_entre", "se divide entre 2 y 12 personas")
+	}
+	seen := map[bson.ObjectID]bool{}
+	for _, id := range among {
+		if seen[id] {
+			return nil, invalid("dividir_entre", "hay personas repetidas")
+		}
+		seen[id] = true
+		if !members[id] {
+			return nil, invalid("dividir_entre", "todas las personas deben ser integrantes confirmados")
+		}
+	}
+	return seen, nil
+}
+
+// checkCustom valida la división personalizada: un monto por persona y suma exacta.
+func checkCustom(e Expense, seen map[bson.ObjectID]bool) error {
 	if len(e.Custom) != len(e.SplitAmong) {
 		return invalid("montos_personalizados", "va un monto por cada persona de dividir_entre")
 	}

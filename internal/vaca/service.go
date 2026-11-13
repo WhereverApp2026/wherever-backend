@@ -159,6 +159,26 @@ func (s *Service) Create(ctx context.Context, subject, rawGroup string, req Crea
 	} else if !errors.Is(err, ErrNotFound) {
 		return ExpenseResult{}, false, errStore()
 	}
+	e, err := s.newExpense(me, g, req)
+	if err != nil {
+		return ExpenseResult{}, false, err
+	}
+	duplicate, err := s.insert(ctx, g, &e)
+	if err != nil {
+		return ExpenseResult{}, false, err
+	}
+	if duplicate {
+		prev, err := s.repo.FindByClientID(ctx, me, req.ClientID)
+		if err != nil {
+			return ExpenseResult{}, false, errStore()
+		}
+		return s.replay(ctx, me, prev)
+	}
+	return s.result(ctx, g, e, true)
+}
+
+// newExpense arma y valida el gasto del POST.
+func (s *Service) newExpense(me bson.ObjectID, g grupos.Group, req CreateRequest) (Expense, error) {
 	members := confirmed(g)
 	now := s.now().UTC()
 	e := Expense{
@@ -173,11 +193,14 @@ func (s *Service) Create(ctx context.Context, subject, rawGroup string, req Crea
 	if len(e.Custom) == 0 {
 		e.Custom = nil
 	}
-	if err := CheckSplit(e, members); err != nil {
-		return ExpenseResult{}, false, err
-	}
+	return e, CheckSplit(e, members)
+}
+
+// insert guarda el gasto y recalcula dentro del candado. duplicate = otra petición con el
+// mismo id_cliente ganó.
+func (s *Service) insert(ctx context.Context, g grupos.Group, e *Expense) (bool, error) {
 	duplicate := false
-	err = s.locked(ctx, g.ID, func() error {
+	err := s.locked(ctx, g.ID, func() error {
 		n, err := s.repo.CountLive(ctx, g.ID)
 		if err != nil {
 			return errStore()
@@ -185,7 +208,7 @@ func (s *Service) Create(ctx context.Context, subject, rawGroup string, req Crea
 		if n >= MaxExpenses {
 			return invalid("grupo", fmt.Sprintf("el grupo ya tiene %d gastos", MaxExpenses))
 		}
-		if err := s.repo.Insert(ctx, &e); errors.Is(err, ErrDuplicate) {
+		if err := s.repo.Insert(ctx, e); errors.Is(err, ErrDuplicate) {
 			duplicate = true // otra petición con el mismo id_cliente ganó
 			return nil
 		} else if err != nil {
@@ -193,17 +216,7 @@ func (s *Service) Create(ctx context.Context, subject, rawGroup string, req Crea
 		}
 		return s.recalc(ctx, g)
 	})
-	if err != nil {
-		return ExpenseResult{}, false, err
-	}
-	if duplicate {
-		prev, err := s.repo.FindByClientID(ctx, me, req.ClientID)
-		if err != nil {
-			return ExpenseResult{}, false, errStore()
-		}
-		return s.replay(ctx, me, prev)
-	}
-	return s.result(ctx, g, e, true)
+	return duplicate, err
 }
 
 // defaultSplit son todos los integrantes confirmados, o las personas de la división
@@ -251,18 +264,9 @@ func (s *Service) List(ctx context.Context, subject, rawGroup string, q ListQuer
 	if err != nil {
 		return ExpensePage{}, err
 	}
-	f := ExpenseFilter{Concept: q.Concept, PaidBy: optionalID(q.PaidBy)}
-	scope := s.cursor.Scope("gastos", g.ID.Hex(), q.Concept, q.PaidBy)
-	c, ok, err := validation.Position(s.cursor, scope, q.Cursor)
+	f, scope, err := s.filter(g, q)
 	if err != nil {
 		return ExpensePage{}, err
-	}
-	if ok {
-		after, err := bson.ObjectIDFromHex(c.ID)
-		if err != nil {
-			return ExpensePage{}, invalid("cursor", "cursor inválido")
-		}
-		f.After = &after
 	}
 	rows, err := s.repo.ListExpenses(ctx, g.ID, f, q.Limit)
 	if err != nil {
@@ -280,19 +284,44 @@ func (s *Service) List(ctx context.Context, subject, rawGroup string, q ListQuer
 	if err != nil {
 		return ExpensePage{}, errStore()
 	}
+	items, err := s.views(ctx, rows)
+	if err != nil {
+		return ExpensePage{}, err
+	}
+	return ExpensePage{Items: items, Next: next, Total: total}, nil
+}
+
+// filter arma el filtro de la lista y su ámbito de cursor; un cursor ajeno o alterado = 422.
+func (s *Service) filter(g grupos.Group, q ListQuery) (ExpenseFilter, string, error) {
+	f := ExpenseFilter{Concept: q.Concept, PaidBy: optionalID(q.PaidBy)}
+	scope := s.cursor.Scope("gastos", g.ID.Hex(), q.Concept, q.PaidBy)
+	c, ok, err := validation.Position(s.cursor, scope, q.Cursor)
+	if err != nil || !ok {
+		return f, scope, err
+	}
+	after, err := bson.ObjectIDFromHex(c.ID)
+	if err != nil {
+		return f, scope, invalid("cursor", "cursor inválido")
+	}
+	f.After = &after
+	return f, scope, nil
+}
+
+// views resuelve los nombres de quien pagó y arma la página.
+func (s *Service) views(ctx context.Context, rows []Expense) ([]ExpenseView, error) {
 	payers := make([]bson.ObjectID, 0, len(rows))
 	for _, e := range rows {
 		payers = append(payers, e.PaidBy)
 	}
 	names, err := s.names(ctx, payers)
 	if err != nil {
-		return ExpensePage{}, err
+		return nil, err
 	}
 	items := make([]ExpenseView, 0, len(rows))
 	for _, e := range rows {
 		items = append(items, expenseView(e, names))
 	}
-	return ExpensePage{Items: items, Next: next, Total: total}, nil
+	return items, nil
 }
 
 // editable trae el gasto y su grupo si puedo editarlo: quien lo capturó o el organizador
@@ -481,6 +510,32 @@ func (s *Service) cut(ctx context.Context, g grupos.Group) (CutView, error) {
 	return out, nil
 }
 
+// payable trae la deuda pendiente y su grupo si soy el deudor o el acreedor.
+func (s *Service) payable(ctx context.Context, me bson.ObjectID, raw string) (Debt, grupos.Group, error) {
+	id, err := bson.ObjectIDFromHex(raw)
+	if err != nil {
+		return Debt{}, grupos.Group{}, errDebtNotFound()
+	}
+	d, err := s.repo.FindDebt(ctx, id)
+	if errors.Is(err, ErrNotFound) {
+		return Debt{}, grupos.Group{}, errDebtNotFound()
+	}
+	if err != nil {
+		return Debt{}, grupos.Group{}, errStore()
+	}
+	g, err := s.groupByID(ctx, me, d.GroupID)
+	if err != nil {
+		return Debt{}, grupos.Group{}, errDebtNotFound()
+	}
+	if d.Debtor != me && d.Creditor != me {
+		return Debt{}, grupos.Group{}, apperr.Forbidden("solo el deudor o el acreedor marcan la deuda")
+	}
+	if d.Status == DebtPaid {
+		return Debt{}, grupos.Group{}, apperr.Conflict("la deuda ya está pagada")
+	}
+	return d, g, nil
+}
+
 // MarkPaid marca una deuda como pagada: solo el deudor o el acreedor (otro integrante = 403;
 // ajeno = 404; ya pagada = 409). Recalcula el corte.
 func (s *Service) MarkPaid(ctx context.Context, subject, raw string, req MarkPaidRequest) (DebtView, error) {
@@ -488,26 +543,9 @@ func (s *Service) MarkPaid(ctx context.Context, subject, raw string, req MarkPai
 	if err != nil {
 		return DebtView{}, err
 	}
-	id, err := bson.ObjectIDFromHex(raw)
+	d, g, err := s.payable(ctx, me, raw)
 	if err != nil {
-		return DebtView{}, errDebtNotFound()
-	}
-	d, err := s.repo.FindDebt(ctx, id)
-	if errors.Is(err, ErrNotFound) {
-		return DebtView{}, errDebtNotFound()
-	}
-	if err != nil {
-		return DebtView{}, errStore()
-	}
-	g, err := s.groupByID(ctx, me, d.GroupID)
-	if err != nil {
-		return DebtView{}, errDebtNotFound()
-	}
-	if d.Debtor != me && d.Creditor != me {
-		return DebtView{}, apperr.Forbidden("solo el deudor o el acreedor marcan la deuda")
-	}
-	if d.Status == DebtPaid {
-		return DebtView{}, apperr.Conflict("la deuda ya está pagada")
+		return DebtView{}, err
 	}
 	err = s.locked(ctx, g.ID, func() error {
 		ok, err := s.repo.MarkPaid(ctx, d.ID, req.Reference, s.now().UTC())

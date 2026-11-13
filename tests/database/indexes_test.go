@@ -25,11 +25,12 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
+	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
 // expected son los índices de las hojas A1 y J1 (incluido ix_refresh_previo) más los de
-// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52), `busquedas_recientes` (nv-22), `consentimientos` (nv-19) y `grupos` (nv-37).
+// `exportaciones` (colección nueva de nv-05), el único de `descartes_usuario` (nv-24) los de `amistades` (nv-36), la cola `grafo_pendiente` (nv-52), `busquedas_recientes` (nv-22), `consentimientos` (nv-19) `grupos` (nv-37) y la Vaca (nv-58).
 var expected = map[string][]string{
 	usuarios.Collection:                 {"_id_", "ux_correo", "ux_google_id", "ux_codigo_amigo", "ix_nombre_busqueda", "ix_ubicacion", "ix_eliminacion", "ux_telefono_hash", "ux_nombre_usuario"},
 	ciudades.Collection:                 {"_id_", "ux_ciudad", "ix_centro"},
@@ -50,6 +51,8 @@ var expected = map[string][]string{
 	sincronizacion.ActionsCollection:    {"_id_", "ux_usuario_cliente", "ttl_accion"},
 	notificaciones.Collection:           {"_id_", "ix_usuario_creada", "ttl_notificacion"},
 	notificaciones.DevicesCollection:    {"_id_", "ux_token_hash", "ix_usuario_uso"},
+	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
+	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -109,6 +112,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		grupos.Collection:                {"ux_plan", "ux_codigo_hash"},
 		votaciones.Collection:            {"ux_parada_abierta"},
 		notificaciones.DevicesCollection: {"ux_token_hash"},
+		vaca.ExpensesCollection:          {"ux_id_cliente"},
+		vaca.DebtsCollection:             {"ux_deuda_corte"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

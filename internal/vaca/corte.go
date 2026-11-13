@@ -90,13 +90,14 @@ func Compute(people []bson.ObjectID, expenses []Expense, paid []Debt) ([]Balance
 	return out, settle(out)
 }
 
-// settle empareja al que más debe con al que más le deben hasta dejar a uno en cero.
-func settle(balances []Balance) []Transfer {
-	type entry struct {
-		id  bson.ObjectID
-		amt int64
-	}
-	var debtors, creditors []entry
+// entry es una persona con lo que debe o le deben, en centavos positivos.
+type entry struct {
+	id  bson.ObjectID
+	amt int64
+}
+
+// split separa a quienes deben de a quienes les deben.
+func split(balances []Balance) (debtors, creditors []entry) {
 	for _, b := range balances {
 		switch {
 		case b.Balance < 0:
@@ -105,18 +106,26 @@ func settle(balances []Balance) []Transfer {
 			creditors = append(creditors, entry{b.UserID, b.Balance})
 		}
 	}
-	largest := func(es []entry) int {
-		best := -1
-		for i, e := range es {
-			if e.amt == 0 {
-				continue
-			}
-			if best < 0 || e.amt > es[best].amt || (e.amt == es[best].amt && e.id.Hex() < es[best].id.Hex()) {
-				best = i
-			}
+	return debtors, creditors
+}
+
+// largest es el índice del mayor monto pendiente (empate: el menor id); -1 si ya no hay.
+func largest(es []entry) int {
+	best := -1
+	for i, e := range es {
+		if e.amt == 0 {
+			continue
 		}
-		return best
+		if best < 0 || e.amt > es[best].amt || (e.amt == es[best].amt && e.id.Hex() < es[best].id.Hex()) {
+			best = i
+		}
 	}
+	return best
+}
+
+// settle empareja al que más debe con al que más le deben hasta dejar a uno en cero.
+func settle(balances []Balance) []Transfer {
+	debtors, creditors := split(balances)
 	var out []Transfer
 	for {
 		d, c := largest(debtors), largest(creditors)

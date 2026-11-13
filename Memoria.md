@@ -581,7 +581,7 @@
   - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-45 en `main` (nv-44 ya está).
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
-- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
+- WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local; nv-58 ya se trajo a `main` en su PR). Traerles `main` antes de seguir.
 - Pendiente del operador antes de desplegar: `/wherever/dev/DATA_KEYS` (nv-48/49) y después `make migrar-cifrado APLICAR=1` en ese entorno; `/wherever/dev/FCM_PROJECT_ID` y `FCM_CREDENCIALES_B64` (nv-41, van juntas o ninguna). Ninguna es obligatoria en staging: sin ellas la API arranca, guarda en claro y no manda push. `deploy-env.sh` lee todo `/wherever/dev/`, así que basta con instalar la siguiente imagen.
 - A evitar: fiarse del `main` local; el 2026-11-13 iba 21 commits atrás de `origin/main`. Hacer `git fetch` antes de revisar el estado.
 
@@ -620,6 +620,14 @@
 - Decisión propuesta: el panel junta reservas (nv-59), cupones (nv-61, P-49) y reseñas (nv-62, P-50) por interfaces `PanelFuente`; la pausa avisa por `negocios.Observador`. `reservas_config` lleva `confirmacion` y `permite_cambios` que pidió nv-59.
 - Choque abierto con nv-60: nv-60 reclama `PUT /cuenta-deposito`; nv-55 propone guardarla cifrada y que nv-60 la mande a Stripe y la borre (D3/D11).
 - A evitar: correr Python con `-I` en esta máquina: desactiva el `site` del usuario y `openpyxl` no carga; usar `-E -P` y `sys.stdout.reconfigure(encoding="utf-8")` (con `-E` se ignora `PYTHONIOENCODING`). Poner filas de rutas sin código en la tabla viva rompe `check_endpoints`: van como viñetas en «Diferidos».
+
+## NV-58 — La Vaca (2026-11-13)
+- Estado: rama `claude/heuristic-diffie-a733bc` (WIP `ef2d91e` + `origin/main`), PR contra `main`. Paquete `internal/vaca` (corte puro, repositorio, service, handler, Privacy), colecciones `gastos` y `deudas_vaca`, siete rutas. Local: build, vet, Unit (en Docker), lint, critic, `check_sdd`, `check_endpoints`. Integration, Security, Database y Contract en el CI. Falta la firma.
+- Decisión: el corte se recalcula entero en cada escritura dentro de `lock:vaca:{grupo}` (SET NX + EVALSHA, 2 comandos); las deudas `pendiente` se reemplazan con `version_corte + 1` y las `pagada` cuentan como transferencias hechas. Porqué: un solo juego vigente aunque lleguen altas a la vez, sin contador en Mongo.
+- Decisión: residuo de la división igual a quien pagó si participa; si no, al primero por id. Empates por id: el corte es determinista y todos ven el mismo.
+- Decisión: borrar la cuenta conserva gastos y deudas (son del grupo); el nombre sale «Cuenta eliminada» porque se resuelve en cada respuesta. Exporta `gastos` y `deudas_vaca` sin ids de los demás.
+- Operador: nada. Sin variables ni Terraform; los índices los crea `/indexes` al instalar la imagen.
+- A evitar: escribir `?query` dentro de la ruta en `docs/endpoints.md` (`check_endpoints` la toma como parte del path). Correr Unit fuera de Docker: Control de aplicaciones bloquea los `.test.exe`.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
