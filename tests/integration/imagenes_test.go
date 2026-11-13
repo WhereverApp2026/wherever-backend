@@ -41,7 +41,14 @@ func imgCall(t *testing.T, app *fiber.App, method, path string, body any, token 
 	}
 	var out map[string]any
 	require.NoError(t, json.Unmarshal([]byte(raw), &out))
-	assertSnakeCase(t, out)
+	// `campos` son los nombres del formulario de S3 (Content-Type, X-Amz-*): van tal cual los pide S3.
+	cuerpo := make(map[string]any, len(out))
+	for k, v := range out {
+		if k != "campos" {
+			cuerpo[k] = v
+		}
+	}
+	assertSnakeCase(t, cuerpo)
 	return out
 }
 
