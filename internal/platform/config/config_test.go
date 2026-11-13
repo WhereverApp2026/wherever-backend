@@ -73,10 +73,12 @@ func TestLoad_RejectsInvalidValues(t *testing.T) {
 
 func prodMail(overrides map[string]string) map[string]string {
 	values := map[string]string{
-		config.KeyAppEnv:      config.EnvProd,
-		config.KeySMTPHost:    "smtp.proveedor.test",
-		config.KeyMailFrom:    "no-responder@wherever.test",
-		config.KeyAppLinkBase: "https://wherever.test",
+		config.KeyAppEnv:         config.EnvProd,
+		config.KeySMTPHost:       "smtp.proveedor.test",
+		config.KeyMailFrom:       "no-responder@wherever.test",
+		config.KeyAppLinkBase:    "https://wherever.test",
+		config.KeyImagenesBucket: "wherever-prod-imagenes",
+		config.KeyImagenesURL:    "https://imagenes.wherever.test",
 	}
 	for k, v := range overrides {
 		values[k] = v
@@ -203,4 +205,28 @@ func TestLoad_DataKeys(t *testing.T) {
 	cfg, err := config.Load(testutil.Env(prodMail(nil)))
 	require.NoError(t, err)
 	assert.Equal(t, testutil.DataKeys, cfg.DataKeys)
+}
+
+func TestLoad_Imagenes(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+	require.NoError(t, err, "fuera de prod pueden faltar")
+	assert.False(t, cfg.Imagenes.Enabled())
+	assert.Equal(t, config.DefaultImagenesRegion, cfg.Imagenes.Region)
+
+	cfg, err = config.Load(testutil.Env(map[string]string{config.KeyImagenesBucket: "b", config.KeyImagenesURL: "https://d.cloudfront.net/"}))
+	require.NoError(t, err)
+	assert.True(t, cfg.Imagenes.Enabled())
+	assert.Equal(t, "https://d.cloudfront.net", cfg.Imagenes.URL, "sin la diagonal final")
+
+	for name, env := range map[string]map[string]string{
+		"solo bucket":   {config.KeyImagenesBucket: "b"},
+		"solo url":      {config.KeyImagenesURL: "https://d.cloudfront.net"},
+		"url con ruta":  {config.KeyImagenesBucket: "b", config.KeyImagenesURL: "https://d.cloudfront.net/i"},
+		"url sin https": {config.KeyAppEnv: config.EnvStaging, config.KeyImagenesBucket: "b", config.KeyImagenesURL: "http://d.cloudfront.net"},
+	} {
+		_, err := config.Load(testutil.Env(env))
+		assert.ErrorContains(t, err, config.KeyImagenesURL, name)
+	}
+	_, err = config.Load(testutil.Env(prodMail(map[string]string{config.KeyImagenesBucket: "", config.KeyImagenesURL: ""})))
+	assert.ErrorContains(t, err, config.KeyImagenesBucket, "obligatorias en prod")
 }

@@ -27,6 +27,7 @@ import (
 	httpapi "github.com/WhereverApp2026/wherever-backend/internal/http"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
+	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
@@ -49,6 +50,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/climatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/imagenestest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
@@ -80,6 +82,7 @@ type Env struct {
 	Semantica       *semantica.Service
 	Busquedas       *busquedas.Service
 	Sugerencias     *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
+	Imagenes        imagenestest.Modulo  // doble del bucket y Rekognition local (nv-45)
 	Mail            *mailer.Memory
 	Log             *slog.Logger
 	Logs            *testutil.LogBuffer
@@ -170,8 +173,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
+	images := imagenestest.Build(t, client.DB(), log)
 	registry := privacidad.NewRegistry()
-	for _, p := range []privacidad.Purger{auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
+	for _, p := range []privacidad.Purger{images.Privacy, auth.NewPrivacy(authRepo), exports, iaUses, planPrivacy, recomendaciones.NewPrivacy(recoRepo), busquedas.NewPrivacy(searchRepo), amistades.NewPrivacy(friendRepo), grupos.NewPrivacy(groupRepo), votaciones.NewPrivacy(voteRepo), notificaciones.NewPrivacy(notifRepo), sincronizacion.NewPrivacy(syncRepo, syncActions), grafo.NewPrivacy(graph), usuarios.NewConsentPrivacy(consentRepo), account.NewPrivacy(users)} {
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
@@ -185,6 +189,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
+	registry.RegisterExporter(images.Privacy)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -204,7 +209,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes,
-		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches,
+		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -223,6 +228,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			clima.NewHandler(weather, cities, v),
 			inicio.NewHandler(inicio.NewService(reco, weather), v),
 			notificaciones.NewHandler(notifier, v).WithActiveGuard(usuarios.RequireActive(users)),
+			imagenes.NewHandler(images.Service, v).WithActiveGuard(usuarios.RequireActive(users)),
 			sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), v).
 				WithPending(sincronizacion.NewPending(syncActions, plans, acc, users, v), usuarios.RequireActive(users)),
 			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
