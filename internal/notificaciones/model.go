@@ -22,6 +22,9 @@ const (
 	KindPlanInvite     = "invitacion_plan"
 	KindVoteOpened     = "votacion_abierta"
 	KindVoteClosed     = "votacion_cerrada"
+	// KindGroupMessage avisa que hay mensajes nuevos en el chat de un grupo (nv-57); uno por
+	// grupo y persona cada 5 minutos, sin texto ni autor.
+	KindGroupMessage = "mensaje_grupo"
 )
 
 // Límites de la spec.

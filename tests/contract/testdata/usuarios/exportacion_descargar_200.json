@@ -7,6 +7,10 @@
     "descartes_usuario": [],
     "favoritos": [],
     "grupos": [],
+    "mensajes": {
+      "mensajes": [],
+      "reacciones": []
+    },
     "moderacion": [],
     "notificaciones": {
       "avisos": [],

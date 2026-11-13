@@ -604,6 +604,15 @@
 - Operador: nada antes de fusionar. Sin variables ni Terraform; los índices los crea `actualizar.sh` con `/indexes` al instalar la imagen.
 - A evitar: olvidar el contrato de la exportación ARCO (`tests/contract/testdata/usuarios/exportacion_descargar_200.json`) al registrar un Exporter nuevo. Editar con Python en Windows sin modo binario: deja CRLF y `gofmt -l` en Docker marca el archivo completo. Correr `critic` fuera de Docker: B4 falla porque Control de aplicaciones bloquea `go run`.
 
+## NV-57 — Chat de grupo (2026-11-13)
+- Estado: rama `nv-57` desde `origin/main`, PR contra `main`. `internal/chat` (4 rutas REST, `PublicarSistema`, ARCO), `grupos.ultimo_mensaje`, aviso `mensaje_grupo`. Local: build, vet, Unit, lint, `check_sdd` y `check_endpoints` (110 rutas). `critic` no corrió en local (límite de uso): lo corre el CI. Falta la firma.
+- Decisión: canal en vivo diferido (sin WebSocket ni pub/sub de Redis): sin decisión del revisor, con dos instancias pide change streams o pub/sub medido. La app se pone al día con `despues_de` al abrir el chat, al recibir el push y al deslizar; nada de consultas periódicas (cada una cuesta 4 comandos de Redis).
+- Decisión: el límite de 30 mensajes por minuto se cuenta en MongoDB (`ix_autor`), no en Redis: enviar cuesta 7 comandos y leer 4 (`TestPresupuestoRedis_Chat`).
+- Decisión: sin moderación previa del texto (costo y latencia del modelo en cada mensaje); reportar mensajes queda fuera.
+- Decisión: push genérico, uno por grupo y persona cada 5 min con candado en `mensajes_avisos` (TTL); sigue el interruptor «grupos». `ultimo_mensaje` solo lo ven los confirmados.
+- Decisión: historial hacia atrás con cursor firmado (`cursor`) en vez del `antes_de` crudo; el bloqueo no saca a nadie del grupo. ARCO: el Purger del chat va antes que el de grupos y borra el chat de los grupos que organizaba.
+- Variables: ninguna. Índices nuevos en `mensajes` y `mensajes_avisos` (los crea `/indexes` al instalar).
+
 ## NV-54 — Favoritos de negocios y planes (2026-11-13)
 - Estado: rama `nv-54` (WIP de base nv-37 + `origin/main`), PR contra `main`. Paquete `internal/favoritos`, colección `favoritos`, cinco rutas `/api/v1/favoritos…` solo para `consumidor` con `RequireActive`. Local: build, vet, Unit, lint 0, critic, `check_sdd` y `check_endpoints` (111 rutas, en Docker). Integration, Security, Database y Contract en el CI. Falta la firma.
 - Corrección de drift: `FindCards` ya existía en `negocios` (nv-38, tarjetas visibles); la de favoritos es `FindFavoriteCards` (sin filtrar estado, para limpiar borrados). Con grupos (nv-37) sigue marcando un plan solo su dueño; favoritos de planes de grupo quedan fuera. Sin paquete `favoritostest`: se arma en `authtest`.

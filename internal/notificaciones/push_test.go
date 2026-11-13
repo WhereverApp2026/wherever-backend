@@ -52,7 +52,7 @@ func TestWanted_PreferenciasYHorarioSilencioso(t *testing.T) {
 }
 
 func TestPushText_GenericoParaCadaTipo(t *testing.T) {
-	for _, kind := range []string{KindFriendRequest, KindFriendAccepted, KindPlanInvite, KindVoteOpened, KindVoteClosed} {
+	for _, kind := range []string{KindFriendRequest, KindFriendAccepted, KindPlanInvite, KindVoteOpened, KindVoteClosed, KindGroupMessage} {
 		assert.NotEmpty(t, pushText[kind], kind)
 	}
 }
