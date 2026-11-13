@@ -25,6 +25,8 @@ func compressApp() *fiber.App {
 	app.Get("/api/v1/auth/sesiones", reply)
 	app.Post("/api/v1/usuarios", reply)
 	app.Get("/api/v1/usuarios", reply)
+	app.Post("/api/v1/planes/:id/compartir", reply)
+	app.Post("/api/v1/planes/:id/clonar", reply)
 	return app
 }
 
@@ -51,4 +53,6 @@ func TestCompress_LoQueLlevaTokensNoSeComprime(t *testing.T) {
 	assert.Empty(t, encodingOf(t, http.MethodGet, "/api/v1/auth/sesiones", "gzip"))
 	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/usuarios", "gzip"), "el registro devuelve tokens")
 	assert.Equal(t, "gzip", encodingOf(t, http.MethodGet, "/api/v1/usuarios", "gzip"), "solo se excluye el POST")
+	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/planes/abc/compartir", "gzip"), "el enlace de un plan lleva su código (nv-38)")
+	assert.Equal(t, "gzip", encodingOf(t, http.MethodPost, "/api/v1/planes/abc/clonar", "gzip"))
 }

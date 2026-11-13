@@ -15,6 +15,14 @@ const (
 	invitePolicy = "grupos_invitacion"
 	inviteLimit  = 30
 	inviteWindow = time.Hour
+	// Vista pública por IP y unirse por usuario (nv-38). El código tiene 128 bits: el límite
+	// frena el escaneo, no la adivinanza.
+	previewPolicy = "plan_compartido"
+	previewLimit  = 30
+	previewWindow = time.Minute
+	joinPolicy    = "grupos_unirse"
+	joinLimit     = 30
+	joinWindow    = time.Hour
 )
 
 // Handler traduce HTTP ↔ service. No toca la base ni atrapa pánicos (test de arquitectura).
@@ -48,8 +56,12 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 		return append(h.write(chain...), handler)
 	}
 	v1.Post("/planes/:id/invitaciones", append([]fiber.Handler{middleware.RequireAuth()}, invites(h.inviteToPlan)...)...)
+	h.shareRoutes(v1, limiter)
 
 	g := v1.Group("/grupos", middleware.RequireAuth())
+	g.Post("/unirse", append(h.write(limited(limiter, func(l *middleware.Limiter) fiber.Handler {
+		return l.WindowUser(joinPolicy, joinLimit, joinWindow)
+	})...), h.join)...)
 	g.Get("", h.list)
 	g.Get("/:id", h.get)
 	g.Post("", invites(h.create)...)
@@ -159,4 +171,59 @@ func (h *Handler) remove(c *fiber.Ctx) error {
 		return err
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// shareRoutes registra el enlace de invitación (nv-38). La vista pública no pide sesión.
+func (h *Handler) shareRoutes(v1 fiber.Router, limiter *middleware.Limiter) {
+	v1.Post("/planes/compartidos", append(limited(limiter, func(l *middleware.Limiter) fiber.Handler {
+		return l.Window(previewPolicy, previewLimit, previewWindow)
+	}), h.preview)...)
+	v1.Post("/planes/:id/compartir", append([]fiber.Handler{middleware.RequireAuth()}, append(h.write(), h.share)...)...)
+	v1.Delete("/planes/:id/compartir", append([]fiber.Handler{middleware.RequireAuth()}, append(h.write(), h.revoke)...)...)
+}
+
+// limited devuelve el limitador de la ruta, o nada si no hay limitador (scripts/routes).
+func limited(limiter *middleware.Limiter, policy func(*middleware.Limiter) fiber.Handler) []fiber.Handler {
+	if limiter == nil {
+		return nil
+	}
+	return []fiber.Handler{policy(limiter)}
+}
+
+func (h *Handler) share(c *fiber.Ctx) error {
+	out, err := h.svc.Share(c.UserContext(), subject(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func (h *Handler) revoke(c *fiber.Ctx) error {
+	if err := h.svc.Revoke(c.UserContext(), subject(c), c.Params("id")); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *Handler) preview(c *fiber.Ctx) error {
+	var req CodeRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	out, err := h.svc.Preview(c.UserContext(), req.Code)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+func (h *Handler) join(c *fiber.Ctx) error {
+	var req JoinRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	v, err := h.svc.Join(c.UserContext(), subject(c), req)
+	return send(c, fiber.StatusOK, v, err)
 }

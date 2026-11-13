@@ -203,7 +203,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
 			negocios.NewHandler(businesses, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
-			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
+			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),
 			recomendaciones.NewHandler(reco, v).WithActiveGuard(usuarios.RequireActive(users)),
 			clima.NewHandler(weather, cities, v),

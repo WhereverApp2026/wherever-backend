@@ -225,7 +225,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
 		// grupos va antes que planes: atiende POST /planes/:id/invitaciones (nv-37).
-		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor), validator).WithActiveGuard(active),
+		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
 		recomendaciones.NewHandler(recoSvc, validator).WithActiveGuard(active),
 		clima.NewHandler(weather, citySvc, validator),
