@@ -116,7 +116,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
-	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, log)
+	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -173,7 +173,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	voteRepo := votaciones.NewRepository(db)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
-	notifier := notificaciones.NewService(notifRepo, cursor, log)
+	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
@@ -405,11 +405,12 @@ func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 
 // startVotes cierra cada minuto las votaciones vencidas y aplica su ganadora al plan (nv-39)
 // hasta que ctx termina. Solo usa MongoDB; la función devuelta espera a que termine.
-func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, log *slog.Logger) func() {
+func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, fcm config.FCM, log *slog.Logger) func() {
 	planRepo := planes.NewRepository(db)
 	places := negocios.NewRepository(db)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue)
-	notifier := notificaciones.NewService(notificaciones.NewRepository(db), nil, log)
+	notifRepo := notificaciones.NewRepository(db)
+	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db), notifRepo, log))
 	svc := votaciones.NewService(votaciones.NewRepository(db), grupos.NewRepository(db), planRepo, plans, places, log).WithNotifier(notifier)
 	closer := votaciones.NewCloser(svc, log)
 	done := make(chan struct{})

@@ -1,15 +1,15 @@
 # task.md — NV-41 Envío de push con Firebase
 
 ## Fase 0 — Preparación
-- [ ] T01 Aprobar la spec; rama `nv-41`.
+- [ ] T01 Aprobar la spec (firma pendiente); rama `nv-41` desde `nv-40`.
 
 ## Fase 1 — Implementación
-- [ ] T02 Todo evento crea la notificación en el centro y, si corresponde, envía push por FCM.
-- [ ] T03 El push respeta las preferencias del usuario por tipo y el horario silencioso; en…
-- [ ] T04 Tokens inválidos (UNREGISTERED) se borran solos.
-- [ ] T05 Envío en segundo plano con reintentos; un fallo de FCM nunca cambia la respuesta de la…
-- [ ] T06 Sin contenido sensible en el push: título y texto genéricos.
+- [x] T02 Cliente FCM HTTP v1 con la cuenta de servicio (sin librerías nuevas).
+- [x] T03 Cola en segundo plano con reintentos; FCM caído no frena la acción.
+- [x] T04 Preferencias por tipo y horario silencioso en la hora de México.
+- [x] T05 Tokens `UNREGISTERED` se borran; texto genérico sin datos.
 
 ## Fase 2 — Cierre
-- [ ] T07 Pruebas, documentos y `Memoria.md`.
-- [ ] T08 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [x] T06 Pruebas, documentos y `Memoria.md`.
+- [ ] T07 `go build`, `go vet`, cinco suites, `critic`, `check_sdd`, `check_endpoints`; PR; evidencia en `gates.md`.
+- [ ] T08 Prueba en vivo con un teléfono real (requiere las credenciales de Firebase del equipo).

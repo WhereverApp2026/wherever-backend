@@ -535,6 +535,14 @@
 - Para nv-41: el push sale del mismo `Emit` (envolverlo, no llamar a FCM desde los módulos); falta `RemoveDeviceByHash` para los tokens `UNREGISTERED`.
 - A evitar: heredocs largos de Python con comillas y acentos en Bash (fallan); escribir el script en el scratchpad y correrlo con `python -I archivo.py "$(pwd -W)"`.
 
+## NV-41 — Push con Firebase (2026-11-12)
+- Estado: rama `nv-41` desde `nv-40`, PR contra `main`. Implementada y probada contra `internal/testutil/fcmtest` (servidor local con llave propia). Falta la prueba en vivo: el equipo crea el proyecto de Firebase y carga las credenciales (nunca por el chat). Falta la firma.
+- Decisión: cliente propio de FCM HTTP v1 (`internal/platform/push`) que firma el JWT RS256 con `golang-jwt` y cambia el token en `token_uri`; sin librerías de Google. Token de acceso en memoria hasta 1 min antes de vencer (`Reset()` con mutex).
+- Decisión: credenciales en `FCM_CREDENCIALES_B64` (JSON en base64, una línea) con `FCM_PROJECT_ID`; van juntas o ninguna, y sin ellas no hay push. Corrige el hallazgo de la revisión (`fcm-service-account` no era nombre de variable y el JSON tenía varias líneas). `FCM_URL` solo fuera de prod.
+- Decisión: el push sale del mismo `Emit` que el centro y solo si el aviso se guardó. Cola de 500 y 4 trabajadores; 3 intentos solo en fallos temporales; `UNREGISTERED` borra el token.
+- Decisión: los tipos de grupo siguen `preferencias.notificaciones.grupos`; los de amistad no tienen interruptor en nv-05 y siempre suenan fuera del horario silencioso (hora de México).
+- Operación: PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("llave.json"))`; en AWS, `/wherever/dev/FCM_PROJECT_ID` (String) y `/wherever/dev/FCM_CREDENCIALES_B64` (SecureString); la siguiente instalación de imagen los toma.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
