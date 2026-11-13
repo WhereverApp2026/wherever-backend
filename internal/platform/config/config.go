@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cifrado"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/push"
 )
 
@@ -126,6 +127,7 @@ const (
 	KeyFCMProjectID     = "FCM_PROJECT_ID"
 	KeyFCMCredenciales  = "FCM_CREDENCIALES_B64" // #nosec G101 -- nombre de la variable, no su valor
 	KeyFCMURL           = "FCM_URL"
+	KeyDataKeys         = "DATA_KEYS" // #nosec G101 -- nombre de la variable, no su valor
 )
 
 // Modos de SMTP_TLS (spec nv-06).
@@ -149,7 +151,7 @@ var optionalKeys = []string{
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
 	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
 	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
-	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL,
+	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL, KeyDataKeys,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -183,6 +185,8 @@ type Config struct {
 	JobHour           int
 	HideInternals     bool
 	IA                IA
+	// DataKeys son las llaves de cifrado de campos (nv-48): `id:base64,…`, la primera cifra.
+	DataKeys string
 	// FCM es el push por Firebase (nv-41); sin credenciales solo queda el centro de avisos.
 	FCM        FCM
 	VersionApp VersionApp
@@ -279,6 +283,7 @@ func Load(getenv func(string) string) (Config, error) {
 		CORSAllowedOrigin: strings.TrimSpace(getenv(KeyCORSOrigin)),
 		TrustedProxies:    splitList(getenv(KeyTrustedProxies)),
 		HideInternals:     strings.EqualFold(strings.TrimSpace(getenv(KeyHideInternals)), "true"),
+		DataKeys:          strings.TrimSpace(getenv(KeyDataKeys)),
 		FCM: FCM{
 			ProjectID:      strings.TrimSpace(getenv(KeyFCMProjectID)),
 			CredentialsB64: strings.TrimSpace(getenv(KeyFCMCredenciales)),
@@ -411,6 +416,7 @@ func (c Config) validate() []error {
 	errs = append(errs, c.validateMail()...)
 	errs = append(errs, c.IA.validate()...)
 	errs = append(errs, c.FCM.validate(c.Env)...)
+	errs = append(errs, c.validateDataKeys()...)
 	return append(errs, c.validateLimits()...)
 }
 
@@ -648,4 +654,19 @@ func (f FCM) validate(env string) []error {
 		errs = append(errs, fmt.Errorf("%s no se cambia en prod", KeyFCMURL))
 	}
 	return errs
+}
+
+// validateDataKeys: en prod las llaves son obligatorias (sin ellas la API no arranca); fuera
+// de prod pueden faltar y los campos sensibles se guardan en claro con un aviso al arrancar.
+func (c Config) validateDataKeys() []error {
+	if c.DataKeys == "" {
+		if c.Env == EnvProd {
+			return []error{fmt.Errorf("%s es obligatoria en prod (cifrado de campos, nv-48)", KeyDataKeys)}
+		}
+		return nil
+	}
+	if _, err := cifrado.CargarLlavero(c.DataKeys); err != nil {
+		return []error{fmt.Errorf("%s: %w", KeyDataKeys, err)}
+	}
+	return nil
 }

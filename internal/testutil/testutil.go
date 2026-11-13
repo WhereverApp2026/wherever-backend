@@ -23,8 +23,10 @@ const (
 	SigningKey = "solo_para_pruebas_no_usar_en_ningun_entorno_0123"
 	PhoneKey   = "solo_para_pruebas_hmac_de_telefonos_no_usar_0456"
 	CursorKey  = "solo_para_pruebas_hmac_de_cursores_no_usar_0789"
-	Issuer     = "wherever-api"
-	Audience   = "wherever-app"
+	// DataKeys es una llave de cifrado de campos solo para pruebas (nv-48).
+	DataKeys = "pruebas:c29sb19wYXJhX3BydWViYXNfY2lmcmFkb18wMDAwMDA="
+	Issuer   = "wherever-api"
+	Audience = "wherever-app"
 	// DeadAddr no tiene nada escuchando: simula una base caída sin reiniciar contenedores.
 	DeadAddr = "127.0.0.1:1"
 )
@@ -41,6 +43,7 @@ func Config(env string) config.Config {
 		RefreshTTL:    config.MaxRefreshTTL,
 		PhoneHMACKey:  []byte(PhoneKey),
 		CursorHMACKey: []byte(CursorKey),
+		DataKeys:      DataKeys,
 		ArcoGraceDays: config.MaxArcoGraceDays,
 		Mail: config.Mail{
 			SMTPTLS: config.SMTPTLSStartTLS, SMTPPort: 587, Timeout: 5 * time.Second, Workers: 4, QueueSize: 100,
@@ -69,6 +72,7 @@ func Env(overrides map[string]string) func(string) string {
 		config.KeyJWTAudience:   Audience,
 		config.KeyPhoneHMACKey:  PhoneKey,
 		config.KeyCursorHMACKey: CursorKey,
+		config.KeyDataKeys:      DataKeys,
 	}
 	for k, v := range overrides {
 		values[k] = v
