@@ -112,6 +112,9 @@ type Privacy struct {
 	NoticeVersion string    `bson:"version_aviso,omitempty"`
 	AcceptedAt    time.Time `bson:"fecha_aceptacion"`
 	PromoEmail    bool      `bson:"promociones_correo"`
+	// BusinessData es el consentimiento expreso `datos_negocio` (nv-55): INE, comprobante,
+	// datos fiscales y CLABE. Sin él, el expediente del negocio responde 422.
+	BusinessData bool `bson:"datos_negocio,omitempty"`
 }
 
 // DefaultPreferences son los ajustes con los que nace una cuenta.

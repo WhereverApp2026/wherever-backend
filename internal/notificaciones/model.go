@@ -22,6 +22,8 @@ const (
 	KindPlanInvite     = "invitacion_plan"
 	KindVoteOpened     = "votacion_abierta"
 	KindVoteClosed     = "votacion_cerrada"
+	// KindBusinessReviewed avisa al dueño que su negocio se aprobó o rechazó (nv-55).
+	KindBusinessReviewed = "negocio_revisado"
 )
 
 // Límites de la spec.

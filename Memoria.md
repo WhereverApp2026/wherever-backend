@@ -578,7 +578,7 @@
 - Sin ejecutar: ola 6 (nv-42 → 43 y nv-44 → 45; nv-42 primero porque las otras tres dependen de ella; revisar antes el presupuesto de US$50 por Rekognition, S3 y CloudFront).
 - Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
   - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
-  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma):** `specs/nv-55` y `specs/nv-56`, filas de A5 en la sección de diferidos de `docs/endpoints.md`. Ejecutarlas espera las decisiones D1–D11 (nv-55) y E1–E9 (nv-56) y nv-45 en `main` (nv-44 ya está).
+  - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma).** nv-55 implementada (2026-11-13, PR contra `main`); nv-56 espera a que nv-55 esté en `main` y sus decisiones E1–E9.
   - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local). Traerles `main` antes de seguir.
@@ -620,6 +620,17 @@
 - Decisión propuesta: el panel junta reservas (nv-59), cupones (nv-61, P-49) y reseñas (nv-62, P-50) por interfaces `PanelFuente`; la pausa avisa por `negocios.Observador`. `reservas_config` lleva `confirmacion` y `permite_cambios` que pidió nv-59.
 - Choque abierto con nv-60: nv-60 reclama `PUT /cuenta-deposito`; nv-55 propone guardarla cifrada y que nv-60 la mande a Stripe y la borre (D3/D11).
 - A evitar: correr Python con `-I` en esta máquina: desactiva el `site` del usuario y `openpyxl` no carga; usar `-E -P` y `sys.stdout.reconfigure(encoding="utf-8")` (con `-E` se ignora `PYTHONIOENCODING`). Poner filas de rutas sin código en la tabla viva rompe `check_endpoints`: van como viñetas en «Diferidos».
+
+## nv-55 — Alta de negocio por pasos y revisión del administrador (2026-11-13)
+- Estado: implementada en `internal/negocios/alta` y `internal/negocios/expediente` (15 rutas en la tabla viva). Local: build, vet, Unit y `golangci-lint` v2.15.0 en 0; `check_endpoints` OK en Docker; Integration, Security, Database y Contract los corre el CI del PR. D1–D11 aplicadas como se proponían, sin firma.
+- Decisión: el expediente vive en `negocios_documentos`, cifrado con la capa de nv-48 (archivo atado a colección, tipo y negocio); `negocios` solo guarda banderas y la CLABE enmascarada. Porqué: `/lugares`, la caché y la exportación de favoritos leen `negocios`.
+- Decisión: sin `DATA_KEYS` el expediente responde 503 (a diferencia de nv-49, nunca en claro). La lectura del administrador escribe `accesos_expediente` antes de descifrar; si falla, 503.
+- Decisión: `expediente.Almacen` es el subconjunto `Leer/Guardar/Borrar` del almacén S3 de nv-45 y las fotos van por `alta.Imagenes` (imagen publicada de la persona). Porqué: nv-45 no estaba en `main`; así el adaptador de S3 sirve sin cambios.
+- Decisión: el consentimiento es un campo `datos_negocio` en `POST /usuarios/yo/consentimientos` (la colección no tiene `tipo`); mandar `false` borra el expediente antes de guardar el retiro (oposición).
+- Decisión: la baja por ARCO solo toca negocios con `origen: alta`. Porqué: la semilla tiene al administrador como dueño provisional.
+- Decisión: la retención corre como `privacidad.Tarea` dentro del trabajo nocturno, con su candado.
+- Pendiente: al fusionar nv-45, conectar su S3 a `expediente.NewService` y una implementación de `alta.Imagenes` en `cmd/api/alta.go` (hoy las dos van nil: fotos y documentos dan 503). El aviso con estos datos y `AVISO_VERSION` nueva antes de desplegar. Avisar a nv-60 de D3 (la CLABE cifrada es la única copia hasta Stripe).
+- A evitar: un `bson.D` con `ubicacion` vacía en `negocios` rompe el índice 2dsphere: el borrador se inserta sin ese campo. En Go 1.26 no se puede poner `Subject` en el literal de `middleware.Claims` (campo promovido): usar `authtest.ClaimsDe`. En Windows, Python en modo texto escribe CRLF: abrir con `newline=""`. En Windows la política de aplicaciones bloquea el binario de `go run ./scripts/routes`: correr `check_endpoints` en Docker con un `GIT_DIR` temporal.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

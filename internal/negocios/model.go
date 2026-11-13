@@ -70,11 +70,13 @@ type VentanaMin struct {
 	Hasta int `bson:"hasta" json:"hasta"`
 }
 
-// Foto es una URL de la galería. Tipo: fachada, interior o producto.
+// Foto es una URL de la galería. Tipo: fachada, interior o producto. ImagenID es la imagen
+// publicada de nv-45 cuando la sube el dueño (nv-55); la semilla no lo lleva.
 type Foto struct {
-	URL   string `bson:"url" json:"url"`
-	Tipo  string `bson:"tipo" json:"tipo"`
-	Orden int    `bson:"orden" json:"orden"`
+	ImagenID string `bson:"imagen_id,omitempty" json:"-"`
+	URL      string `bson:"url" json:"url"`
+	Tipo     string `bson:"tipo" json:"tipo"`
+	Orden    int    `bson:"orden" json:"orden"`
 }
 
 // Accesibilidad sustituye las banderas `accesible` y `mascotas` del stub.
@@ -115,44 +117,62 @@ type Pausa struct {
 	Motivo string     `bson:"motivo,omitempty" json:"motivo,omitempty"`
 }
 
+// Documentos dice qué parte del expediente subió el dueño (nv-55). El expediente vive en
+// `negocios_documentos`, cifrado; aquí solo quedan banderas para el paso 6 y la cola.
+type Documentos struct {
+	INE         bool `bson:"ine" json:"ine"`
+	Comprobante bool `bson:"comprobante" json:"comprobante"`
+}
+
+// CuentaMascara es la cuenta de depósito sin la CLABE completa (nv-55): la cifrada vive en
+// `negocios_documentos` hasta que nv-60 la registre en Stripe.
+type CuentaMascara struct {
+	Ultimos4 string `bson:"clabe_ultimos4" json:"clabe_ultimos4"`
+	Banco    string `bson:"banco" json:"banco"`
+	Titular  string `bson:"titular" json:"titular"`
+	Estado   string `bson:"estado" json:"estado"`
+}
+
 // Business es el documento de `negocios`: A2 §1 más los campos de control de A5 §1 que
 // esta spec necesita. Los datos fiscales y de cobro llegan con A5.
 type Business struct {
-	ID                  bson.ObjectID `bson:"_id"`
-	OwnerID             bson.ObjectID `bson:"propietario_id"`
-	Slug                string        `bson:"slug"`
-	Name                string        `bson:"nombre"`
-	NormalizedName      string        `bson:"nombre_normalizado"`
-	Category            string        `bson:"categoria"`
-	Tags                []string      `bson:"etiquetas"`
-	Description         string        `bson:"descripcion"`
-	PriceLevel          int           `bson:"nivel_precio"`
-	AveragePrice        int           `bson:"precio_promedio"`
-	Location            Location      `bson:"ubicacion"`
-	Address             Direccion     `bson:"direccion"`
-	Phone               string        `bson:"telefono,omitempty"`
-	Schedules           []Horario     `bson:"horarios"`
-	ScheduleMin         []VentanaMin  `bson:"horario_min"`
-	Photos              []Foto        `bson:"fotos"`
-	Services            []string      `bson:"servicios"`
-	Accessibility       Accesibilidad `bson:"accesibilidad"`
-	DietOptions         []string      `bson:"opciones_dieta"`
-	Allergens           []string      `bson:"alergenos"`
-	AcceptsReservations bool          `bson:"acepta_reservas"`
-	Rating              Calificacion  `bson:"calificacion"`
-	State               string        `bson:"estado"`
-	Plan                string        `bson:"plan"`
-	Verified            bool          `bson:"verificado"`
-	ExcellenceSeal      bool          `bson:"sello_excelencia"`
-	Coupons             int           `bson:"cupones_activos"`
-	Traffic             [][]int       `bson:"afluencia,omitempty"`
-	HighlightedUntil    *time.Time    `bson:"destacado_hasta,omitempty"`
-	Paused              *Pausa        `bson:"pausado,omitempty"`
-	DeletedAt           *time.Time    `bson:"eliminado_en,omitempty"`
-	QRCheckin           string        `bson:"qr_checkin"`
-	Step                int           `bson:"paso_alta"`
-	Revision            Revision      `bson:"revision"`
-	Version             int           `bson:"version"`
-	CreatedAt           time.Time     `bson:"creado_en"`
-	UpdatedAt           time.Time     `bson:"actualizado_en"`
+	ID                  bson.ObjectID  `bson:"_id"`
+	OwnerID             bson.ObjectID  `bson:"propietario_id"`
+	Slug                string         `bson:"slug"`
+	Name                string         `bson:"nombre"`
+	NormalizedName      string         `bson:"nombre_normalizado"`
+	Category            string         `bson:"categoria"`
+	Tags                []string       `bson:"etiquetas"`
+	Description         string         `bson:"descripcion"`
+	PriceLevel          int            `bson:"nivel_precio"`
+	AveragePrice        int            `bson:"precio_promedio"`
+	Location            Location       `bson:"ubicacion"`
+	Address             Direccion      `bson:"direccion"`
+	Phone               string         `bson:"telefono,omitempty"`
+	Schedules           []Horario      `bson:"horarios"`
+	ScheduleMin         []VentanaMin   `bson:"horario_min"`
+	Photos              []Foto         `bson:"fotos"`
+	Services            []string       `bson:"servicios"`
+	Accessibility       Accesibilidad  `bson:"accesibilidad"`
+	DietOptions         []string       `bson:"opciones_dieta"`
+	Allergens           []string       `bson:"alergenos"`
+	AcceptsReservations bool           `bson:"acepta_reservas"`
+	Rating              Calificacion   `bson:"calificacion"`
+	State               string         `bson:"estado"`
+	Plan                string         `bson:"plan"`
+	Verified            bool           `bson:"verificado"`
+	ExcellenceSeal      bool           `bson:"sello_excelencia"`
+	Coupons             int            `bson:"cupones_activos"`
+	Traffic             [][]int        `bson:"afluencia,omitempty"`
+	HighlightedUntil    *time.Time     `bson:"destacado_hasta,omitempty"`
+	Paused              *Pausa         `bson:"pausado,omitempty"`
+	DeletedAt           *time.Time     `bson:"eliminado_en,omitempty"`
+	QRCheckin           string         `bson:"qr_checkin"`
+	Step                int            `bson:"paso_alta"`
+	Revision            Revision       `bson:"revision"`
+	Documentos          Documentos     `bson:"documentos"`
+	CuentaDeposito      *CuentaMascara `bson:"cuenta_deposito,omitempty"`
+	Version             int            `bson:"version"`
+	CreatedAt           time.Time      `bson:"creado_en"`
+	UpdatedAt           time.Time      `bson:"actualizado_en"`
 }

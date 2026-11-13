@@ -40,11 +40,12 @@ const (
 const pushTitle = "Wherever"
 
 var pushText = map[string]string{
-	KindFriendRequest:  "Tienes una nueva solicitud de amistad",
-	KindFriendAccepted: "Aceptaron tu solicitud de amistad",
-	KindPlanInvite:     "Te invitaron a un plan",
-	KindVoteOpened:     "Hay una votación abierta en tu plan",
-	KindVoteClosed:     "Se cerró una votación de tu plan",
+	KindFriendRequest:    "Tienes una nueva solicitud de amistad",
+	KindFriendAccepted:   "Aceptaron tu solicitud de amistad",
+	KindPlanInvite:       "Te invitaron a un plan",
+	KindVoteOpened:       "Hay una votación abierta en tu plan",
+	KindVoteClosed:       "Se cerró una votación de tu plan",
+	KindBusinessReviewed: "Ya revisamos tu negocio",
 }
 
 type pushJob struct {
