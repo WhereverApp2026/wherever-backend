@@ -17,7 +17,7 @@ import (
 // Businesses es lo que favoritos lee de negocios.
 type Businesses interface {
 	FindVisible(ctx context.Context, id bson.ObjectID) (negocios.Business, bool, error)
-	FindCards(ctx context.Context, ids []bson.ObjectID) ([]negocios.Business, error)
+	FindFavoriteCards(ctx context.Context, ids []bson.ObjectID) ([]negocios.Business, error)
 }
 
 // Plans es lo que favoritos lee de planes: el plan propio y cuáles siguen activos.
@@ -248,7 +248,7 @@ func (s *Service) visible(ctx context.Context, me bson.ObjectID, rows []Favorite
 			businessIDs = append(businessIDs, f.TargetID)
 		}
 	}
-	cards, err := s.businesses.FindCards(ctx, businessIDs)
+	cards, err := s.businesses.FindFavoriteCards(ctx, businessIDs)
 	if err != nil {
 		return nil, errStore()
 	}

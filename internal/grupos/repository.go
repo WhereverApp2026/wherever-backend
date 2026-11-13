@@ -29,6 +29,11 @@ func Indexes() []platformmongo.IndexSet {
 				Keys:    bson.D{{Key: "integrantes.usuario_id", Value: 1}, {Key: "actualizado_en", Value: -1}, {Key: "_id", Value: -1}},
 				Options: options.Index().SetName("ix_integrante_actualizado"),
 			},
+			{
+				Keys: bson.D{{Key: "codigo_hash", Value: 1}},
+				Options: options.Index().SetName("ux_codigo_hash").SetUnique(true).
+					SetPartialFilterExpression(bson.D{{Key: "codigo_hash", Value: bson.D{{Key: "$exists", Value: true}}}}),
+			},
 		},
 	}}
 }
@@ -219,4 +224,60 @@ func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) err
 	}
 	_, err := r.col.UpdateMany(ctx, bson.D{{Key: "integrantes.usuario_id", Value: userID}}, bson.D{pull})
 	return err
+}
+
+// SetCode guarda el hash del código del enlace y su vencimiento; reemplaza al anterior, que
+// deja de servir (nv-38).
+func (r *Repository) SetCode(ctx context.Context, groupID, organizer bson.ObjectID, hash string, expires, now time.Time) error {
+	ok, err := r.updated(ctx, bson.D{{Key: "_id", Value: groupID}, {Key: "organizador_id", Value: organizer}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "codigo_hash", Value: hash}, {Key: "codigo_vence", Value: expires}, {Key: "actualizado_en", Value: now}}}})
+	if err == nil && !ok {
+		return ErrNotFound
+	}
+	return err
+}
+
+// ClearCode revoca el enlace del grupo. Devuelve false si no tenía.
+func (r *Repository) ClearCode(ctx context.Context, groupID, organizer bson.ObjectID, now time.Time) (bool, error) {
+	return r.updated(ctx,
+		bson.D{{Key: "_id", Value: groupID}, {Key: "organizador_id", Value: organizer}, {Key: "codigo_hash", Value: bson.D{{Key: "$exists", Value: true}}}},
+		bson.D{{Key: "$unset", Value: bson.D{{Key: "codigo_hash", Value: ""}, {Key: "codigo_vence", Value: ""}}}, {Key: "$set", Value: bson.D{{Key: "actualizado_en", Value: now}}}})
+}
+
+// FindByCode trae el grupo con ese hash de código (ux_codigo_hash).
+func (r *Repository) FindByCode(ctx context.Context, hash string) (Group, error) {
+	return r.findOne(ctx, bson.D{{Key: "codigo_hash", Value: hash}})
+}
+
+// Join deja a userID confirmado por el enlace: entra nuevo, pasa de invitado a confirmado o
+// vuelve después de declinar. Entrar nuevo o volver exige cupo en la misma operación
+// (ErrFull). Si ya estaba confirmado no cambia nada.
+func (r *Repository) Join(ctx context.Context, groupID, userID bson.ObjectID, now time.Time) error {
+	g, err := r.FindByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if m, in := g.Member(userID); in {
+		if m.Status == StatusConfirmed {
+			return nil
+		}
+		ok, err := r.SetStatus(ctx, groupID, userID, m.Status, StatusConfirmed, now)
+		return joinResult(ok, err)
+	}
+	member := Member{UserID: userID, Role: RoleMember, Status: StatusConfirmed, Since: now}
+	ok, err := r.updated(ctx, bson.D{{Key: "_id", Value: groupID}, hasRoom(), {Key: "integrantes.usuario_id", Value: bson.D{{Key: "$ne", Value: userID}}}}, bson.D{
+		{Key: "$push", Value: bson.D{{Key: "integrantes", Value: member}}},
+		{Key: "$inc", Value: bson.D{{Key: "ocupados", Value: 1}}},
+		{Key: "$set", Value: bson.D{{Key: "actualizado_en", Value: now}}},
+	})
+	return joinResult(ok, err)
+}
+
+// joinResult: sin coincidencia es falta de cupo (o una carrera con la misma persona, que el
+// service resuelve releyendo).
+func joinResult(ok bool, err error) error {
+	if err != nil || ok {
+		return err
+	}
+	return ErrFull
 }

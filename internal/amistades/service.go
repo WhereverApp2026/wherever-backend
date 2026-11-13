@@ -9,6 +9,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -20,15 +21,21 @@ type Users interface {
 	FindPublicByIDs(ctx context.Context, ids []bson.ObjectID) ([]usuarios.User, error)
 }
 
-// Service maneja las amistades. Las notificaciones `solicitud_amistad` y `amistad_aceptada`
-// no se guardan ni se envían mientras nv-40 y nv-41 estén pospuestas: la app ve las
-// solicitudes con el contador de pendientes.
+// Service maneja las amistades. Avisa `solicitud_amistad` a quien la recibe y
+// `amistad_aceptada` a quien la envió (nv-40).
 type Service struct {
-	repo  *Repository
-	users Users
-	graph Graph
-	log   *slog.Logger
-	now   func() time.Time
+	repo   *Repository
+	users  Users
+	graph  Graph
+	notify notificaciones.Notifier
+	log    *slog.Logger
+	now    func() time.Time
+}
+
+// WithNotifier guarda los avisos en el centro de notificaciones (nv-40).
+func (s *Service) WithNotifier(n notificaciones.Notifier) *Service {
+	s.notify = n
+	return s
 }
 
 // Graph recibe a quien aceptó, eliminó o bloqueó una amistad para reflejarlo en Neo4j
@@ -53,7 +60,7 @@ func NewService(repo *Repository, users Users, log *slog.Logger) (*Service, erro
 	if repo == nil || users == nil {
 		return nil, errors.New("amistades: faltan los repositorios")
 	}
-	return &Service{repo: repo, users: users, graph: noGraph{}, log: log, now: func() time.Time { return time.Now().UTC() }}, nil
+	return &Service{repo: repo, users: users, graph: noGraph{}, notify: notificaciones.Noop{}, log: log, now: func() time.Time { return time.Now().UTC() }}, nil
 }
 
 func unavailable(err error) error {
@@ -107,6 +114,7 @@ func (s *Service) Send(ctx context.Context, subject string, req SendRequest) (It
 		}
 		err = s.repo.Insert(ctx, &f)
 		if err == nil {
+			s.notify.Emit(ctx, target, notificaciones.KindFriendRequest, map[string]string{"usuario_id": me.Hex()})
 			return newItem(f, me, person), nil
 		}
 		if !errors.Is(err, ErrDuplicate) {
@@ -146,6 +154,7 @@ func (s *Service) resolveExisting(ctx context.Context, me bson.ObjectID, f Frien
 			return Item{}, apperr.Conflict("la solicitud cambió; inténtalo de nuevo")
 		}
 		_ = s.graph.Touch(ctx, me)
+		s.notify.Emit(ctx, f.From, notificaciones.KindFriendAccepted, map[string]string{"usuario_id": me.Hex()})
 		return newItem(accepted, me, person), nil
 	case f.Status == StatusBlocked && f.From != me:
 		return Item{}, notFound()
@@ -254,6 +263,7 @@ func (s *Service) Respond(ctx context.Context, subject, rawID string, req Respon
 		return Item{}, answered
 	}
 	_ = s.graph.Touch(ctx, me)
+	s.notify.Emit(ctx, f.From, notificaciones.KindFriendAccepted, map[string]string{"usuario_id": me.Hex()})
 	return newItem(accepted, me, person), nil
 }
 

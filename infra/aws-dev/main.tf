@@ -103,6 +103,27 @@ data "aws_iam_policy_document" "read_params" {
   }
 }
 
+# nv-42: moderación de imágenes. DetectModerationLabels no admite ARN de recurso; se limita
+# a la región del entorno.
+data "aws_iam_policy_document" "moderacion" {
+  statement {
+    sid       = "ModerarImagenes"
+    actions   = ["rekognition:DetectModerationLabels"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [data.aws_region.current.region]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "moderacion" {
+  name   = "moderar-imagenes"
+  role   = aws_iam_role.instance.id
+  policy = data.aws_iam_policy_document.moderacion.json
+}
+
 resource "aws_iam_role_policy" "read_params" {
   name   = "leer-parametros"
   role   = aws_iam_role.instance.id

@@ -7,9 +7,9 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// FindCards trae de los ids lo que favoritos (nv-54) muestra, sin filtrar por estado: quien
+// FindFavoriteCards trae de los ids lo que favoritos (nv-54) muestra, sin filtrar por estado: quien
 // llama decide qué ocultar (no aprobado) y qué limpiar (`eliminado_en` o id ausente).
-func (r *Repository) FindCards(ctx context.Context, ids []bson.ObjectID) ([]Business, error) {
+func (r *Repository) FindFavoriteCards(ctx context.Context, ids []bson.ObjectID) ([]Business, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}

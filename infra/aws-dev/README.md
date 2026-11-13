@@ -97,6 +97,12 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 - **Alarmas:** llegan al correo de `budget_email`; AWS manda un correo que hay que confirmar una vez.
 - **Instalar o actualizar archivos del servidor:** `infra/aws-dev/scripts/instalar-actualizador.sh --instance <id>`, por Systems Manager.
 
+## Moderación de imágenes (spec nv-42)
+- **Permiso:** `rekognition:DetectModerationLabels` solo en `us-east-2`, en tres lugares: el boundary (`iam/wherever-dev-boundary.json`), el rol de la instancia (`aws_iam_role_policy.moderacion` en `main.tf`) y el deployer (`MedirModeracionEnVivo`, solo para la prueba en vivo).
+- **Aplicar:** con un usuario administrador, en IAM → *Policies*, crea una versión nueva de `wherever-dev-boundary` y de `wherever-dev-deployer-policy` con los JSON del repo (el deployer no puede cambiar el boundary). Después `terraform apply` con el perfil `wherever-dev`; agrega una política en línea al rol y no recrea las instancias.
+- **Sin variables nuevas:** la región sale del entorno y las credenciales del rol de la instancia.
+- **Costo:** US$0.001 por imagen; ver `specs/nv-42/spec.md`.
+
 ## Pendiente: correo
 La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
 

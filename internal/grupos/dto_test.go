@@ -1,6 +1,7 @@
 package grupos
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
@@ -99,4 +102,39 @@ func TestNewView_IntegranteNoVeAQuienDeclino(t *testing.T) {
 	mine := newView(g, no, nil)
 	assert.Equal(t, StatusDeclined, mine.MyStatus)
 	assert.Len(t, mine.Members, 3)
+}
+
+func TestCodigo_AleatorioYSoloHash(t *testing.T) {
+	a, hashA, err := newCode()
+	require.NoError(t, err)
+	b, _, err := newCode()
+	require.NoError(t, err)
+	assert.Len(t, a, 22, "128 bits en base64url sin relleno")
+	assert.NotEqual(t, a, b)
+	assert.Len(t, hashA, 64)
+	assert.NotContains(t, hashA, a)
+	assert.Equal(t, hashA, hashCode(a))
+}
+
+func TestPublicPlan_SinPersonas(t *testing.T) {
+	g, _, _, _ := sampleGroup()
+	expires := time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)
+	g.CodeExpires = &expires
+	g.CodeHash = "secreto"
+	shop := bson.NewObjectID()
+	p := planes.Plan{
+		ID: g.PlanID, OwnerID: g.OrganizerID, Nombre: "Sábado", Personas: 4, Presupuesto: 900,
+		Paradas: []planes.Parada{{ID: bson.NewObjectID(), NegocioID: shop, Minutos: 60, Nota: "llevar regalo"}, {ID: bson.NewObjectID(), NegocioID: bson.NewObjectID(), Minutos: 30}},
+	}
+	out := newPublicPlan(g, p, []negocios.PlaceItem{{ID: shop.Hex(), Name: "Café"}})
+	raw, err := json.Marshal(out)
+	require.NoError(t, err)
+	for _, hidden := range []string{g.OrganizerID.Hex(), g.Members[1].UserID.Hex(), "llevar regalo", "secreto", "presupuesto", "900"} {
+		assert.NotContains(t, string(raw), hidden)
+	}
+	require.Len(t, out.Stops, 2)
+	require.NotNil(t, out.Stops[0].Place)
+	assert.Nil(t, out.Stops[1].Place, "un negocio que ya no está disponible sale sin lugar")
+	assert.Equal(t, expires, out.LinkExpiresAt)
+	assert.Equal(t, 2, out.Seats.Occupied)
 }
