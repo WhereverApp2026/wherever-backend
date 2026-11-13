@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/platform/cifrado"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 )
 
@@ -123,33 +124,38 @@ func DefaultPreferences() Preferences {
 
 // User es un documento de `usuarios` (hoja A1 §1 más `version`, constitución §5).
 type User struct {
-	ID             bson.ObjectID   `bson:"_id"`
-	Name           string          `bson:"nombre"`
-	Username       string          `bson:"nombre_usuario,omitempty"`
-	NormalizedName string          `bson:"nombre_normalizado"`
-	Email          string          `bson:"correo"`
-	EmailVerified  bool            `bson:"correo_verificado"`
-	PhoneHash      string          `bson:"telefono_hash,omitempty"`
-	PasswordHash   string          `bson:"password_hash,omitempty"`
-	GoogleID       string          `bson:"google_id,omitempty"`
-	BirthDate      *time.Time      `bson:"fecha_nacimiento,omitempty"`
-	PhotoURL       string          `bson:"foto_url,omitempty"`
-	FriendCode     string          `bson:"codigo_amigo"`
-	Roles          []string        `bson:"roles"`
-	Mode           string          `bson:"modo_actual"`
-	BusinessIDs    []bson.ObjectID `bson:"negocios_ids,omitempty"`
-	City           *City           `bson:"ciudad,omitempty"`
-	Tastes         *Tastes         `bson:"gustos,omitempty"`
-	Preferences    Preferences     `bson:"preferencias"`
-	Privacy        Privacy         `bson:"privacidad"`
-	Points         int             `bson:"puntos"`
-	Level          string          `bson:"nivel"`
-	StreakWeeks    int             `bson:"racha_semanas"`
-	Status         string          `bson:"estado"`
-	DeleteAt       *time.Time      `bson:"eliminar_en,omitempty"`
-	Version        int             `bson:"version"`
-	CreatedAt      time.Time       `bson:"creado_en"`
-	UpdatedAt      time.Time       `bson:"actualizado_en"`
+	ID             bson.ObjectID `bson:"_id"`
+	Name           string        `bson:"nombre"`
+	Username       string        `bson:"nombre_usuario,omitempty"`
+	NormalizedName string        `bson:"nombre_normalizado"`
+	Email          string        `bson:"correo"`
+	EmailVerified  bool          `bson:"correo_verificado"`
+	PhoneHash      string        `bson:"telefono_hash,omitempty"`
+	PasswordHash   string        `bson:"password_hash,omitempty"`
+	GoogleID       string        `bson:"google_id,omitempty"`
+	// BirthDate es la fecha en claro para el resto del código; en la base va cifrada en
+	// BirthDateStored (texto `enc:v1:…`, o la fecha de antes de la migración) (nv-49).
+	BirthDate       *time.Time `bson:"-"`
+	BirthDateStored any        `bson:"fecha_nacimiento,omitempty"`
+	// Adult se guarda al registrar: la edad ya se validó y la fecha queda cifrada.
+	Adult       bool            `bson:"mayor_de_edad,omitempty"`
+	PhotoURL    string          `bson:"foto_url,omitempty"`
+	FriendCode  string          `bson:"codigo_amigo"`
+	Roles       []string        `bson:"roles"`
+	Mode        string          `bson:"modo_actual"`
+	BusinessIDs []bson.ObjectID `bson:"negocios_ids,omitempty"`
+	City        *City           `bson:"ciudad,omitempty"`
+	Tastes      *Tastes         `bson:"gustos,omitempty"`
+	Preferences Preferences     `bson:"preferencias"`
+	Privacy     Privacy         `bson:"privacidad"`
+	Points      int             `bson:"puntos"`
+	Level       string          `bson:"nivel"`
+	StreakWeeks int             `bson:"racha_semanas"`
+	Status      string          `bson:"estado"`
+	DeleteAt    *time.Time      `bson:"eliminar_en,omitempty"`
+	Version     int             `bson:"version"`
+	CreatedAt   time.Time       `bson:"creado_en"`
+	UpdatedAt   time.Time       `bson:"actualizado_en"`
 }
 
 // SearchableByUsername dice si la persona aparece al buscarla por nombre de usuario.
@@ -170,6 +176,8 @@ func NormalizeEmail(email string) string { return strings.ToLower(strings.TrimSp
 type Repository struct {
 	col     *mongo.Collection
 	newCode func() (string, error)
+	// cipher cifra alergias y fecha de nacimiento (nv-49); nil = en claro.
+	cipher *cifrado.Llavero
 }
 
 // NewRepository recibe la base por constructor.
@@ -225,7 +233,11 @@ func (r *Repository) Create(ctx context.Context, u *User) error {
 			}
 			u.FriendCode = code
 		}
-		_, err := r.col.InsertOne(ctx, u)
+		doc, err := r.sealUser(u)
+		if err != nil {
+			return err
+		}
+		_, err = r.col.InsertOne(ctx, doc)
 		if !generated || !isDuplicate(err, "ux_codigo_amigo") || attempt+1 >= friendCodeRetries {
 			return mapDuplicate(err)
 		}
@@ -341,26 +353,33 @@ func (r *Repository) findOne(ctx context.Context, filter bson.D) (User, error) {
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return User{}, ErrNotFound
 	}
-	return u, err
+	if err != nil {
+		return User{}, err
+	}
+	return u, r.open(&u)
 }
 
 // apply hace $set (más `actualizado_en`), $unset opcional y `version + 1`, y devuelve el
 // documento nuevo.
 func (r *Repository) apply(ctx context.Context, filter, set, unset bson.D) (User, error) {
+	set, err := r.sealSet(idOf(filter), set)
+	if err != nil {
+		return User{}, err
+	}
 	set = append(set, bson.E{Key: "actualizado_en", Value: time.Now().UTC()})
 	update := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
 	if len(unset) > 0 {
 		update = append(update, bson.E{Key: "$unset", Value: unset})
 	}
 	var u User
-	err := r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&u)
+	err = r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&u)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return User{}, ErrNotFound
 	}
 	if err != nil {
 		return User{}, mapDuplicate(err)
 	}
-	return u, nil
+	return u, r.open(&u)
 }
 
 func isDuplicate(err error, index string) bool {

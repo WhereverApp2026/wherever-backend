@@ -21,6 +21,7 @@ type Service struct {
 	repo    *Repository
 	calc    *Calculadora
 	graph   Graph
+	sync    Sync
 	members Members
 	now     func() time.Time
 	// cursor firma la paginación de GET /planes (nv-17).
@@ -43,6 +44,22 @@ type Members interface {
 	CanRead(ctx context.Context, planID, userID bson.ObjectID) (bool, error)
 }
 
+// Sync numera cada cambio de los planes del dueño y guarda los borrados (nv-46).
+type Sync interface {
+	Next(ctx context.Context, userID bson.ObjectID) (int64, error)
+	Deleted(ctx context.Context, userID bson.ObjectID, kind string, entityID bson.ObjectID, seq int64) error
+}
+
+// KindPlan es el tipo de un plan en los borrados de la sincronización.
+const KindPlan = "plan"
+
+type noSync struct{}
+
+func (noSync) Next(context.Context, bson.ObjectID) (int64, error) { return 0, nil }
+func (noSync) Deleted(context.Context, bson.ObjectID, string, bson.ObjectID, int64) error {
+	return nil
+}
+
 type noMembers struct{}
 
 func (noMembers) CanRead(context.Context, bson.ObjectID, bson.ObjectID) (bool, error) {
@@ -51,12 +68,18 @@ func (noMembers) CanRead(context.Context, bson.ObjectID, bson.ObjectID) (bool, e
 
 // NewService recibe el repositorio y la calculadora por constructor.
 func NewService(repo *Repository, calc *Calculadora) *Service {
-	return &Service{repo: repo, calc: calc, graph: noGraph{}, members: noMembers{}, now: time.Now}
+	return &Service{repo: repo, calc: calc, graph: noGraph{}, sync: noSync{}, members: noMembers{}, now: time.Now}
 }
 
 // WithCursor fija la llave del cursor firmado (nv-17).
 func (s *Service) WithCursor(signer *pagination.Signer) *Service {
 	s.cursor = signer
+	return s
+}
+
+// WithSync numera los cambios para la sincronización (nv-46).
+func (s *Service) WithSync(sync Sync) *Service {
+	s.sync = sync
 	return s
 }
 
@@ -136,6 +159,9 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 	if err := s.calc.Aplicar(ctx, p); err != nil {
 		return Plan{}, planError(err)
 	}
+	if err := s.stamp(ctx, p); err != nil {
+		return Plan{}, err
+	}
 	if err := s.repo.Create(ctx, p); err != nil {
 		return Plan{}, errStore()
 	}
@@ -211,11 +237,41 @@ func (s *Service) edit(ctx context.Context, subject, rawID string, version int, 
 	if err := s.calc.Aplicar(ctx, &p); err != nil {
 		return Plan{}, planError(err)
 	}
+	if err := s.stamp(ctx, &p); err != nil {
+		return Plan{}, err
+	}
 	if err := s.repo.UpdateIfVersion(ctx, &p, version); err != nil {
 		return Plan{}, storeError(err)
 	}
 	_ = s.graph.Touch(ctx, p.OwnerID)
 	return p, nil
+}
+
+// ReplaceBusiness cambia el negocio de una parada del plan del dueño y lo recalcula. Lo usa
+// el cierre de una votación (nv-39), que no tiene la versión: la lee y, si otra edición
+// gana la carrera, reintenta una vez.
+func (s *Service) ReplaceBusiness(ctx context.Context, ownerID, planID, stopID, businessID bson.ObjectID) (Plan, error) {
+	var err error
+	for range 2 {
+		var p Plan
+		p, err = s.repo.FindOwned(ctx, ownerID, planID)
+		if err != nil {
+			return Plan{}, storeError(err)
+		}
+		p, err = s.edit(ctx, ownerID.Hex(), planID.Hex(), p.Version, func(p *Plan) error {
+			i, err := stopIndex(p, stopID.Hex())
+			if err != nil {
+				return err
+			}
+			p.Paradas[i].NegocioID = businessID
+			return nil
+		})
+		var appErr *apperr.Error
+		if err == nil || !errors.As(err, &appErr) || appErr.Kind != apperr.KindConflict {
+			return p, err
+		}
+	}
+	return Plan{}, err
 }
 
 // Patch cambia nombre, fecha, personas, presupuesto o movilidad.
@@ -280,8 +336,15 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string, version int
 	if err != nil {
 		return err
 	}
-	if err := s.repo.DeleteIfVersion(ctx, p.OwnerID, p.ID, version); err != nil {
+	seq, err := s.sync.Next(ctx, p.OwnerID)
+	if err != nil {
+		return errStore()
+	}
+	if err := s.repo.DeleteIfVersion(ctx, p.OwnerID, p.ID, version, seq); err != nil {
 		return storeError(err)
+	}
+	if err := s.sync.Deleted(ctx, p.OwnerID, KindPlan, p.ID, seq); err != nil {
+		return errStore()
 	}
 	_ = s.graph.Touch(ctx, p.OwnerID)
 	return nil
@@ -380,4 +443,14 @@ func position(signer *pagination.Signer, scope, tab, raw string) (*Position, err
 		return nil, bad
 	}
 	return &Position{Fecha: at, ID: id}, nil
+}
+
+// stamp le pone al plan el número de su cambio antes de guardarlo.
+func (s *Service) stamp(ctx context.Context, p *Plan) error {
+	seq, err := s.sync.Next(ctx, p.OwnerID)
+	if err != nil {
+		return errStore()
+	}
+	p.SyncSeq = seq
+	return nil
 }

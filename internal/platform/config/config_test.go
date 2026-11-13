@@ -190,3 +190,17 @@ func TestLoad_IARechazaValoresInvalidos(t *testing.T) {
 		})
 	}
 }
+
+// nv-48: sin DATA_KEYS la API no arranca en prod; fuera de prod puede faltar; mal formada
+// nunca arranca.
+func TestLoad_DataKeys(t *testing.T) {
+	_, err := config.Load(testutil.Env(prodMail(map[string]string{config.KeyDataKeys: ""})))
+	assert.ErrorContains(t, err, config.KeyDataKeys)
+	_, err = config.Load(testutil.Env(map[string]string{config.KeyDataKeys: ""}))
+	assert.NoError(t, err, "en dev puede faltar")
+	_, err = config.Load(testutil.Env(map[string]string{config.KeyDataKeys: "v1:corta"}))
+	assert.ErrorContains(t, err, config.KeyDataKeys)
+	cfg, err := config.Load(testutil.Env(prodMail(nil)))
+	require.NoError(t, err)
+	assert.Equal(t, testutil.DataKeys, cfg.DataKeys)
+}
