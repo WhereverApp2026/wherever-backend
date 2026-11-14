@@ -97,3 +97,13 @@ func (e *Env) AltaEnRevision(t testing.TB, u usuarios.User, nombre string) alta.
 	require.NoError(t, err)
 	return out
 }
+
+// AltaAprobada es AltaEnRevision más la aprobación de un administrador (nv-56: el panel parte
+// de un negocio aprobado).
+func (e *Env) AltaAprobada(t testing.TB, u usuarios.User, nombre string) alta.NegocioResponse {
+	t.Helper()
+	b := e.AltaEnRevision(t, u, nombre)
+	out, err := e.Alta.Decidir(context.Background(), ClaimsDe(bson.NewObjectID().Hex(), middleware.RoleAdmin), b.ID, b.Version, alta.DecisionRequest{Decision: alta.DecisionAprobar})
+	require.NoError(t, err)
+	return out
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
@@ -92,4 +94,27 @@ func TestContract_NegociosAlta(t *testing.T) {
 	adminToken := testutil.ValidTokenFor(t, admin.ID.Hex(), "jti-admin-alta-contrato", middleware.RoleAdmin)
 	status, body = call(t, app, http.MethodGet, "/api/v1/admin/negocios?estado=en_revision", nil, adminToken)
 	check(t, "negocios/admin_cola_200", status, body)
+}
+
+// TestContract_NegociosPanel fija el panel sin fuentes, «Horas y cupo» (lo lee nv-59) y el menú
+// público (nv-56).
+func TestContract_NegociosPanel(t *testing.T) {
+	env := authtest.New(t, mongoClient, redisClient, testutil.Config(config.EnvProd))
+	app := env.App()
+	duena := env.CreateUser(t, "duena-panel-contrato@wherever.test")
+	b := env.AltaAprobada(t, duena, "Contrato Panel")
+	token := testutil.ValidTokenFor(t, duena.ID.Hex(), "jti-panel-contrato", middleware.RoleConsumer, middleware.RoleMerchant)
+
+	status, body := call(t, app, http.MethodGet, "/api/v1/negocios/"+b.ID+"/panel", nil, token)
+	check(t, "negocios/panel_200", status, body)
+
+	cfg := map[string]any{"acepta_reservas": true, "capacidad_por_horario": 20, "duracion_turno_min": 30,
+		"anticipo": map[string]any{"tipo": "fijo", "valor": 0}, "politica_cancelacion": "moderada", "confirmacion": "automatica", "permite_cambios": true}
+	status, body = callHeaders(t, app, http.MethodPut, "/api/v1/negocios/"+b.ID+"/reservas-config", cfg, token, map[string]string{"If-Match": strconv.Itoa(b.Version)})
+	check(t, "negocios/reservas_config_200", status, body)
+
+	_, err := env.Menu.Crear(context.Background(), authtest.Comerciante(duena), b.ID, menu.CrearRequest{Seccion: "Tacos", Nombre: "Pastor", Precio: 25, Etiquetas: []string{"picante"}})
+	require.NoError(t, err)
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+b.ID+"/menu", nil, "")
+	check(t, "negocios/menu_200", status, body)
 }

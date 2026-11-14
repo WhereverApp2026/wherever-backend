@@ -84,7 +84,7 @@ const (
 
 // ColaQuery filtra la cola del administrador.
 type ColaQuery struct {
-	Estado string `query:"estado" validate:"omitempty,oneof=en_revision"`
+	Estado string `query:"estado" validate:"omitempty,oneof=en_revision cambios_pendientes"`
 	Cursor string `query:"cursor" validate:"omitempty,max=300,cursor"`
 	Limit  int    `query:"limite" validate:"min=1,max=50"`
 }
@@ -149,6 +149,17 @@ type ColaItem struct {
 	EnviadoEn   *time.Time          `json:"enviado_en,omitempty"`
 	DiasEspera  int                 `json:"dias_espera"`
 	Version     int                 `json:"version"`
+	// Cambios son los campos por revisar de un negocio ya aprobado (nv-56); con sus valores nuevos.
+	Cambios *CambiosResponse `json:"cambios_pendientes,omitempty"`
+}
+
+// CambiosResponse son nombre, dirección o ubicación nuevos de un negocio aprobado (nv-56).
+type CambiosResponse struct {
+	Campos    []string            `json:"campos"`
+	Nombre    string              `json:"nombre,omitempty"`
+	Direccion *negocios.Direccion `json:"direccion,omitempty"`
+	Ubicacion *Ubicacion          `json:"ubicacion,omitempty"`
+	EnviadoEn time.Time           `json:"enviado_en"`
 }
 
 // DocumentosResponse es la lista de metadatos del expediente.
@@ -189,10 +200,20 @@ func fotosResponse(fotos []negocios.Foto) []FotoResponse {
 }
 
 func colaItem(b negocios.Business, now time.Time) ColaItem {
+	sent := b.Revision.EnviadoEn
+	var cambios *CambiosResponse
+	if c := b.CambiosPendientes; c != nil {
+		at := c.EnviadoEn
+		sent = &at
+		cambios = &CambiosResponse{Campos: nonNil(c.Campos), Nombre: c.Nombre, Direccion: c.Direccion, EnviadoEn: c.EnviadoEn.UTC()}
+		if c.Ubicacion != nil {
+			cambios.Ubicacion = &Ubicacion{Type: c.Ubicacion.Type, Coordinates: c.Ubicacion.Coordinates}
+		}
+	}
 	dias := 0
-	if b.Revision.EnviadoEn != nil {
-		dias = int(now.Sub(*b.Revision.EnviadoEn).Hours() / 24)
+	if sent != nil {
+		dias = int(now.Sub(*sent).Hours() / 24)
 	}
 	return ColaItem{ID: b.ID.Hex(), Nombre: b.Name, Categoria: b.Category, Descripcion: b.Description, Fotos: len(b.Photos),
-		Documentos: b.Documentos, PasoAlta: b.Step, EnviadoEn: b.Revision.EnviadoEn, DiasEspera: dias, Version: b.Version}
+		Documentos: b.Documentos, PasoAlta: b.Step, EnviadoEn: sent, DiasEspera: dias, Version: b.Version, Cambios: cambios}
 }

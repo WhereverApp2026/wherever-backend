@@ -423,9 +423,14 @@ func (s *Service) EnviarRevision(ctx context.Context, claims *middleware.Claims,
 	return negocioResponse(nb), nil
 }
 
-// Cola lista los negocios en revisión, del envío más viejo al más nuevo.
+// Cola lista los negocios en revisión (o, con `estado=cambios_pendientes`, los aprobados con
+// nombre o dirección por revisar, nv-56), del envío más viejo al más nuevo.
 func (s *Service) Cola(ctx context.Context, q ColaQuery) (pagination.PageResult[ColaItem], error) {
-	scope := s.cursor.Scope("negocios_revision", negocios.StatusReview)
+	estado := q.Estado
+	if estado == "" {
+		estado = negocios.StatusReview
+	}
+	scope := s.cursor.Scope("negocios_revision", estado)
 	var after *negocios.QueuePosition
 	c, ok, err := validation.Position(s.cursor, scope, q.Cursor)
 	if err != nil {
@@ -440,7 +445,7 @@ func (s *Service) Cola(ctx context.Context, q ColaQuery) (pagination.PageResult[
 		}
 		after = &negocios.QueuePosition{SentAt: at, ID: oid}
 	}
-	rows, err := s.repo.Queue(ctx, negocios.StatusReview, after, q.Limit)
+	rows, err := s.repo.Queue(ctx, estado, after, q.Limit)
 	if err != nil {
 		return pagination.PageResult[ColaItem]{}, errStore()
 	}
@@ -448,11 +453,7 @@ func (s *Service) Cola(ctx context.Context, q ColaQuery) (pagination.PageResult[
 	if len(rows) > q.Limit {
 		rows = rows[:q.Limit]
 		last := rows[len(rows)-1]
-		sent := time.Time{}
-		if last.Revision.EnviadoEn != nil {
-			sent = *last.Revision.EnviadoEn
-		}
-		next, err = s.cursor.Encode(pagination.Cursor{ID: last.ID.Hex(), Sort: sent.UTC().Format(time.RFC3339Nano), Scope: scope})
+		next, err = s.cursor.Encode(pagination.Cursor{ID: last.ID.Hex(), Sort: enviadoEn(last, estado).UTC().Format(time.RFC3339Nano), Scope: scope})
 		if err != nil {
 			return pagination.PageResult[ColaItem]{}, errStore()
 		}
@@ -463,6 +464,17 @@ func (s *Service) Cola(ctx context.Context, q ColaQuery) (pagination.PageResult[
 		items = append(items, colaItem(b, now))
 	}
 	return pagination.NewPageResult(items, next, q.Limit), nil
+}
+
+// enviadoEn es la posición del negocio en su cola: el envío a revisión o el de los cambios.
+func enviadoEn(b negocios.Business, estado string) time.Time {
+	if estado == negocios.EstadoCambiosPendientes && b.CambiosPendientes != nil {
+		return b.CambiosPendientes.EnviadoEn
+	}
+	if b.Revision.EnviadoEn != nil {
+		return *b.Revision.EnviadoEn
+	}
+	return time.Time{}
 }
 
 // Decidir aprueba o rechaza un negocio en revisión (If-Match). Solo un administrador lleva un
@@ -481,6 +493,9 @@ func (s *Service) Decidir(ctx context.Context, claims *middleware.Claims, id str
 		return NegocioResponse{}, err
 	}
 	now := s.now().UTC().Truncate(time.Millisecond)
+	if b.State != negocios.StatusReview && b.CambiosPendientes != nil {
+		return s.decidirCambios(ctx, b, version, req.Decision, motivo)
+	}
 	set, resultado := cambiosDeDecision(req.Decision, motivo, negocios.Revision{EnviadoEn: b.Revision.EnviadoEn, RevisadoPor: &admin, RevisadoEn: &now})
 	nb, err := s.repo.ApplyIf(ctx, bson.D{{Key: "_id", Value: b.ID}, {Key: "estado", Value: negocios.StatusReview}, {Key: "version", Value: version}}, set)
 	if errors.Is(err, negocios.ErrNoAplica) {
@@ -513,4 +528,41 @@ func (s *Service) despuesDeDecidir(ctx context.Context, b negocios.Business, res
 		s.fichas.InvalidarFicha(ctx, b.ID.Hex())
 	}
 	s.notifier.Emit(ctx, b.OwnerID, KindRevisado, map[string]string{"negocio_id": b.ID.Hex(), "resultado": resultado})
+}
+
+// decidirCambios aplica o descarta nombre, dirección o ubicación de un negocio aprobado
+// (nv-56). El negocio nunca se despublica; descartar exige motivo y avisa al dueño.
+func (s *Service) decidirCambios(ctx context.Context, b negocios.Business, version int, decision, motivo string) (NegocioResponse, error) {
+	c := b.CambiosPendientes
+	set := bson.D{}
+	resultado := "cambios_descartados"
+	if decision == DecisionAprobar {
+		resultado = "cambios_aplicados"
+		if c.Nombre != "" {
+			set = append(set, bson.E{Key: "nombre", Value: c.Nombre}, bson.E{Key: "nombre_normalizado", Value: text.Normalize(c.Nombre)})
+		}
+		if c.Direccion != nil {
+			set = append(set, bson.E{Key: "direccion", Value: *c.Direccion})
+		}
+		if c.Ubicacion != nil {
+			set = append(set, bson.E{Key: "ubicacion", Value: *c.Ubicacion})
+		}
+	}
+	nb, err := s.repo.ChangeIf(ctx, bson.D{{Key: "_id", Value: b.ID}, {Key: "version", Value: version},
+		{Key: "cambios_pendientes", Value: bson.D{{Key: "$exists", Value: true}}}}, set, "cambios_pendientes")
+	if errors.Is(err, negocios.ErrNoAplica) {
+		return NegocioResponse{}, apperr.Conflict("el negocio ya se decidió o cambió")
+	}
+	if err != nil {
+		return NegocioResponse{}, errStore()
+	}
+	if s.fichas != nil {
+		s.fichas.InvalidarFicha(ctx, b.ID.Hex())
+	}
+	data := map[string]string{"negocio_id": b.ID.Hex(), "resultado": resultado}
+	if decision == DecisionRechazar {
+		data["motivo"] = motivo
+	}
+	s.notifier.Emit(ctx, b.OwnerID, KindRevisado, data)
+	return negocioResponse(nb), nil
 }

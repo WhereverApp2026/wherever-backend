@@ -1,8 +1,8 @@
 # plan.md — NV-56 Panel del negocio: perfil, horarios, pausa, menú y reservas
 
 1. Mapeo
-- Crear: `internal/negocios/panel/{service,handler,dto,sello,qr}.go`, `internal/negocios/menu/{model,repository,service,handler,dto}.go`, pruebas de las cuatro suites.
-- Modificar: `internal/negocios/model.go` (`reservas_config`, `cambios_pendientes`, `sello`), interfaces `Observador`, `PanelFuente` y `ReservasFuturas` en `internal/negocios`; `scripts/indexes` y `/ready` (`ix_menu`, `ix_menu_texto`); rutas en `internal/http`; cola de nv-55 (`estado=cambios_pendientes`); trabajo nocturno (reanudar pausas, reintentar observadores); `internal/privacidad` (Exporter); `docs/endpoints.md` (filas de A5 a la tabla viva al programar). Si se aprueba E3, `go.mod` con la biblioteca de QR.
+- Crear: `internal/negocios/panel.go` (modelo e interfaces), `internal/negocios/panel/{service,handler,dto,sello,privacy,tarea}.go`, `internal/negocios/menu/{repository,service,handler,dto}.go`, pruebas de las cinco suites.
+- Modificar: `internal/negocios/model.go` (`reservas_config`, `cambios_pendientes`, `sello`), interfaces `Observador`, `PanelFuente` y `ReservasFuturas` en `internal/negocios`; `internal/indexes` (lo usan `scripts/indexes` y `/ready`: `ix_menu`, `ix_menu_texto`), `scripts/routes`; rutas en `internal/http`; cola de nv-55 (`estado=cambios_pendientes`); trabajo nocturno (reanudar pausas, reintentar observadores); `internal/privacidad` (Exporter); `docs/endpoints.md` (filas de A5 a la tabla viva al programar). E3 sin biblioteca: `go.mod` sin cambios.
 - Sin cambios: el expediente (se llama a la cancelación de nv-55), variables y Terraform.
 
 2. Guardarraíles
