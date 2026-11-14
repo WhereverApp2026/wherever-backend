@@ -736,6 +736,7 @@
 - Operador: nada de variables. Correr `/indexes` al instalar: sin `ux_checkin_dia`, `ux_resena_checkin`, `ix_resenas_texto`, `ux_util` y demás, `/ready` da 503.
 - Pendiente: recálculo completo de mantenimiento si algún día se desalinea; las reseñas de un negocio dado de baja no se ocultan; carrera de dos reseñas del mismo negocio con visitas de días distintos en el mismo instante (la regla de 30 días es por consulta, no por índice).
 - A evitar: un `python - <<'EOF'` largo con comillas y backticks en Bash de Windows se corta («unexpected EOF»): escribir el script en un archivo del scratchpad. Registrar la fuente de reseñas en `authtest` por defecto rompe el contrato `panel_200` (espera null): cada prueba la registra con `env.Panel.WithFuentes`.
+- Corrección (2026-11-14): «Por reseñar» devolvía `negocio_nombre` vacío porque `FindVisibleMany` solo proyectaba `ubicacion` y `horario_min`. Ahora proyecta también `nombre` (sigue filtrando por `VisibleFilter`) y `TestResenas_CrearPublicarYCache` lo afirma. A evitar: al reutilizar un `Find*` con proyección, revisar que traiga los campos que se leen; Unit no lo detecta.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
