@@ -19,6 +19,10 @@
 | Cupones: guardar | 30 | 1 h | `POST /api/v1/cupones/{id}/guardar` por usuario (`rate:cupones_guardar:{usuario}`, ventana fija) | nv-61 |
 | Cupones: canjear | 10 | 1 h | `POST /api/v1/mis-cupones/{id}/canjear` por usuario (`rate:cupones_canjear:{usuario}`, ventana fija); pedir otra vez el mismo código también cuenta | nv-61 |
 | Cupones: validar | 60 | 10 min | `POST /api/v1/negocios/{id}/cupones/validar` por usuario del negocio (`rate:cupones_validar:{usuario}`, ventana fija); frena probar códigos al azar (32⁶ ≈ 10⁹). Canje, reintento y trabajo de cupones van en MongoDB: cada petición limitada cuesta solo el pipeline de 3 comandos | nv-61 |
+| Check-in | 10 | 1 h | `POST /api/v1/checkins` por usuario (`rate:checkins:{usuario}`, ventana fija); cuentan también los no válidos | nv-62 |
+| Reseñas: crear | 10 | 1 día | `POST /api/v1/resenas` por usuario (`rate:resenas_crear:{usuario}`, ventana fija) | nv-62 |
+| Reseñas: útil | 60 | 1 h | `PUT /api/v1/resenas/{id}/util` por usuario (`rate:resenas_util:{usuario}`, ventana fija) | nv-62 |
+| Reseñas: reportes | 20 | 1 día | `POST /api/v1/resenas/{id}/reportes` por usuario (`rate:resenas_reporte:{usuario}`, ventana fija). Sugerir respuesta usa la IA por usuario de nv-28; recálculo, útiles y cola van en MongoDB: cada petición limitada cuesta solo el pipeline de 3 comandos | nv-62 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |
 | Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |

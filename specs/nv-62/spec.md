@@ -37,6 +37,21 @@ El check-in comprueba que la persona sí llegó (por ubicación a ≤ 100 m o es
 - **ARCO:** `Purger` al eliminar la cuenta: borra `checkins` y `resenas_utiles` del usuario (los contadores `util` quedan), quita `por` de sus reportes y anonimiza sus reseñas (`usuario_id = null`; texto y calificación se quedan, como manda nv-05); sus fotos las borra nv-45. «Borrar historial» borra los check-ins sin reseña. `Exporter` agrega `checkins` (`negocio_id`, `metodo`, `valido`, `distancia_m`, fecha) y `resenas` (todo lo que escribió + `respuesta_negocio`).
 - **Roles:** consumidor con `usuarios.RequireActive`; dueño = `comerciante` + `propietario_id = sub` (ajeno = 404); reseña ajena para editar o borrar = 404.
 
+## Drift corregido contra el código (2026-11-14)
+Lo que sigue manda sobre el Diseño de arriba donde choquen.
+- **Moderación (nv-42):** `resenas.Moderador` es la interfaz `Evaluar(ctx, moderacion.Contenido) moderacion.Resultado`. La API arma `moderacion.New(nil, moderacion.NewTextoIA(guardia), modSvc, log)`: umbrales de `moderacion_reglas` y la `ia.Guardia` compartida (tope y límites de nv-27/nv-28). Sin IA no hay moderador de texto y todo comentario queda `en_moderacion` (fail-closed). Solo se modera el `comentario`: los chips salen de un catálogo fijo. Una reseña sin comentario se publica sin llamar al moderador (`Evaluar` con contenido vacío da cuarentena).
+- **Cola (nv-43):** `moderacion.Service.Encolar(Entrada{Tipo, Referencia, AutorID, Texto, Resultado})` exige veredicto `cuarentena` y texto; la reseña entra con `Tipo: "resena"` y la respuesta del negocio con `"resena_respuesta"`. Los reportes entran igual, con `Falla: "reportes"`. `resenas.Destino` se registra con `WithDestino` para los dos tipos: aprobar publica (o restablece) y cuenta; rechazar deja `rechazada` (estado nuevo, cuenta para la regla del Sello). Rechazo inmediato del moderador = 422 sin guardar (la visita sigue libre). Mientras la reseña está `en_moderacion` no se edita (409): así la cola nunca decide sobre un texto viejo.
+- **Fotos (nv-45):** `imagenes.Service.Publicada(ctx, autor, id)` devuelve la URL de una imagen publicada propia (`ErrNoPublicada` → 422). La reseña guarda `fotos[{id, url}]`; las fotos ya vienen moderadas. Al anonimizar se vacía `fotos` (nv-45 borra los objetos).
+- **P-50 (nv-56):** `Service` cumple `negocios.FuenteResenas` y se registra en `PanelFuente.Resenas` (`buildPanel`). `LlegadasHoy` = check-ins válidos del día; `CalificacionSemana` y `CambioVsSemanaAnterior` = promedio de estrellas de las publicadas de los últimos 7 días contra los 7 anteriores; `PorResponder` = publicadas sin respuesta; `Verificadas90`, `Promedio90` y `RechazadasModeracion90` para la regla del Sello.
+- **Caché de la ficha (nv-18):** cada cambio de `calificacion` llama `negocios.Service.InvalidarFicha` (borra `cache:negocio:{id}` y categorías).
+- **`qr_checkin` (nv-20):** `negocios.Repository.FindVisibleByQR` busca por `ux_qr_checkin` solo entre visibles.
+- **Calificación:** `negocios.Repository.AplicarSuma` hace el `updateOne` de pipeline (inicializa `calificacion_suma` con `$ifNull` desde la semilla, suma con `$max: 0` y recalcula promedio y aspectos con `$round` a 1 decimal). Si falla tras mover la bandera `contada`, la reseña vuelve a su documento anterior (`ReplaceOne` condicionado a la versión) y la petición da 503.
+- **If-Match:** como nv-61 y el resto del código (`apperr` no tiene 412/428): falta o mal formada = 400, versión vieja = 409. Las filas de contrato se ajustan.
+- **Zona del día:** fija `negocios.MexicoCity()` (como nv-59 y nv-61).
+- **Límites:** 4 políticas nuevas (`checkins`, `resenas_crear`, `resenas_util`, `resenas_reporte`); `sugerir-respuesta` usa el límite por usuario de la guardia (`rate:ia_usuario`, 429), sin llave `rate:resenas_ia`. Cada petición limitada cuesta el pipeline de 3 comandos de Upstash; el resto va en MongoDB.
+- **Índices:** se agrega `ix_resenas_recientes` (`negocio_id, estado, creado_en, _id`) porque `ix_resenas_estrellas` no sirve el orden por fecha sin filtro de estrellas; `ix_reportadas` es `reportes.por` parcial (lo usa ARCO); `resenas_utiles` lleva `ix_util_usuario` para ARCO; `ix_resenas_texto` es compuesto `{negocio_id, comentario: text}`.
+- **Precisión mala** (`precision_m` > 100) se guarda como `fuera_de_radio`; el salto imposible solo se revisa por ubicación y con más de 1 km entre negocios.
+
 ## Contratos
 Filas de J7 §3, sin los métodos de reserva. Se copian a `docs/endpoints.md` al programar. Fiber registra `/resenas/pendientes` y `/resenas/mias` antes de `/resenas/{id}`.
 
@@ -48,7 +63,7 @@ Filas de J7 §3, sin los métodos de reserva. Se copian a `docs/endpoints.md` al
 | POST | `/api/v1/resenas` | JWT consumidor | 201, 400, 401, 403, 404, 409, 422, 429 |
 | GET | `/api/v1/lugares/{id}/resenas?estrellas=&aspecto=&con_fotos=&q=&orden=&cursor=` | Público | 200, 404, 422, 429 |
 | GET | `/api/v1/resenas/mias?cursor=` | JWT consumidor | 200, 401, 403 |
-| PATCH | `/api/v1/resenas/{id}` | JWT autor + If-Match | 200, 400, 401, 403, 404, 412, 422, 428 |
+| PATCH | `/api/v1/resenas/{id}` | JWT autor + If-Match | 200, 400, 401, 403, 404, 409, 422 |
 | DELETE | `/api/v1/resenas/{id}` | JWT autor | 204, 401, 403, 404 |
 | PUT | `/api/v1/resenas/{id}/util` | JWT | 200, 400, 401, 403, 404, 429 |
 | PUT | `/api/v1/negocios/{id}/resenas/{rid}/respuesta` | JWT dueño | 200, 400, 401, 403, 404, 422 |
@@ -77,8 +92,10 @@ Filas de J7 §3, sin los métodos de reserva. Se copian a `docs/endpoints.md` al
 - Sin aspectos por giro ni avance al Sello.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-12), ola por decidir
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
+- **Estado:** 🚧 Borrador con evidencia (2026-11-14), implementada en `internal/resenas` (ola 10). Sin firma.
+- **Revisores:** Osmar Reséndiz (decisiones aceptadas el 2026-11-14; firma pendiente)
 - **Fecha:** —
-- **Decisiones para el revisor:** un check-in válido por negocio y día y una reseña por negocio cada 30 días (consulta en `ix_mis_resenas`); no guardar la ubicación del usuario; `calificacion_suma` nueva en `negocios` e inicializada desde la semilla; 5 aspectos fijos; 3 reportes ocultan; reseñas anonimizadas (no borradas) al eliminar la cuenta; reservas y puntos fuera.
+- **Decisiones del revisor (Osmar Reséndiz, 2026-11-14), aceptadas tal como las proponía la spec:** un check-in válido por negocio y día; una reseña por negocio cada 30 días, consultada con `ix_mis_resenas`; no se guarda la ubicación del usuario; campo nuevo `calificacion_suma` en `negocios`, inicializado desde la semilla; 5 aspectos fijos; 3 reportes ocultan una reseña; al eliminar la cuenta las reseñas se anonimizan, no se borran; reservas y puntos quedan fuera.
+- **Drift corregido:** ver «Drift corregido contra el código (2026-11-14)» (moderación de nv-42 y cola de nv-43, fotos de nv-45, P-50 de nv-56, caché de nv-18, `qr_checkin` de nv-20, If-Match 400/409, sin `rate:resenas_ia`, estado `rechazada`, `ix_resenas_recientes`).
+- **Pruebas:** `tests/integration/resenas_test.go`, `tests/security/resenas_security_test.go`, `tests/database/indexes_test.go`, contrato `usuarios/exportacion_descargar_200` (`checkins` y `resenas`) y Unit `internal/resenas/reglas_test.go`.
 - **Detalle:** evidencia en `specs/nv-62/checklists/gates.md`.

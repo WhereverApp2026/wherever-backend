@@ -14,8 +14,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/chat"
-	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -30,6 +30,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -74,6 +75,9 @@ var expected = map[string][]string{
 	cupones.Collection:                  {"_id_", "ix_cupones_cerca", "ix_cupones_negocio", "ix_vencimiento"},
 	cupones.CarteraCollection:           {"_id_", "ux_cartera", "ix_cartera_filtros", "ux_codigo_canje", "ix_codigo_usado", "ix_canjes_negocio", "ix_cartera_vence"},
 	cupones.MetricasCollection:          {"_id_", "ux_cupon_dia"},
+	resenas.CheckinsCollection:          {"_id_", "ix_mis_checkins", "ix_checkins_negocio", "ix_por_resenar", "ux_checkin_dia"},
+	resenas.Collection:                  {"_id_", "ux_resena_checkin", "ix_resenas_utiles", "ix_resenas_estrellas", "ix_resenas_recientes", "ix_mis_resenas", "ix_resenas_texto", "ix_reportadas"},
+	resenas.UtilesCollection:            {"_id_", "ux_util", "ix_util_usuario"},
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 }
 
@@ -144,6 +148,9 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		errores.Collection:               {"ux_huella"},
 		cupones.CarteraCollection:        {"ux_cartera", "ux_codigo_canje"},
 		cupones.MetricasCollection:       {"ux_cupon_dia"},
+		resenas.CheckinsCollection:       {"ux_checkin_dia"},
+		resenas.Collection:               {"ux_resena_checkin"},
+		resenas.UtilesCollection:         {"ux_util"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

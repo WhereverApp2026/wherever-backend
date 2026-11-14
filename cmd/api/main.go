@@ -57,6 +57,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
@@ -231,7 +232,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, registry, log)
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
-	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, log)
+	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
+	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
 	registry.RegisterExporter(imagePrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
@@ -254,7 +256,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
-	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, bookings.cupones, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, moderacion: modSvc}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -269,8 +271,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
-		// El menú va antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
+		// El menú y las reseñas (nv-62) van antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
 		menu.NewHandler(merchant.menu, validator).WithActiveGuard(active),
+		resenas.NewHandler(reviews, validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
@@ -384,7 +387,8 @@ type iaDeps struct {
 }
 
 // buildGuardia arma Gemini detrás de ia.Guardia (tope, caché y límites de nv-27/nv-28), una
-// sola para el asistente y los títulos de cupones (nv-61): comparten tope y `rate:ia_usuario`.
+// sola para el asistente, los títulos de cupones (nv-61) y la moderación y respuestas de reseñas
+// (nv-62): comparten tope y `rate:ia_usuario`.
 // Sin GEMINI_API_KEY o IA_MODELO_ID devuelve nil.
 func buildGuardia(cfg config.IA, deps iaDeps, log *slog.Logger) (*ia.Guardia, error) {
 	if !cfg.Enabled() {
@@ -404,9 +408,10 @@ func buildGuardia(cfg config.IA, deps iaDeps, log *slog.Logger) (*ia.Guardia, er
 }
 
 // buildAsistente arma el asistente de planes (nv-31) con la guardia y la conecta a los títulos
-// de cupones (nv-61). Sin guardia la IA queda apagada: POST /planes/generar responde con el
-// motor de reglas (nv-33) y sugerir título, 503.
-func buildAsistente(cfg config.IA, deps iaDeps, coupons *cupones.Service, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, *semantica.Service, error) {
+// de cupones (nv-61) y a las reseñas (nv-62). Sin guardia la IA queda apagada: POST
+// /planes/generar responde con el motor de reglas (nv-33), sugerir título o respuesta, 503, y
+// los comentarios de reseñas quedan en revisión.
+func buildAsistente(cfg config.IA, deps iaDeps, clientes iaClientes, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, *semantica.Service, error) {
 	pesos, err := recomendador.PesosPorDefecto()
 	if err != nil {
 		return nil, nil, err
@@ -418,7 +423,7 @@ func buildAsistente(cfg config.IA, deps iaDeps, coupons *cupones.Service, fuente
 	var modelo ia.Modelo
 	if guardia != nil {
 		modelo = guardia
-		coupons.WithIA(guardia)
+		clientes.conectar(guardia, log)
 	}
 	sem, err := buildSemantica(cfg, deps.redis, deps.db, pesos, log)
 	if err != nil {

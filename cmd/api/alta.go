@@ -77,17 +77,17 @@ type panelParts struct {
 }
 
 // buildPanel arma el panel y el menú y registra la exportación de los negocios del dueño. Las
-// reservas (nv-59) alimentan su tarjeta y frenan la baja; los cupones (nv-61) dan la suya; las
-// reseñas llegan con nv-62 (mientras, su tarjeta sale en null).
+// reservas (nv-59) alimentan su tarjeta y frenan la baja; los cupones (nv-61) y las reseñas
+// (nv-62, P-50 y regla del Sello) dan las suyas.
 func buildPanel(db *mongodriver.Database, repo *negocios.Repository, fichas *negocios.Service, a altaParts, images *imagenes.Service,
-	notifier notificaciones.Notifier, registry *privacidad.Registry, res reservasParts, log *slog.Logger) panelParts {
+	notifier notificaciones.Notifier, registry *privacidad.Registry, res reservasParts, reviews negocios.FuenteResenas, log *slog.Logger) panelParts {
 	menuRepo := menu.NewRepository(db)
 	menuSvc := menu.NewService(menuRepo, repo, log)
 	if a.fotos != nil {
 		menuSvc.WithImagenes(a.fotos)
 	}
 	svc := panel.NewService(repo, menuRepo, a.exp, fichas, log).WithObservadores(res.observadores).WithNotifier(notifier).
-		WithFuentes(negocios.PanelFuente{Reservas: res.svc, Cupones: res.cupones}).WithReservasFuturas(res.svc)
+		WithFuentes(negocios.PanelFuente{Reservas: res.svc, Cupones: res.cupones, Resenas: reviews}).WithReservasFuturas(res.svc)
 	if images != nil {
 		svc.WithImagenes(images)
 	}
