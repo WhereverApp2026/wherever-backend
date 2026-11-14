@@ -381,7 +381,8 @@ func TestResenas_EditarBorrarYUtil(t *testing.T) {
 	resp = sendJSON(t, app, http.MethodDelete, path, nil, token)
 	requireStatus(t, resp, http.StatusNoContent)
 	assert.Empty(t, readAll(t, resp))
-	requireStatus(t, sendJSON(t, app, http.MethodDelete, path, nil, token), http.StatusNotFound)
+	// Idempotente (spec nv-62): repetir el borrado del autor vuelve a dar 204 y no descuenta dos veces.
+	requireStatus(t, sendJSON(t, app, http.MethodDelete, path, nil, token), http.StatusNoContent)
 	cal = calificacion(t, env, b.ID)
 	assert.Equal(t, 0, cal.TotalResenas)
 	assert.Equal(t, 0.0, cal.Promedio)
@@ -449,7 +450,15 @@ func TestResenas_RespuestaResumenYPanel(t *testing.T) {
 	resp = sendJSON(t, app, http.MethodGet, base+"resumen?periodo=mes", nil, duenoTok)
 	requireStatus(t, resp, http.StatusOK)
 	res := decode(t, resp)
-	assertSnakeCase(t, res)
+	// `distribucion` usa las estrellas 1..5 como llaves (contrato de docs/endpoints.md): son datos,
+	// no nombres de campo, así que se revisa el resto de la respuesta.
+	sinDistribucion := make(map[string]any, len(res))
+	for k, v := range res {
+		if k != "distribucion" {
+			sinDistribucion[k] = v
+		}
+	}
+	assertSnakeCase(t, sinDistribucion)
 	actual := obj(t, res["actual"])
 	assert.Equal(t, float64(1), actual["total"])
 	assert.Equal(t, 4.0, actual["promedio"])
