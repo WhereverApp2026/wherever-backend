@@ -599,26 +599,35 @@ func checkOpenHours(abre, cierra string) (bool, string) {
 	return true, ""
 }
 
+// validatePhotos acepta una fila sin fotos: la semilla puede cargar el negocio y las fotos
+// llegan después por el panel (nv-45, nv-56). Si trae alguna, deben ser de 3 a 10.
 func validatePhotos(photos []Foto, add func(string, string)) {
+	if len(photos) == 0 {
+		return
+	}
 	if len(photos) < MinPhotos || len(photos) > MaxPhotos {
 		add("fotos", fmt.Sprintf("deben ser de %d a %d URLs", MinPhotos, MaxPhotos))
 		return
 	}
 	orders := map[int]bool{}
 	for _, photo := range photos {
-		if !strings.HasPrefix(photo.URL, "https://") || len(photo.URL) > 500 {
-			add("fotos", "cada foto debe ser una URL https:// de hasta 500 caracteres")
-		}
-		switch photo.Tipo {
-		case "fachada", "interior", "producto":
-		default:
-			add("fotos", "el tipo debe ser fachada, interior o producto")
-		}
-		if photo.Orden < 1 || photo.Orden > len(photos) || orders[photo.Orden] {
-			add("fotos", "el orden debe ser único y estar entre 1 y el número de fotos")
-		}
-		orders[photo.Orden] = true
+		validatePhoto(photo, len(photos), orders, add)
 	}
+}
+
+func validatePhoto(photo Foto, total int, orders map[int]bool, add func(string, string)) {
+	if !strings.HasPrefix(photo.URL, "https://") || len(photo.URL) > 500 {
+		add("fotos", "cada foto debe ser una URL https:// de hasta 500 caracteres")
+	}
+	switch photo.Tipo {
+	case "fachada", "interior", "producto":
+	default:
+		add("fotos", "el tipo debe ser fachada, interior o producto")
+	}
+	if photo.Orden < 1 || photo.Orden > total || orders[photo.Orden] {
+		add("fotos", "el orden debe ser único y estar entre 1 y el número de fotos")
+	}
+	orders[photo.Orden] = true
 }
 
 func validateList(field string, values []string, max int, add func(string, string)) {

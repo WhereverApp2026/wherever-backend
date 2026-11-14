@@ -104,7 +104,6 @@ func (r *Repository) Upsert(ctx context.Context, b *Business) (bool, error) {
 		{Key: "telefono", Value: b.Phone},
 		{Key: "horarios", Value: b.Schedules},
 		{Key: "horario_min", Value: b.ScheduleMin},
-		{Key: "fotos", Value: b.Photos},
 		{Key: "servicios", Value: b.Services},
 		{Key: "accesibilidad", Value: b.Accessibility},
 		{Key: "opciones_dieta", Value: b.DietOptions},
@@ -115,6 +114,10 @@ func (r *Repository) Upsert(ctx context.Context, b *Business) (bool, error) {
 		{Key: "revision", Value: b.Revision},
 		{Key: "actualizado_en", Value: now},
 	}
+	// Una fila sin fotos no borra las que el negocio ya tenga (subidas después por el panel).
+	if len(b.Photos) > 0 {
+		set = append(set, bson.E{Key: "fotos", Value: b.Photos})
+	}
 	setOnInsert := bson.D{
 		{Key: "_id", Value: b.ID},
 		{Key: "qr_checkin", Value: b.QRCheckin},
@@ -124,6 +127,9 @@ func (r *Repository) Upsert(ctx context.Context, b *Business) (bool, error) {
 		{Key: "sello_excelencia", Value: false},
 		{Key: "verificado", Value: false},
 		{Key: "plan", Value: PlanFree},
+	}
+	if len(b.Photos) == 0 {
+		setOnInsert = append(setOnInsert, bson.E{Key: "fotos", Value: []Foto{}})
 	}
 	update := bson.D{
 		{Key: "$set", Value: set},
