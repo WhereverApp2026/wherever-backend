@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
@@ -63,6 +64,8 @@ var expected = map[string][]string{
 	expediente.AccesosCollection:        {"_id_", "ix_acceso_negocio", "ttl_acceso"},
 	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
 	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
+	reservas.Collection:                 {"_id_", "ux_codigo", "ix_mis_reservas", "ix_agenda_negocio", "ix_bloqueos", "ix_recordatorios"},
+	reservas.BloqueosCollection:         {"_id_", "ix_bloqueo_negocio"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 }
@@ -128,6 +131,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		notificaciones.DevicesCollection: {"ux_token_hash"},
 		vaca.ExpensesCollection:          {"ux_id_cliente"},
 		vaca.DebtsCollection:             {"ux_deuda_corte"},
+		reservas.Collection:              {"ux_codigo"},
 		errores.Collection:               {"ux_huella"},
 	} {
 		got := specs(t, db, collection)

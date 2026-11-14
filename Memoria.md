@@ -579,7 +579,7 @@
 - Olas nuevas (2026-11-13, Osmar Reséndiz) para las specs que no entraban en las 7, ordenadas por dependencias:
   - Ola 8, sin bloqueos (ya tienen lo que necesitan en `main`): nv-54 (favoritos), nv-58 (La Vaca), nv-64 (errores de la app y código de amigo), nv-57 (chat de grupo). Corre en paralelo con la ola 6.
   - Ola 9, negocios aliados (hoja A5): escribir y ejecutar nv-55 (alta por pasos, INE, datos fiscales, CLABE, revisión del admin) → nv-56 (panel del negocio). Es la que más bloquea: de ella dependen nv-59, 60, 61 y 62. Escribir las specs puede ir en paralelo con las olas 6 y 8. **Specs escritas (2026-11-13, Borrador sin firma).** nv-55 en `main` (PR #88); nv-56 implementada (2026-11-13, PR contra `main`, E1–E9 aplicadas sin firma).
-  - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45).
+  - Ola 10, después de las olas 6 y 9: nv-59 → 60 (reservas y Stripe), nv-61 (cupones, necesita nv-56), nv-62 (check-in y reseñas, necesita nv-56 y la ola 6 completa) y nv-63 (postales, necesita nv-42, 43 y 45). **nv-59 implementada (2026-11-13, PR contra `main`, sin firma); sigue nv-60.**
   - Si el tiempo no alcanza el 2 de diciembre, lo que quede es de la ola 10.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54`, `origin/nv-64` y `claude/nv-58-vaca` (solo local; nv-58 ya se trajo a `main` en su PR). Traerles `main` antes de seguir.
 - WIP sin fusionar, salidos de una base vieja (nv-37): `origin/nv-54` y `claude/nv-58-vaca` (solo local); `origin/nv-64` ya trae `main` (2026-11-13). Traerles `main` antes de seguir.
@@ -686,6 +686,15 @@
 - Decisión: borrar la cuenta conserva gastos y deudas (son del grupo); el nombre sale «Cuenta eliminada» porque se resuelve en cada respuesta. Exporta `gastos` y `deudas_vaca` sin ids de los demás.
 - Operador: nada. Sin variables ni Terraform; los índices los crea `/indexes` al instalar la imagen.
 - A evitar: escribir `?query` dentro de la ruta en `docs/endpoints.md` (`check_endpoints` la toma como parte del path). Correr Unit fuera de Docker: Control de aplicaciones bloquea los `.test.exe`.
+
+## nv-59 — Reservas y disponibilidad (2026-11-13)
+- Estado: paquete `internal/reservas` (disponibilidad y reembolso puros, código, candado e idempotencia en `redis.go`, service, handler, barrido, panel, ARCO), colecciones `reservas` y `bloqueos_horario`, 12 rutas y política `reservas` (10/h por usuario). Local: build, vet, Unit, `golangci-lint` v2.15.0, critic, `check_sdd`, `check_endpoints`; además, en Docker con el socket, Integration y Security de reservas, Database y Contract completas en verde. El resto de las suites en el CI.
+- Decisión: el anticipo va detrás de `reservas.Anticipos` (`Habilitado`) y el reembolso de `reservas.Refunder`; nv-60 los conecta con `WithAnticipos`/`WithRefunder` y confirma el pago con `Service.ConfirmarPago(id, pago_id)`. Porqué: nv-59 no depende de Stripe y sin puerto el anticipo > 0 da 422 `anticipo_no_disponible`.
+- Decisión: idempotencia con `SET NX` (y `GET` solo al repetir) en vez de `SET NX GET`. Porqué: Redis 6 y Upstash no aceptan NX con GET. El candado `lock:reserva:{negocio}:{hora unix}` solo cuenta e inserta; el apartado de 10 min vive en Mongo.
+- Decisión: la agenda resuelve nombres al responder y filtra `q` en memoria (tope 500 por día). Porqué: no se copia el nombre a la reserva y la cuenta borrada sale «Cuenta eliminada» sin reescribir.
+- Decisión: `observadores` dejó de ser variable global de `cmd/api/alta.go`; ahora sale de `buildReservas` (`cmd/api/reservas.go`) y se pasa a `buildAlta` y `buildPanel`. Porqué: el slice se copiaba al armar y lo que se agregara después no llegaba. nv-61 agrega su observador ahí.
+- Operador: nada. Sin variables; `ux_codigo`, `ix_mis_reservas`, `ix_agenda_negocio`, `ix_bloqueos`, `ix_recordatorios` e `ix_bloqueo_negocio` los crea `/indexes` al instalar la imagen.
+- A evitar: INFO commandstats cuenta los comandos de dentro de un script (`EVALSHA` + su `GET` y `DEL` = 3); Upstash cobra el `EVALSHA` como 1. Una `|` dentro de una celda de `docs/endpoints.md` parte la tabla: escribir "o". Las suites con contenedor sí corren en Windows con `docker run --network host -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_RYUK_DISABLED=true` (útil para no esperar al CI).
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

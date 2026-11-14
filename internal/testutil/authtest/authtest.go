@@ -50,6 +50,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
@@ -86,6 +87,7 @@ type Env struct {
 	Panel           *panel.Service         // panel del negocio (nv-56); las pruebas registran fuentes y observadores
 	Menu            *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
 	PanelTarea      *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
+	Reservas        *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
 	Planes          *planes.Service
 	Votaciones      *votaciones.Service
 	Chat            *chat.Service
@@ -235,6 +237,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 		panels.WithImagenes(images.Service)
 	}
 	registry.RegisterExporter(panel.NewPrivacy(businessRepo, menuRepo))
+	bookingRepo := reservas.NewRepository(client.DB())
+	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log)
+	registry.RegisterPurger(reservas.NewPrivacy(bookingRepo))
+	registry.RegisterExporter(reservas.NewPrivacy(bookingRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -257,7 +263,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels),
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -272,6 +278,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			negocios.NewHandler(businesses, v),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
+			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos
