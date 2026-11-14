@@ -34,6 +34,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
@@ -56,7 +57,7 @@ func main() {
 		panic(err)
 	}
 	// Los módulos se registran sin service: aquí solo importan sus rutas, nunca se atienden.
-	modules := []httpapi.Module{auth.NewHandler(nil, nil), account.NewHandler(nil, nil), ciudades.NewHandler(nil, nil), configuracion.NewHandler(nil), semantica.NewHandler(nil, nil), busquedas.NewHandler(nil, nil), negocios.NewHandler(nil, nil), alta.NewHandler(nil, nil), moderacion.NewHandler(nil, nil), votaciones.NewHandler(nil, nil), grupos.NewHandler(nil, nil), favoritos.NewHandler(nil, nil), planes.NewHandler(nil, nil), asistente.NewHandler(nil, nil), recomendaciones.NewHandler(nil, nil), clima.NewHandler(nil, nil, nil), inicio.NewHandler(nil, nil), notificaciones.NewHandler(nil, nil), sincronizacion.NewHandler(nil, nil), personas.NewHandler(nil), sugerencias.NewHandler(nil), amistades.NewHandler(nil, nil), chat.NewHandler(nil, nil), errores.NewHandler(nil, nil), vaca.NewHandler(nil, nil), imagenes.NewHandler(nil, nil), menu.NewHandler(nil, nil), panel.NewHandler(nil, nil)}
+	modules := []httpapi.Module{auth.NewHandler(nil, nil), account.NewHandler(nil, nil), ciudades.NewHandler(nil, nil), configuracion.NewHandler(nil), semantica.NewHandler(nil, nil), busquedas.NewHandler(nil, nil), negocios.NewHandler(nil, nil), alta.NewHandler(nil, nil), moderacion.NewHandler(nil, nil), votaciones.NewHandler(nil, nil), grupos.NewHandler(nil, nil), favoritos.NewHandler(nil, nil), planes.NewHandler(nil, nil), asistente.NewHandler(nil, nil), recomendaciones.NewHandler(nil, nil), clima.NewHandler(nil, nil, nil), inicio.NewHandler(nil, nil), notificaciones.NewHandler(nil, nil), sincronizacion.NewHandler(nil, nil), personas.NewHandler(nil), sugerencias.NewHandler(nil), amistades.NewHandler(nil, nil), chat.NewHandler(nil, nil), errores.NewHandler(nil, nil), vaca.NewHandler(nil, nil), imagenes.NewHandler(nil, nil), menu.NewHandler(nil, nil), panel.NewHandler(nil, nil), reservas.NewHandler(nil, nil)}
 	app := httpapi.NewApp(cfg, httpapi.Deps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Redis: rdb, Modules: modules})
 
 	var lines []string

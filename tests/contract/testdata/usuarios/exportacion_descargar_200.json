@@ -22,6 +22,7 @@
       "dispositivos": []
     },
     "planes": [],
+    "reservas": [],
     "sesiones": [
       {
         "creado_en": "string",

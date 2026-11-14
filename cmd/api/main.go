@@ -55,6 +55,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
@@ -128,6 +129,7 @@ func run() error {
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
 	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, cfg.DataKeys, log)
+	waitBookings := startReservas(ctx, mongoClient.DB(), log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -143,6 +145,7 @@ func run() error {
 	stop()
 	waitGraph()
 	waitVotes()
+	waitBookings()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -222,8 +225,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
-	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, log)
-	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, log)
+	bookings := buildReservas(db, businessRepo, users, redisClient, cursor, registry, log)
+	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
+	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, log)
 	registry.RegisterExporter(imagePrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
@@ -266,6 +270,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
+		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
 		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),

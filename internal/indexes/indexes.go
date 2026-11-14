@@ -24,6 +24,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
@@ -33,7 +34,7 @@ import (
 // All son los índices de todos los módulos; cada módulo nuevo agrega aquí los suyos.
 func All() []mongo.IndexSet {
 	var all []mongo.IndexSet
-	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), usuarios.ConsentIndexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), expediente.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), busquedas.Indexes(), amistades.Indexes(), grupos.Indexes(), favoritos.Indexes(), votaciones.Indexes(), moderacion.Indexes(), notificaciones.Indexes(), sincronizacion.Indexes(), sincronizacion.ActionIndexes(), grafo.Indexes(), chat.Indexes(), errores.Indexes(), vaca.Indexes(), imagenes.Indexes(), menu.Indexes()} {
+	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), usuarios.ConsentIndexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), expediente.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), busquedas.Indexes(), amistades.Indexes(), grupos.Indexes(), favoritos.Indexes(), votaciones.Indexes(), moderacion.Indexes(), notificaciones.Indexes(), sincronizacion.Indexes(), sincronizacion.ActionIndexes(), grafo.Indexes(), chat.Indexes(), errores.Indexes(), vaca.Indexes(), reservas.Indexes(), imagenes.Indexes(), menu.Indexes()} {
 		all = append(all, sets...)
 	}
 	return all

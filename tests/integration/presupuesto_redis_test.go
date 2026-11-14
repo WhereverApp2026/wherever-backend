@@ -12,6 +12,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/reservastest"
 )
 
 // Lo que el plan gratuito de Upstash no cobra (nv-11).
@@ -134,4 +135,43 @@ func TestPresupuestoRedis_VentanasPorUsuarioNV64(t *testing.T) {
 		resp := sendJSON(t, app, http.MethodPost, "/api/v1/errores", map[string]string{"modulo": "pagos", "mensaje": "falló", "version": "1.4.0"}, access)
 		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
 	}), "POST /errores: escritura autenticada + ventana")
+}
+
+// nv-59: POST /reservas cuesta una escritura autenticada, la ventana `reservas` y 4 comandos
+// propios que cobra Upstash (idempotencia SET NX + SET XX, candado SET NX + EVALSHA). INFO
+// commandstats cuenta además el GET y el DEL de dentro del script (Upstash cobra EVALSHA como
+// uno), así que aquí se miden 6. Repetir la misma llave cuesta SET NX + GET y no toma el candado.
+func TestPresupuestoRedis_ReservaNV59(t *testing.T) {
+	env := authEnv(t)
+	env.ClearRateLimits(t)
+	app := env.App()
+	access := registerHTTP(t, app, "presupuesto59@example.com")
+	b, _ := dueno(t, env, "presupuesto59-duena@example.com", reservastest.Config{Capacidad: 20})
+	_, token := cliente(t, env, "presupuesto59-cliente@example.com")
+
+	read := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, access).StatusCode)
+	})
+	write := commandsOf(t, func() {
+		resp := sendJSON(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"datos_sensibles": false}, access)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+	window := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/personas/buscar?q=nadie", nil, access).StatusCode)
+	}) - read
+	// Primera reserva: carga el script de liberar el candado (EVALSHA falla y va EVAL).
+	requireStatus(t, reservar(t, app, token, llave(900), cuerpoReserva(b, reservastest.Manana(9), 1)), http.StatusCreated)
+
+	nueva := commandsOf(t, func() {
+		requireStatus(t, reservar(t, app, token, llave(901), cuerpoReserva(b, reservastest.Manana(10), 1)), http.StatusCreated)
+	})
+	repetida := commandsOf(t, func() {
+		requireStatus(t, reservar(t, app, token, llave(901), cuerpoReserva(b, reservastest.Manana(10), 1)), http.StatusOK)
+	})
+	t.Logf("POST /reservas: %d comandos; repetida: %d", nueva, repetida)
+	assert.Equal(t, write+window+6, nueva, "escritura + ventana + idempotencia (2) + candado (SET NX + EVALSHA con su GET y DEL)")
+	assert.Equal(t, write+window+2, repetida, "escritura + ventana + SET NX + GET")
+	assert.Equal(t, 3, commandsOf(t, func() {
+		get(t, app, "/api/v1/lugares/"+b.ID.Hex()+"/disponibilidad?fecha="+reservastest.FechaManana()+"&personas=1")
+	}), "disponibilidad: solo el limitador global")
 }
