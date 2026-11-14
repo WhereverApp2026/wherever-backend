@@ -63,7 +63,8 @@ func Pipeline(cfg config.Config, deps Deps, limiter *middleware.Limiter) []Stage
 		stage("cors", middleware.CORS(cfg.CORSAllowedOrigin)),
 		stage("compress", middleware.Compress()),
 		stage("rate_limit_global", exceptPath(healthPath, limiter.Window(middleware.PolicyGlobal, cfg.RateLimitGlobal, globalWindow))),
-		stage("rate_limit_writes", limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites)),
+		// El webhook de Stripe (nv-60) llega de pocas IP de Stripe: solo cuenta en el límite global.
+		stage("rate_limit_writes", exceptPath(middleware.StripeWebhookPath, limiter.Concurrent(middleware.PolicyWrites, cfg.RateLimitWrites))),
 		stage("version", middleware.Version(versionado.NuevaPolitica(cfg.VersionApp.Minima, cfg.VersionApp.Mantenimiento))),
 		stage("jwt", middleware.JWT(jwtCfg, deps.Redis)),
 	}

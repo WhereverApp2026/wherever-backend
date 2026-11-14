@@ -668,21 +668,88 @@ func (s *Service) Cancelar(ctx context.Context, cl *middleware.Claims, raw strin
 	return s.response(ctx, out, porNegocio), nil
 }
 
+// ErrCupoPerdido: el pago llegó después de vencer el apartado y el cupo ya no está; la reserva
+// queda `cancelada` con motivo `cupo_perdido` y nv-60 reembolsa completo.
+var ErrCupoPerdido = errors.New("cupo perdido")
+
+// MotivoCupoPerdido es el `motivo_cancelacion` de un pago tardío sin cupo.
+const MotivoCupoPerdido = "cupo_perdido"
+
 // ConfirmarPago es lo que llama nv-60 cuando Stripe confirma el anticipo: `bloqueada` →
-// `confirmada` (o `pendiente` si el negocio confirma a mano).
+// `confirmada` (o `pendiente` si el negocio confirma a mano). Si el apartado ya venció (pago
+// tardío), confirma solo si el cupo sigue libre; si no, ErrCupoPerdido. Otro estado = ErrNoAplica.
 func (s *Service) ConfirmarPago(ctx context.Context, id bson.ObjectID, pagoID string) (Reserva, error) {
 	r, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return Reserva{}, err
 	}
-	estado := EstadoConfirmada
-	if b, err := s.negocios.FindByID(ctx, r.NegocioID); err == nil {
-		if cfg, ok := config(b); ok && cfg.Confirmacion == "manual" {
-			estado = EstadoPendiente
-		}
+	b, errNegocio := s.negocios.FindByID(ctx, r.NegocioID)
+	cfg, acepta := config(b)
+	estado := estadoPagado(errNegocio == nil && acepta, cfg)
+	now := s.now().UTC()
+	set := bson.D{{Key: "estado", Value: estado}, {Key: "pago_id", Value: pagoID}}
+	cambio := &Cambio{Estado: estado, Fecha: now, Por: PorSistema}
+	if r.Estado == EstadoBloqueada && r.Ocupa(now) {
+		return s.repo.CambiarSi(ctx, id, []string{EstadoBloqueada}, 0, set, cambio, "bloqueo_expira_en")
 	}
-	return s.repo.CambiarSi(ctx, id, []string{EstadoBloqueada}, 0, bson.D{{Key: "estado", Value: estado}, {Key: "pago_id", Value: pagoID}},
-		&Cambio{Estado: estado, Fecha: s.now().UTC(), Por: PorSistema}, "bloqueo_expira_en")
+	if r.Estado != EstadoBloqueada && r.Estado != EstadoExpirada {
+		return Reserva{}, ErrNoAplica
+	}
+	out, err := s.confirmarTardio(ctx, r, cfg, errCupo(errNegocio, acepta), set, cambio, now)
+	if err == nil || !cupoPerdido(err) {
+		return out, err
+	}
+	return s.perderCupo(ctx, id, pagoID, now)
+}
+
+// estadoPagado: `pendiente` si el negocio confirma a mano; si no, `confirmada`.
+func estadoPagado(conConfig bool, cfg negocios.ReservasConfig) string {
+	if conConfig && cfg.Confirmacion == "manual" {
+		return EstadoPendiente
+	}
+	return EstadoConfirmada
+}
+
+// perderCupo cancela la reserva pagada tarde sin cupo y devuelve ErrCupoPerdido.
+func (s *Service) perderCupo(ctx context.Context, id bson.ObjectID, pagoID string, now time.Time) (Reserva, error) {
+	perdida := bson.D{{Key: "estado", Value: EstadoCancelada}, {Key: "pago_id", Value: pagoID}, {Key: "motivo_cancelacion", Value: MotivoCupoPerdido}}
+	out, err := s.repo.CambiarSi(ctx, id, []string{EstadoBloqueada, EstadoExpirada}, 0, perdida,
+		&Cambio{Estado: EstadoCancelada, Fecha: now, Por: PorSistema}, "bloqueo_expira_en")
+	if err != nil {
+		return Reserva{}, err
+	}
+	return out, ErrCupoPerdido
+}
+
+// confirmarTardio confirma un pago que llegó con el apartado vencido si el cupo sigue libre.
+func (s *Service) confirmarTardio(ctx context.Context, r Reserva, cfg negocios.ReservasConfig, previo error, set bson.D, cambio *Cambio, now time.Time) (Reserva, error) {
+	if previo != nil {
+		return Reserva{}, previo
+	}
+	var out Reserva
+	err := s.conCupo(ctx, r.NegocioID, r.FechaHora, cfg.DuracionTurnoMin, &r.ID, func(ocupadas int) error {
+		if !r.FechaHora.After(now) || cfg.CapacidadPorHorario-ocupadas < r.Personas {
+			return ErrCupoPerdido
+		}
+		var errCambio error
+		out, errCambio = s.repo.CambiarSi(ctx, r.ID, []string{EstadoBloqueada, EstadoExpirada}, 0, set, cambio, "bloqueo_expira_en")
+		return errCambio
+	})
+	return out, err
+}
+
+// cupoPerdido: sin cupo, horario bloqueado u ocupado (409 del candado).
+func cupoPerdido(err error) bool {
+	var ae *apperr.Error
+	return errors.Is(err, ErrCupoPerdido) || (errors.As(err, &ae) && ae.Kind == apperr.KindConflict)
+}
+
+// errCupo: sin negocio o sin reservas ya no hay cupo que recuperar.
+func errCupo(errNegocio error, acepta bool) error {
+	if errNegocio != nil || !acepta {
+		return ErrCupoPerdido
+	}
+	return nil
 }
 
 // --- Negocio ---

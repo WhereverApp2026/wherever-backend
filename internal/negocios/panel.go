@@ -56,9 +56,18 @@ type Sello struct {
 	Motivo      string        `bson:"motivo"`
 }
 
-// Cobros es el estado de la cuenta de cobro; lo escribe nv-60.
+// Estados de `cobros.estado` (nv-60).
+const (
+	CobrosPendiente   = "pendiente"
+	CobrosRestringido = "restringido"
+)
+
+// Cobros es la cuenta de Stripe Connect del negocio; la escribe nv-60. `ComisionPct` es lo que
+// Wherever retiene de cada anticipo.
 type Cobros struct {
-	Estado string `bson:"estado"`
+	StripeAccountID string `bson:"stripe_account_id,omitempty"`
+	Estado          string `bson:"estado"`
+	ComisionPct     int    `bson:"comision_pct,omitempty"`
 }
 
 // Avisos que reciben los observadores. Si uno falla, el evento queda en `avisos_pendientes`

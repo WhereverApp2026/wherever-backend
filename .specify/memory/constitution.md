@@ -1,7 +1,7 @@
 ---
-version: 1.7.0
+version: 1.8.0
 ratified: 2026-10-28
-last_amended: 2026-11-12
+last_amended: 2026-11-14
 status: borrador (pendiente de firma del revisor)
 source_of_truth: .specify/memory/constitution.md
 mirror: ./constitution.md
@@ -47,6 +47,7 @@ methodology: SDD
 | SAST | Semgrep + `gosec` + `golangci-lint` + `govulncheck` |
 | CI | GitHub Actions: `ci-pr.yml` sin deploy; `cd-dev.yml` publica la imagen y el entorno de desarrollo se actualiza solo (nv-08); `ci-pr.yml` incluye análisis estático, de imagen y gate, y `nightly.yml` incluye DAST (nv-09); producción sin CD |
 | Infra de desarrollo | Docker Compose (`deployments/docker-compose.yml`: MongoDB, Redis, Neo4j) con `make infra-up`/`infra-down`; el servidor de desarrollo usa servicios gestionados: Atlas, Upstash y Aura (nv-11), envía sus logs a CloudWatch (nv-13), se crea y elimina con scripts versionados (nv-14) y corre dos instancias detrás de balanceador y CloudFront, con el certificado de CloudFront (nv-12); `Dockerfile` multi-etapa en la raíz |
+| Pagos | Stripe (`stripe-go`): PaymentIntents con PaymentSheet en la app y Connect Express para depósitos; el backend nunca recibe datos de tarjeta; llaves en Parameter Store; en pruebas, un doble de la API de Stripe (interfaz externa) |
 | Infra (posterior) | Docker, Terraform, AWS (ALB con SSL, ≥2 instancias en zonas distintas, S3 + CDN, Secrets Manager) |
 
 No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla de excepción en `nv-00`.
@@ -127,3 +128,4 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 | 1.5.0 | 2026-11-06 | Compresión en el pipeline, sin comprimir lo que lleva tokens (nv-12) |
 | 1.6.0 | 2026-11-06 | Dos instancias detrás de balanceador y CloudFront en desarrollo, con HTTPS del certificado de CloudFront (nv-12) |
 | 1.7.0 | 2026-11-12 | Etapa `version` entre los límites y JWT, solo sobre `/api/v1/`; códigos `426` y `304` (ETag débil); lista del pipeline igual al código, con `request_timeout` (nv-16) |
+| 1.8.0 | 2026-11-14 | Stripe entra al stack para el anticipo de reservas y los depósitos a negocios (nv-60); aprobada por Osmar Reséndiz |

@@ -230,3 +230,26 @@ func TestLoad_Imagenes(t *testing.T) {
 	_, err = config.Load(testutil.Env(prodMail(map[string]string{config.KeyImagenesBucket: "", config.KeyImagenesURL: ""})))
 	assert.ErrorContains(t, err, config.KeyImagenesBucket, "obligatorias en prod")
 }
+
+func TestLoad_Stripe(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+	require.NoError(t, err, "sin llaves la API arranca")
+	assert.False(t, cfg.Stripe.Enabled())
+
+	prueba, live := "sk_"+"test_prueba", "sk_"+"live_prueba"
+	cfg, err = config.Load(testutil.Env(map[string]string{config.KeyStripeSecretKey: prueba, config.KeyStripeWebhook: "whsec_prueba", config.KeyStripeAPIURL: "http://127.0.0.1:1/"}))
+	require.NoError(t, err)
+	assert.True(t, cfg.Stripe.Enabled())
+	assert.Equal(t, "http://127.0.0.1:1", cfg.Stripe.APIURL)
+
+	for name, env := range map[string]map[string]string{
+		"live en dev":        {config.KeyStripeSecretKey: live},
+		"restringida en dev": {config.KeyStripeSecretKey: "rk_" + "live_prueba"},
+		"live en staging":    {config.KeyAppEnv: config.EnvStaging, config.KeyStripeSecretKey: live},
+		"prueba en prod":     prodMail(map[string]string{config.KeyStripeSecretKey: prueba}),
+		"url del doble prod": prodMail(map[string]string{config.KeyStripeAPIURL: "http://127.0.0.1:1"}),
+	} {
+		_, err := config.Load(testutil.Env(env))
+		assert.Error(t, err, name)
+	}
+}

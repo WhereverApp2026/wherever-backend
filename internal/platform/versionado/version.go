@@ -84,8 +84,9 @@ func NuevaPolitica(minima Version, mantenimiento bool) Politica {
 	return Politica{
 		Minima:        minima,
 		Mantenimiento: mantenimiento,
-		exactas:       map[string]bool{"/api/v1/ping": true, "/api/v1/configuracion": true},
-		prefijos:      []string{"/api/v1/auth/"},
+		// Stripe no manda X-App-Version: su webhook (nv-60) nunca recibe 426 ni mantenimiento.
+		exactas:  map[string]bool{"/api/v1/ping": true, "/api/v1/configuracion": true, "/api/v1/webhooks/stripe": true},
+		prefijos: []string{"/api/v1/auth/"},
 	}
 }
 

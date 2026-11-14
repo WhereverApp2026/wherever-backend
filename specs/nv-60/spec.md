@@ -83,8 +83,19 @@ Cobra el anticipo de una reserva con Stripe, confirma la reserva cuando Stripe a
 - Sin claves de Stripe en GitHub: el CI usa solo el doble.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-12), ola por decidir; requiere nv-59 y nv-55 en `main`, la enmienda de §3 y el aviso de privacidad de pagos en `main`
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
+- **Estado:** 🚧 Borrador con evidencia (2026-11-14), implementada en la rama de nv-60; sin firma.
+- **Revisores:** Osmar Reséndiz (decisiones tomadas el 2026-11-14; firma pendiente)
 - **Fecha:** —
-- **Decisiones para el revisor antes de ejecutar:** aprobar la enmienda de §3 (Stripe y `stripe-go`); Stripe Connect Express con cobro en Wherever y transferencia semanal (confirmar con Stripe México que Connect Express y transferencias están disponibles para la cuenta); cobros, cuenta de depósito, saldo y liquidaciones en nv-60 y no en nv-55; `comision_pct` inicial; pago tardío con cupo perdido = reembolso completo; reembolso con `reverse_transfer` y comisión proporcional; borrado de pagos por TTL a los 5 años.
-- **Detalle:** la evidencia irá en `specs/nv-60/checklists/gates.md` + `Memoria.md`.
+- **Decisiones del revisor (2026-11-14):**
+  1. Se aprueba la enmienda de la constitución §3, versión 1.8.0, con la fila de Stripe (`stripe-go`); aplicada en `.specify/memory/constitution.md` (el espejo `constitution.md` solo enlaza).
+  2. Stripe Connect Express con transferencia semanal: Wherever cobra el anticipo y cada lunes transfiere a cada negocio lo suyo menos la comisión. Confirmar con Stripe México que la cuenta real lo permite queda pendiente del operador; en modo de prueba está completo.
+  3. `comision_pct` inicial = 10 %, configurable por negocio (`negocios.cobros.comision_pct`).
+  4. Se aceptan como estaban: cobros, cuenta de depósito, saldo y liquidaciones en nv-60 (no en nv-55); pago tardío con el cupo perdido = reembolso completo; comisión proporcional al reembolso; pagos y liquidaciones borrados por TTL a los 5 años.
+- **Ajustes al implementar:**
+  - `PUT /negocios/{id}/cuenta-deposito` ya existía en nv-55: no se duplica. nv-60 se conecta por `alta.Deposito`: si el negocio ya tiene cuenta de Connect, la CLABE se registra en Stripe y la cuenta pasa a `registrada`; si no, queda `sin_verificar` y se registra al conectar (`POST …/cobros/conectar` lee la CLABE cifrada del expediente). Sin 409 nuevo. La copia cifrada del expediente sigue en nv-55.
+  - Sin `reverse_transfer`: con cargos y transferencias separados ese parámetro no aplica, y solo se cancela una reserva futura, así que el reembolso siempre ocurre antes del corte que la transferiría. El reembolso se anota al pedirlo para que el corte no lo pague; `charge.refunded` lo concilia.
+  - Un pago `rechazado` se reintenta con el mismo PaymentIntent (no se crea otro intento).
+  - El `client_secret` no se guarda: se lee de Stripe al reutilizar el cobro.
+  - El corte corre como tarea del trabajo nocturno (dentro de su candado), solo los lunes; no gasta comandos propios de Redis. Incluye los pagos `aprobado` o `reembolsado_parcial` con la reserva en la semana anterior, sin importar si terminó en `asistio`, `no_asistio` o `cancelada` con reembolso parcial (lo no devuelto es del negocio).
+  - Webhook: `payment_intent.processing` también se aplica (`procesando`).
+- **Detalle:** evidencia en `specs/nv-60/checklists/gates.md` + `Memoria.md`.

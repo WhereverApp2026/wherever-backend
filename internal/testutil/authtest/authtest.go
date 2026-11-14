@@ -40,6 +40,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
@@ -61,6 +62,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/imagenestest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/negociostest"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/stripetest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
@@ -88,6 +90,8 @@ type Env struct {
 	Menu            *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
 	PanelTarea      *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
 	Reservas        *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
+	Pagos           *pagos.Service         // pagos (nv-60) contra el doble de Stripe
+	Stripe          *stripetest.Server     // doble de la API de Stripe (única interfaz externa simulada)
 	Planes          *planes.Service
 	Votaciones      *votaciones.Service
 	Chat            *chat.Service
@@ -241,6 +245,14 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log)
 	registry.RegisterPurger(reservas.NewPrivacy(bookingRepo))
 	registry.RegisterExporter(reservas.NewPrivacy(bookingRepo))
+	stripeDoble := stripetest.New(t)
+	payRepo := pagos.NewRepository(client.DB())
+	pays := pagos.NewService(payRepo, pagos.NewClient(stripetest.SecretKey, stripeDoble.URL), pagos.NewRedis(rdb), pagos.ReservasDe(bookingRepo, bookings),
+		businessRepo, cursor, pagos.Config{WebhookSecret: stripetest.WebhookSecret, LinkBase: cfg.Mail.LinkBase}, log).WithCLABEs(pagos.CLABEsDe(exp))
+	bookings.WithAnticipos(pays).WithRefunder(pays)
+	altaSvc.WithDeposito(pays)
+	registry.RegisterExporter(pagos.NewPrivacy(payRepo))
+	registry.RegisterExporter(pagos.NewLiquidacionesPrivacy(payRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -263,7 +275,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -279,6 +291,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
 			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
+			pagos.NewHandler(pays, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos

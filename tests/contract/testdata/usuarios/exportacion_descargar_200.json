@@ -10,6 +10,7 @@
     "gastos": [],
     "grupos": [],
     "imagenes": [],
+    "liquidaciones": [],
     "mensajes": {
       "mensajes": [],
       "reacciones": []
@@ -21,6 +22,7 @@
       "avisos": [],
       "dispositivos": []
     },
+    "pagos": [],
     "planes": [],
     "reservas": [],
     "sesiones": [
