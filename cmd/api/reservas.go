@@ -7,6 +7,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
@@ -16,11 +17,12 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
-// reservasParts son las reservas (nv-59) y los pagos (nv-60) armados y los observadores de pausa
-// y baja del negocio (nv-56): hoy solo reservas; cupones (nv-61) se agrega aquí.
+// reservasParts son las reservas (nv-59), los pagos (nv-60) y los cupones (nv-61) armados y los
+// observadores de pausa y baja del negocio (nv-56): reservas y cupones.
 type reservasParts struct {
 	svc          *reservas.Service
 	pagos        *pagos.Service
+	cupones      *cupones.Service
 	observadores negocios.Observadores
 }
 
@@ -47,7 +49,14 @@ func buildReservas(cfg config.Config, db *mongodriver.Database, places *negocios
 	svc.WithAnticipos(pay).WithRefunder(pay)
 	registry.RegisterExporter(pagos.NewPrivacy(payRepo))
 	registry.RegisterExporter(pagos.NewLiquidacionesPrivacy(payRepo))
-	return reservasParts{svc: svc, pagos: pay, observadores: negocios.Observadores{reservas.NewObservador(svc)}}
+
+	couponRepo := cupones.NewRepository(db)
+	coupons := cupones.NewService(couponRepo, places, cursor, log)
+	couponPrivacy := cupones.NewPrivacy(couponRepo)
+	registry.RegisterPurger(couponPrivacy)
+	registry.RegisterExporter(couponPrivacy)
+	return reservasParts{svc: svc, pagos: pay, cupones: coupons,
+		observadores: negocios.Observadores{reservas.NewObservador(svc), cupones.NewObservador(coupons)}}
 }
 
 // startReservas corre el barrido cada 5 minutos (apartados vencidos y `no_asistio`) en cada
@@ -58,6 +67,19 @@ func startReservas(ctx context.Context, db *mongodriver.Database, log *slog.Logg
 	done := make(chan struct{})
 	go func() {
 		barrido.Run(ctx)
+		close(done)
+	}()
+	return func() { <-done }
+}
+
+// startCupones corre el trabajo de cupones cada 5 minutos (activa, vence y recalcula
+// `cupones_activos`) en cada instancia; solo usa MongoDB.
+func startCupones(ctx context.Context, db *mongodriver.Database, log *slog.Logger) func() {
+	svc := cupones.NewService(cupones.NewRepository(db), negocios.NewRepository(db), nil, log)
+	trabajo := cupones.NewTrabajo(svc, log)
+	done := make(chan struct{})
+	go func() {
+		trabajo.Run(ctx)
 		close(done)
 	}()
 	return func() { <-done }

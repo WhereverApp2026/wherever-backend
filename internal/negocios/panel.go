@@ -224,3 +224,10 @@ func (r *Repository) findLimit(ctx context.Context, filter bson.D, limit int64) 
 	out := []Business{}
 	return out, cur.All(ctx, &out)
 }
+
+// FijarCuponesActivos escribe el conteo de cupones vigentes (nv-61) con `$set`; no sube
+// `version` porque no es un cambio del dueño.
+func (r *Repository) FijarCuponesActivos(ctx context.Context, id bson.ObjectID, n int64) error {
+	_, err := r.col.UpdateOne(ctx, bson.D{{Key: "_id", Value: id}}, bson.D{{Key: "$set", Value: bson.D{{Key: "cupones_activos", Value: n}}}})
+	return err
+}

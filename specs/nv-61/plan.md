@@ -1,8 +1,8 @@
 # plan.md — NV-61 Cupones
 
 1. Mapeo
-- Crear: `internal/cupones` (modelo, repositorio, service, handler, DTO, `Privacy`, trabajo de vencimiento), `internal/testutil/cuponestest`, pruebas de las cinco suites.
-- Modificar: `internal/indexes.All()`, rutas en `internal/http`, gancho de pausa en el service de `internal/negocios`, registro de `Purger`/`Exporter`, `docs/endpoints.md` y `docs/rate-limit-matrix.md` (al programar).
+- Crear: `internal/cupones` (modelo, reglas puras, repositorio, service, editar, cartera, validar, estadísticas e IA, trabajo y observador, `Privacy`, handler, DTO) y pruebas de las cinco suites (sin `cuponestest`: basta `reservastest.Negocio`).
+- Modificar: `internal/indexes.All()`, `scripts/routes`, `cmd/api` (`buildReservas` registra el observador y ARCO, `buildPanel` la fuente de P-49, `buildGuardia` compartida con el asistente, `startCupones`), `negocios.Repository.FijarCuponesActivos`, `authtest`, `docs/endpoints.md` y `docs/rate-limit-matrix.md`.
 - Sin cambios: `negocios.cupones_activos` ya existe (nv-20); solo lo escribe el trabajo.
 
 2. Guardarraíles

@@ -14,6 +14,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/chat"
+	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
@@ -70,6 +71,9 @@ var expected = map[string][]string{
 	pagos.Collection:                    {"_id_", "ux_payment_intent", "ux_idempotency", "ix_pago_reserva", "ix_conciliacion", "ix_pago_usuario", "ttl_conservar_hasta"},
 	pagos.LiquidacionesCollection:       {"_id_", "ux_liquidacion", "ix_liquidacion_estado", "ttl_liquidacion_conservar"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
+	cupones.Collection:                  {"_id_", "ix_cupones_cerca", "ix_cupones_negocio", "ix_vencimiento"},
+	cupones.CarteraCollection:           {"_id_", "ux_cartera", "ix_cartera_filtros", "ux_codigo_canje", "ix_codigo_usado", "ix_canjes_negocio", "ix_cartera_vence"},
+	cupones.MetricasCollection:          {"_id_", "ux_cupon_dia"},
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 }
 
@@ -138,6 +142,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		pagos.Collection:                 {"ux_payment_intent", "ux_idempotency"},
 		pagos.LiquidacionesCollection:    {"ux_liquidacion"},
 		errores.Collection:               {"ux_huella"},
+		cupones.CarteraCollection:        {"ux_cartera", "ux_codigo_canje"},
+		cupones.MetricasCollection:       {"ux_cupon_dia"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
