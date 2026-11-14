@@ -1,11 +1,12 @@
 # plan.md — NV-63 Postales, recuerdos y momentos
 
 1. Mapeo
-- Crear: `internal/postales/*` (postales y recuerdos), `internal/momentos/*` (momentos, feed y panel del negocio), cada uno con su `Privacy`; `internal/testutil/postalestest` y pruebas en `tests/`.
+- Crear: `internal/postales/*` (postales, recuerdos, momentos, feed, panel del negocio y destinos de la cola) con tres `Privacy`; `cmd/api/postales.go`; pruebas en `tests/` (`postales_test.go`, `recuerdos_test.go`, `momentos_test.go`, `postales_security_test.go`). Sin `postalestest`: `authtest` arma el módulo con el doble de imágenes de nv-45 y el moderador de texto de `resenastest`.
 - Modificar:
-  - `internal/imagenes`: consultar el estado y el dueño de una imagen.
+  - `internal/imagenes`: `Service.Consultar` (estado y URL pública de una imagen propia).
   - `internal/notificaciones`: tres tipos nuevos.
-  - `internal/negocios`: propietario para el panel.
+  - `internal/negocios`: sin cambios (el panel usa `FindByID` y el recuerdo `FindFavoriteCards`).
+  - `internal/testutil/authtest`, `internal/indexes`, `scripts/routes`, `cmd/api/resenas.go` (la guardia de IA modera también estos textos).
   - `scripts/indexes`, `cmd/api`, `docs/endpoints.md`, `docs/rate-limit-matrix.md` y `Memoria.md`.
 - Sin cambios: lo que esta spec no nombra.
 

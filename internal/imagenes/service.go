@@ -313,6 +313,30 @@ func idValido(id string) bool {
 // ErrNoPublicada: la imagen no existe, es ajena o no está publicada.
 var ErrNoPublicada = errors.New("imagen no publicada o ajena")
 
+// Vista es el estado de una imagen propia; URL solo existe si está publicada (nunca la de
+// cuarentena).
+type Vista struct {
+	Estado string
+	URL    string
+}
+
+// Consultar devuelve el estado de una imagen del dueño (postales, nv-63). Ajena o inexistente =
+// ErrNotFound.
+func (s *Service) Consultar(ctx context.Context, dueno bson.ObjectID, id string) (Vista, error) {
+	if !idValido(id) {
+		return Vista{}, ErrNotFound
+	}
+	img, err := s.repo.Buscar(ctx, id, dueno)
+	if err != nil {
+		return Vista{}, err
+	}
+	v := Vista{Estado: img.Estado}
+	if img.Estado == EstadoPublicada {
+		v.URL = s.cfg.URLPublica + "/" + clavePublicada(img.ID, LadoGrande)
+	}
+	return v, nil
+}
+
 // Publicada devuelve la dirección de 1080 px de una imagen publicada del dueño. La usan la
 // galería del alta (nv-55) y el menú (nv-56) para guardar solo fotos ya moderadas.
 func (s *Service) Publicada(ctx context.Context, dueno bson.ObjectID, id string) (string, error) {

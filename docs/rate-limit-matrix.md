@@ -23,6 +23,7 @@
 | Reseñas: crear | 10 | 1 día | `POST /api/v1/resenas` por usuario (`rate:resenas_crear:{usuario}`, ventana fija) | nv-62 |
 | Reseñas: útil | 60 | 1 h | `PUT /api/v1/resenas/{id}/util` por usuario (`rate:resenas_util:{usuario}`, ventana fija) | nv-62 |
 | Reseñas: reportes | 20 | 1 día | `POST /api/v1/resenas/{id}/reportes` por usuario (`rate:resenas_reporte:{usuario}`, ventana fija). Sugerir respuesta usa la IA por usuario de nv-28; recálculo, útiles y cola van en MongoDB: cada petición limitada cuesta solo el pipeline de 3 comandos | nv-62 |
+| Momentos | 30 | 1 h | `POST /api/v1/momentos` por usuario (`rate:momentos:{usuario}`, ventana fija); cuenta también los rechazados. Postales y recuerdos solo usan el global (la foto ya pasó por el límite de subidas de nv-45); la galería pública también | nv-63 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |
 | Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |

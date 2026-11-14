@@ -54,6 +54,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/neo4j"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
+	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
@@ -234,6 +235,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
 	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
+	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
+		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
 	registry.RegisterExporter(imagePrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
@@ -256,7 +259,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
-	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, moderacion: modSvc}, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, postales: cards, moderacion: modSvc}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -274,6 +277,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// El menú y las reseñas (nv-62) van antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
 		menu.NewHandler(merchant.menu, validator).WithActiveGuard(active),
 		resenas.NewHandler(reviews, validator).WithActiveGuard(active),
+		// Postales y momentos (nv-63) atienden /lugares/:id/postales, /negocios/:id/momentos y /planes/:id/recuerdo.
+		postales.NewHandler(cards, validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),

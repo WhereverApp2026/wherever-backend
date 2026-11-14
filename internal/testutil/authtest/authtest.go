@@ -49,6 +49,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
+	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
@@ -77,47 +78,49 @@ const Password = "Prueba_1234"
 
 // Env es el módulo auth listo para probar, con su buzón y sus logs capturados.
 type Env struct {
-	Cfg              config.Config
-	Mongo            *platformmongo.Client
-	Redis            *goredis.Client
-	Users            *usuarios.Repository
-	Service          *auth.Service
-	Account          *account.Service
-	Cities           *ciudades.Service
-	Negocios         *negocios.Service
-	Alta             *alta.Service          // alta por pasos y revisión (nv-55)
-	Expediente       *expediente.Service    // expediente cifrado (nv-55)
-	Almacen          *negociostest.Almacen  // doble del bucket privado (S3)
-	ImagenesNegocio  *negociostest.Imagenes // doble de las fotos del alta (nv-55); el módulo real es Imagenes (nv-45)
-	Panel            *panel.Service         // panel del negocio (nv-56); las pruebas registran fuentes y observadores
-	Menu             *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
-	PanelTarea       *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
-	Reservas         *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
-	Pagos            *pagos.Service         // pagos (nv-60) contra el doble de Stripe
-	Stripe           *stripetest.Server     // doble de la API de Stripe (única interfaz externa simulada)
-	Cupones          *cupones.Service       // cupones (nv-61) con la guardia de IA real sobre el doble
-	Resenas          *resenas.Service       // check-ins y reseñas (nv-62) con la cola real de nv-43
-	ModeradorResenas *resenastest.Moderador // doble del moderador de texto de nv-42
-	Planes           *planes.Service
-	Votaciones       *votaciones.Service
-	Chat             *chat.Service
-	Moderacion       *moderacion.Service // cola y reglas (nv-43)
-	Recomendaciones  *recomendaciones.Service
-	Clima            *clima.Servicio     // contra OpenMeteo, el doble de Open-Meteo (nv-25)
-	OpenMeteo        *climatest.Servidor // la prueba cambia su respuesta, demora o falla
-	Exports          *privacidad.Exports
-	Grafo            *grafo.Queue // cola de nv-52; las pruebas la aplican con grafo.Worker
-	Job              *privacidad.Job
-	IA               *iatest.Modelo           // doble del proveedor de IA (nv-31)
-	Vectores         *iatest.ServidorVectores // servidor local de embeddings (nv-51)
-	Semantica        *semantica.Service
-	Busquedas        *busquedas.Service
-	Sugerencias      *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
-	Imagenes         imagenestest.Modulo  // doble del bucket y Rekognition local (nv-45)
-	Mail             *mailer.Memory
-	Log              *slog.Logger
-	Logs             *testutil.LogBuffer
-	modules          []httpapi.Module
+	Cfg               config.Config
+	Mongo             *platformmongo.Client
+	Redis             *goredis.Client
+	Users             *usuarios.Repository
+	Service           *auth.Service
+	Account           *account.Service
+	Cities            *ciudades.Service
+	Negocios          *negocios.Service
+	Alta              *alta.Service          // alta por pasos y revisión (nv-55)
+	Expediente        *expediente.Service    // expediente cifrado (nv-55)
+	Almacen           *negociostest.Almacen  // doble del bucket privado (S3)
+	ImagenesNegocio   *negociostest.Imagenes // doble de las fotos del alta (nv-55); el módulo real es Imagenes (nv-45)
+	Panel             *panel.Service         // panel del negocio (nv-56); las pruebas registran fuentes y observadores
+	Menu              *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
+	PanelTarea        *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
+	Reservas          *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
+	Pagos             *pagos.Service         // pagos (nv-60) contra el doble de Stripe
+	Stripe            *stripetest.Server     // doble de la API de Stripe (única interfaz externa simulada)
+	Cupones           *cupones.Service       // cupones (nv-61) con la guardia de IA real sobre el doble
+	Resenas           *resenas.Service       // check-ins y reseñas (nv-62) con la cola real de nv-43
+	ModeradorResenas  *resenastest.Moderador // doble del moderador de texto de nv-42
+	Postales          *postales.Service      // postales, recuerdos y momentos (nv-63) con las imágenes de Imagenes
+	ModeradorPostales *resenastest.Moderador // doble del moderador de texto de nv-42 para postales y momentos
+	Planes            *planes.Service
+	Votaciones        *votaciones.Service
+	Chat              *chat.Service
+	Moderacion        *moderacion.Service // cola y reglas (nv-43)
+	Recomendaciones   *recomendaciones.Service
+	Clima             *clima.Servicio     // contra OpenMeteo, el doble de Open-Meteo (nv-25)
+	OpenMeteo         *climatest.Servidor // la prueba cambia su respuesta, demora o falla
+	Exports           *privacidad.Exports
+	Grafo             *grafo.Queue // cola de nv-52; las pruebas la aplican con grafo.Worker
+	Job               *privacidad.Job
+	IA                *iatest.Modelo           // doble del proveedor de IA (nv-31)
+	Vectores          *iatest.ServidorVectores // servidor local de embeddings (nv-51)
+	Semantica         *semantica.Service
+	Busquedas         *busquedas.Service
+	Sugerencias       *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
+	Imagenes          imagenestest.Modulo  // doble del bucket y Rekognition local (nv-45)
+	Mail              *mailer.Memory
+	Log               *slog.Logger
+	Logs              *testutil.LogBuffer
+	modules           []httpapi.Module
 }
 
 // New deja la base y Redis vacíos, crea los índices (como scripts/indexes) y arma el módulo.
@@ -272,6 +275,17 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterPurger(resenas.NewPrivacy(reviewRepo))
 	registry.RegisterExporter(resenas.NewPrivacy(reviewRepo))
 	registry.RegisterExporter(resenas.NewCheckinsPrivacy(reviewRepo))
+	cardRepo := postales.NewRepository(client.DB())
+	moderadorPostales := resenastest.NuevoModerador()
+	cards := postales.NewService(postales.Deps{Repo: cardRepo, Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo, Negocios: businessRepo,
+		Autores: users, Cursor: cursor, Log: log}).WithImagenes(images.Service).WithModeracion(moderadorPostales, mods).WithNotifier(notifier)
+	mods.WithDestino(imagenes.TipoCola, cards.DestinoImagen(images.Service.Destino()))
+	mods.WithDestino(postales.TipoColaPostal, cards.Destino())
+	mods.WithDestino(postales.TipoColaMomento, cards.Destino())
+	registry.RegisterPurger(postales.NewPrivacy(cardRepo))
+	registry.RegisterExporter(postales.NewPrivacy(cardRepo))
+	registry.RegisterExporter(postales.NewRecuerdosPrivacy(cardRepo))
+	registry.RegisterExporter(postales.NewMomentosPrivacy(cardRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -294,7 +308,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -307,6 +321,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
 			menu.NewHandler(menus, v).WithActiveGuard(usuarios.RequireActive(users)),      // antes que negocios
 			resenas.NewHandler(reviews, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que negocios
+			postales.NewHandler(cards, v).WithActiveGuard(usuarios.RequireActive(users)),  // antes que negocios y planes
 			negocios.NewHandler(businesses, v),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),

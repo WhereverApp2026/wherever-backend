@@ -47,6 +47,9 @@ var pushText = map[string]string{
 	KindVoteOpened:       "Hay una votación abierta en tu plan",
 	KindVoteClosed:       "Se cerró una votación de tu plan",
 	KindGroupMessage:     "Tienes mensajes nuevos en un grupo",
+	KindMomentTagged:     "Te etiquetaron en un momento",
+	KindMomentThanked:    "Un lugar agradeció tu momento",
+	KindMomentFeatured:   "Un lugar destacó tu momento",
 }
 
 type pushJob struct {
