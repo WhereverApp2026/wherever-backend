@@ -25,6 +25,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
@@ -131,6 +132,7 @@ func run() error {
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
 	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, cfg.DataKeys, log)
 	waitBookings := startReservas(ctx, mongoClient.DB(), log)
+	waitCoupons := startCupones(ctx, mongoClient.DB(), log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -147,6 +149,7 @@ func run() error {
 	waitGraph()
 	waitVotes()
 	waitBookings()
+	waitCoupons()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -251,7 +254,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
-	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, bookings.cupones, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -272,6 +275,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),
+		cupones.NewHandler(bookings.cupones, validator).WithActiveGuard(active),
 		pagos.NewHandler(bookings.pagos, validator).WithActiveGuard(active),
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
 		moderacion.NewHandler(modSvc, validator),
@@ -379,32 +383,42 @@ type iaDeps struct {
 	db    *mongodriver.Database
 }
 
-// buildAsistente arma el asistente de planes (nv-31) con Gemini detrás de ia.Guardia (tope,
-// caché y límites de nv-27/nv-28). Sin GEMINI_API_KEY o IA_MODELO_ID la IA queda apagada y
-// POST /planes/generar responde con el motor de reglas (nv-33).
-func buildAsistente(cfg config.IA, deps iaDeps, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, *semantica.Service, error) {
+// buildGuardia arma Gemini detrás de ia.Guardia (tope, caché y límites de nv-27/nv-28), una
+// sola para el asistente y los títulos de cupones (nv-61): comparten tope y `rate:ia_usuario`.
+// Sin GEMINI_API_KEY o IA_MODELO_ID devuelve nil.
+func buildGuardia(cfg config.IA, deps iaDeps, log *slog.Logger) (*ia.Guardia, error) {
+	if !cfg.Enabled() {
+		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente responde solo con el motor de reglas y sugerir título de cupón da 503")
+		return nil, nil
+	}
+	g, err := ia.NewGemini(ia.GeminiConfig{APIKey: cfg.GeminiAPIKey, ModeloID: cfg.ModeloID, Timeout: cfg.Timeout})
+	if err != nil {
+		return nil, err
+	}
+	return ia.NewGuardia(g, ia.NewContadorRedis(deps.redis), deps.usos, ia.NewCacheRedis(deps.redis), ia.GuardiaConfig{
+		TopeUSDMes: cfg.TopeUSDMes,
+		Precios:    ia.Precios{EntradaUSDMTok: cfg.PrecioEntradaUSDMTok, SalidaUSDMTok: cfg.PrecioSalidaUSDMTok},
+		Limites:    ia.Limites{PorHora: cfg.LimiteHora, PorMinuto: cfg.LimiteMin, PorDia: cfg.LimiteDia},
+		Limitador:  ia.NewLimitadorRedis(deps.redis),
+	}, log)
+}
+
+// buildAsistente arma el asistente de planes (nv-31) con la guardia y la conecta a los títulos
+// de cupones (nv-61). Sin guardia la IA queda apagada: POST /planes/generar responde con el
+// motor de reglas (nv-33) y sugerir título, 503.
+func buildAsistente(cfg config.IA, deps iaDeps, coupons *cupones.Service, fuente recomendador.Fuente, users asistente.Usuarios, descartes asistente.Descartes, log *slog.Logger) (*asistente.Service, *semantica.Service, error) {
 	pesos, err := recomendador.PesosPorDefecto()
 	if err != nil {
 		return nil, nil, err
 	}
+	guardia, err := buildGuardia(cfg, deps, log)
+	if err != nil {
+		return nil, nil, err
+	}
 	var modelo ia.Modelo
-	if cfg.Enabled() {
-		g, err := ia.NewGemini(ia.GeminiConfig{APIKey: cfg.GeminiAPIKey, ModeloID: cfg.ModeloID, Timeout: cfg.Timeout})
-		if err != nil {
-			return nil, nil, err
-		}
-		guardia, err := ia.NewGuardia(g, ia.NewContadorRedis(deps.redis), deps.usos, ia.NewCacheRedis(deps.redis), ia.GuardiaConfig{
-			TopeUSDMes: cfg.TopeUSDMes,
-			Precios:    ia.Precios{EntradaUSDMTok: cfg.PrecioEntradaUSDMTok, SalidaUSDMTok: cfg.PrecioSalidaUSDMTok},
-			Limites:    ia.Limites{PorHora: cfg.LimiteHora, PorMinuto: cfg.LimiteMin, PorDia: cfg.LimiteDia},
-			Limitador:  ia.NewLimitadorRedis(deps.redis),
-		}, log)
-		if err != nil {
-			return nil, nil, err
-		}
+	if guardia != nil {
 		modelo = guardia
-	} else {
-		log.Warn("sin GEMINI_API_KEY o IA_MODELO_ID: el asistente de planes responde solo con el motor de reglas")
+		coupons.WithIA(guardia)
 	}
 	sem, err := buildSemantica(cfg, deps.redis, deps.db, pesos, log)
 	if err != nil {

@@ -23,6 +23,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -92,6 +93,7 @@ type Env struct {
 	Reservas        *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
 	Pagos           *pagos.Service         // pagos (nv-60) contra el doble de Stripe
 	Stripe          *stripetest.Server     // doble de la API de Stripe (única interfaz externa simulada)
+	Cupones         *cupones.Service       // cupones (nv-61) con la guardia de IA real sobre el doble
 	Planes          *planes.Service
 	Votaciones      *votaciones.Service
 	Chat            *chat.Service
@@ -253,6 +255,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	altaSvc.WithDeposito(pays)
 	registry.RegisterExporter(pagos.NewPrivacy(payRepo))
 	registry.RegisterExporter(pagos.NewLiquidacionesPrivacy(payRepo))
+	couponRepo := cupones.NewRepository(client.DB())
+	coupons := cupones.NewService(couponRepo, businessRepo, cursor, log).WithIA(guardia)
+	registry.RegisterPurger(cupones.NewPrivacy(couponRepo))
+	registry.RegisterExporter(cupones.NewPrivacy(couponRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -275,7 +281,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -292,6 +298,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
 			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
 			pagos.NewHandler(pays, v).WithActiveGuard(usuarios.RequireActive(users)),
+			cupones.NewHandler(coupons, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos
