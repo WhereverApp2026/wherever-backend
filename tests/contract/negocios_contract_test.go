@@ -77,3 +77,19 @@ func TestContract_Negocios(t *testing.T) {
 	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+business.OwnerID.Hex(), nil, "")
 	check(t, "negocios/lugares_ficha_404", status, body)
 }
+
+// TestContract_NegociosAlta fija el alta en borrador y la cola del administrador (nv-55).
+func TestContract_NegociosAlta(t *testing.T) {
+	env := authtest.New(t, mongoClient, redisClient, testutil.Config(config.EnvProd))
+	app := env.App()
+	duena := env.CreateUser(t, "duena-contrato@wherever.test")
+	token := testutil.ValidTokenFor(t, duena.ID.Hex(), "jti-duena-contrato", middleware.RoleConsumer)
+	status, body := call(t, app, http.MethodPost, "/api/v1/negocios", map[string]string{"nombre": "Contrato Alta", "categoria": "restaurante", "descripcion": "Alta de contrato"}, token)
+	check(t, "negocios/alta_crear_201", status, body)
+
+	env.AltaEnRevision(t, duena, "Contrato Revision")
+	admin := env.CreateAdmin(t, "admin-alta-contrato@wherever.test")
+	adminToken := testutil.ValidTokenFor(t, admin.ID.Hex(), "jti-admin-alta-contrato", middleware.RoleAdmin)
+	status, body = call(t, app, http.MethodGet, "/api/v1/admin/negocios?estado=en_revision", nil, adminToken)
+	check(t, "negocios/admin_cola_200", status, body)
+}

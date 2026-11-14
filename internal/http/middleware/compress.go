@@ -13,6 +13,10 @@ const (
 	// El código del enlace de un plan (nv-38) es una credencial: tampoco se comprime.
 	plansPrefix = "/api/v1/planes/"
 	shareSuffix = "/compartir"
+	// El expediente del negocio (nv-55) se entrega descifrado: ni se comprime ni se guarda.
+	businessPrefix = "/api/v1/negocios/"
+	adminBusiness  = "/api/v1/admin/negocios/"
+	docsSegment    = "/documentos/"
 )
 
 // Compress comprime las respuestas según Accept-Encoding: detrás de CloudFront sin caché y sin Caddy
@@ -24,6 +28,10 @@ func Compress() fiber.Handler {
 func carriesTokens(c *fiber.Ctx) bool {
 	path := c.Path()
 	if strings.HasPrefix(path, authPrefix) {
+		return true
+	}
+	if c.Method() == fiber.MethodGet && strings.Contains(path, docsSegment) &&
+		(strings.HasPrefix(path, businessPrefix) || strings.HasPrefix(path, adminBusiness)) {
 		return true
 	}
 	if c.Method() != fiber.MethodPost {

@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "categoria": "string",
+        "descripcion": "string",
+        "dias_espera": "number",
+        "documentos": {
+          "comprobante": "bool",
+          "ine": "bool"
+        },
+        "enviado_en": "string",
+        "fotos": "number",
+        "id": "string",
+        "nombre": "string",
+        "paso_alta": "number",
+        "version": "number"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

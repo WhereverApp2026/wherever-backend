@@ -40,13 +40,13 @@ La persona da de alta su negocio en pasos con guardado automático (datos del ne
 |---|---|---|---|
 | POST | `/api/v1/negocios` | JWT consumidor o comerciante | 201, 400, 401, 403, 409, 422 |
 | PATCH | `/api/v1/negocios/{id}/alta/{paso}` | JWT dueño | 200, 400, 401, 403, 404, 409, 422 |
-| POST | `/api/v1/negocios/{id}/fotos` | JWT dueño | 201, 401, 403, 404, 422, 429 |
-| DELETE | `/api/v1/negocios/{id}/fotos/{foto_id}` | JWT dueño | 204, 401, 403, 404, 422 |
-| PUT | `/api/v1/negocios/{id}/fotos/orden` | JWT dueño | 200, 401, 403, 404, 422 |
-| POST | `/api/v1/negocios/{id}/documentos` | JWT dueño | 201, 401, 403, 404, 413, 422, 429, 503 |
+| POST | `/api/v1/negocios/{id}/fotos` | JWT dueño | 201, 401, 403, 404, 409, 422, 503 |
+| DELETE | `/api/v1/negocios/{id}/fotos/{foto_id}` | JWT dueño | 204, 401, 403, 404, 409, 422 |
+| PUT | `/api/v1/negocios/{id}/fotos/orden` | JWT dueño | 200, 401, 403, 404, 409, 422 |
+| POST | `/api/v1/negocios/{id}/documentos` | JWT dueño | 201, 401, 403, 404, 409, 413, 422, 429, 503 |
 | GET | `/api/v1/negocios/{id}/documentos` | JWT dueño | 200, 401, 403, 404 |
 | GET | `/api/v1/negocios/{id}/documentos/{tipo}` | JWT dueño | 200, 401, 403, 404, 503 |
-| PUT | `/api/v1/negocios/{id}/datos-fiscales` | JWT dueño | 200, 401, 403, 404, 422, 503 |
+| PUT | `/api/v1/negocios/{id}/datos-fiscales` | JWT dueño | 200, 401, 403, 404, 422, 429, 503 |
 | PUT | `/api/v1/negocios/{id}/cuenta-deposito` | JWT dueño | 200, 401, 403, 404, 422, 429, 503 |
 | POST | `/api/v1/negocios/{id}/enviar-revision` | JWT dueño | 200, 401, 403, 404, 409, 422 |
 | GET | `/api/v1/negocios/mios` | JWT comerciante | 200, 401, 403 |
@@ -54,7 +54,7 @@ La persona da de alta su negocio en pasos con guardado automático (datos del ne
 | GET | `/api/v1/admin/negocios/{id}/documentos/{tipo}?motivo=` | JWT administrador | 200, 401, 403, 404, 422, 503 |
 | PATCH | `/api/v1/admin/negocios/{id}/revision` | JWT administrador | 200, 400, 401, 403, 404, 409, 422 |
 
-403 = otro rol, negocio ajeno o cuenta en eliminación pendiente; un negocio ajeno da 404 para no confirmar que existe. 422 = paso fuera de 2–6, RFC o CLABE inválidos, archivo de otro tipo, falta de consentimiento o lo que falta para enviar. Las rutas `documentos`, `GET /admin/negocios` y `GET /admin/negocios/{id}/documentos/{tipo}` no están en A5 (drift documentado). Filas copiadas a `docs/endpoints.md` (sección de diferidos hasta que haya código).
+403 = otro rol, negocio ajeno o cuenta en eliminación pendiente; un negocio ajeno da 404 para no confirmar que existe. 422 = paso fuera de 2–6, RFC o CLABE inválidos, archivo de otro tipo, falta de consentimiento o lo que falta para enviar. Las rutas `documentos`, `GET /admin/negocios` y `GET /admin/negocios/{id}/documentos/{tipo}` no están en A5 (drift documentado). Filas en la tabla viva de `docs/endpoints.md`.
 
 ## Tests
 - `tests/integration/negocios_alta_test.go` con MongoDB, Redis y S3 local: alta completa paso a paso, `If-Match` viejo (409), rol agregado, tope de 3 altas, enviar con faltantes (422 con la lista), enviar completo, aprobar y rechazar con motivo, dos admins deciden a la vez (uno gana, otro 409), notificación al dueño.
@@ -74,9 +74,25 @@ La persona da de alta su negocio en pasos con guardado automático (datos del ne
 - Sin verificación automática de la INE contra el padrón del INE ni OCR: la revisa una persona.
 - Sin edición del perfil aprobado ni pausa: nv-56.
 
+## Implementación (2026-11-13) — drift resuelto
+- **Paquetes:** `internal/negocios/alta` (service, handler, DTO, `Privacy` de la baja), `internal/negocios/expediente` (modelo, repositorio, cifrado, RFC, CLABE, archivo, `Privacy`, `Retencion`) y `internal/negocios/alta_repository.go` (consultas del alta sobre `negocios`). Armado en `cmd/api/alta.go`; pruebas con `authtest` (`AltaCompleta`, `AltaEnRevision`) y los dobles de `internal/testutil/negociostest`.
+- **Fotos:** la subida, moderación y publicación son de nv-45 (`POST /imagenes/subida`). `POST /negocios/{id}/fotos` recibe `{imagen_id, tipo}` de una imagen ya publicada de la persona (interfaz `alta.Imagenes`); `PUT /fotos/orden` recibe `{fotos_ids[]}` y la primera es la portada (sin `portada_id`). Paso 4 no lleva cuerpo: exige 3 fotos. Las rutas de fotos aceptan cualquier estado y responden 409 si el negocio cambió a la vez. **Hasta que nv-45 llegue a `main`, `alta.Imagenes` no está conectada en `cmd/api` y las fotos responden 503.**
+- **Almacén:** `expediente.Almacen` es el subconjunto `Leer/Guardar/Borrar` del almacén S3 de nv-45; **hasta que nv-45 llegue a `main`, `cmd/api` no lo conecta y la subida de documentos responde 503** (fiscales y CLABE no lo necesitan). En pruebas va el doble de S3.
+- **Paso 2:** `ciudades` solo guarda el centro, no un polígono: la ubicación se valida dentro de México (mismas reglas de la semilla), no dentro de una ciudad.
+- **Paso 6:** sin cuerpo; exige INE (frente y reverso) y comprobante vigentes.
+- **Consentimiento:** `consentimientos` no tiene `tipo`. Se agregó `datos_negocio` (bool) a `POST /usuarios/yo/consentimientos`, a la fila de `consentimientos` y a `usuarios.privacidad`; vale si va con la versión vigente del aviso. Mandar `false` es la oposición: `expediente.Privacy.RetirarDatosNegocio` borra INE, comprobante y CLABE y bloquea los fiscales antes de guardar el retiro.
+- **RFC:** forma del SAT (3 o 4 letras, fecha real AAMMDD, homoclave con dígito 0–9 o A); no se calcula el dígito verificador.
+- **Archivos:** el tipo sale de los primeros bytes; un archivo de otro tipo con extensión `.jpg` da 422. Un PDF es válido aunque se llame `.jpg`.
+- **Índices:** el TTL de 5 años de `accesos_expediente` va en `ttl_acceso` (`leido_en`), aparte de `ix_acceso_negocio`, porque MongoDB solo admite TTL en un índice de un campo. En `negocios_documentos` se suman `ix_conservar` (parcial `estado=bloqueado`) e `ix_propietario` (ARCO).
+- **Baja por ARCO:** `alta.Privacy` da de baja (`eliminado_en`) solo los negocios con `origen: alta`; la semilla no lo lleva, así un administrador que borra su cuenta no se lleva el catálogo.
+- **Aviso al dueño:** `negocio_revisado` lleva `{negocio_id, resultado}`; el motivo del rechazo se lee en `GET /negocios/mios` (los avisos solo llevan ids, nv-40).
+- **Retención:** `privacidad.Job.WithTareas` corre `expediente.Retencion` con el mismo candado; si el borrado en S3 falla, el registro sigue y se reintenta.
+- **Límite de peticiones:** `Expediente del negocio` usa `WindowUser` (el mismo `INCR` con TTL que `Buscar personas`, ya medido en `TestPresupuestoRedis_*`); son pocas peticiones por persona.
+- **Pendientes:** conectar `alta.Imagenes` y `expediente.Almacen` con nv-45 en `cmd/api` (y la cola `en_revision` de las fotos de nv-42/43); el aviso con estos datos y `AVISO_VERSION` nueva (rama `aviso-privacidad-integral`) antes de desplegar; avisar a nv-60 de D3.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola 9; requiere nv-45 en `main` para las fotos (nv-44 ya está: CloudFront solo sirve `i/*`, así que `privado/` queda fuera)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
+- **Estado:** 🚧 Borrador con evidencia (2026-11-13), ola 9; implementada con D1–D11 como se proponen. Fotos y subida de documentos responden 503 hasta conectar nv-45 (ver «Implementación»). nv-44 ya está: CloudFront solo sirve `i/*`, así que `privado/` queda fuera.
+- **Revisores:** Osmar Reséndiz (pendiente de firmar D1–D11)
 - **Fecha:** —
 - **Decisiones para el revisor antes de ejecutar:** D1 documentos subidos a la API y cifrados con `DATA_KEYS` (no URL firmada); D2 colección aparte `negocios_documentos` en lugar de `negocios.documentos`; D3 `PUT /cuenta-deposito` en nv-55 con CLABE cifrada hasta que nv-60 la mande a Stripe (nv-60 la reclama hoy); D4 fiscales y CLABE no frenan la revisión; D5 el comprobante se borra a los 90 días como la INE; D6 el rol `comerciante` se agrega sin quitar `consumidor` y con `requiere_refresh`; D7 tope de 3 altas abiertas; D8 `motivo` obligatorio en cada lectura del admin y bitácora de 5 años; D9 sin `DATA_KEYS` = 503 (no guardar en claro); D10 política nueva «Expediente del negocio» de 10 por hora; D11 avisar a nv-60 del cambio de D3 si se aprueba.
 - **Detalle:** evidencia en `specs/nv-55/checklists/gates.md` + `Memoria.md` al ejecutar.

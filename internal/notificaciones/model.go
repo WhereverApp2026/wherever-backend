@@ -22,6 +22,8 @@ const (
 	KindPlanInvite     = "invitacion_plan"
 	KindVoteOpened     = "votacion_abierta"
 	KindVoteClosed     = "votacion_cerrada"
+	// KindBusinessReviewed avisa al dueño que su negocio se aprobó o rechazó (nv-55).
+	KindBusinessReviewed = "negocio_revisado"
 	// KindGroupMessage avisa que hay mensajes nuevos en el chat de un grupo (nv-57); uno por
 	// grupo y persona cada 5 minutos, sin texto ni autor.
 	KindGroupMessage = "mensaje_grupo"

@@ -10,6 +10,8 @@
 | Correo disponible | 20 | 1 min | `GET /api/v1/usuarios/correo-disponible` por IP; provisional | nv-05 |
 | Descarga de exportación | 10 | 1 min | `POST /api/v1/usuarios/exportaciones/descargar` por IP; provisional | nv-05 |
 | Auth enlaces | 10 | 1 min | `refresh`, `recuperar`, `restablecer`, `verificar-correo`, cada una con su llave (`rate:auth_{ruta}:{ip}`) por IP; valor provisional, se mide antes de endurecer | nv-04 |
+| Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar`, `/api/v1/admin/moderacion/*` y `/api/v1/admin/negocios*` (cola, lectura del expediente y decisión) por IP, en la misma cuenta (`rate:admin:{ip}`) | nv-20, nv-43, nv-55 |
+| Expediente del negocio | 10 | 1 h | `POST /api/v1/negocios/{id}/documentos`, `PUT /api/v1/negocios/{id}/datos-fiscales` y `PUT /api/v1/negocios/{id}/cuenta-deposito` por usuario (`rate:expediente:{usuario}`, ventana fija), para que no se prueben CLABE ni RFC en masa; un `INCR` con TTL por petición | nv-55 |
 | Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar`, `/api/v1/admin/moderacion/*` y `GET /api/v1/admin/errores` por IP, en la misma cuenta (`rate:admin:{ip}`) | nv-20, nv-43, nv-64 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |

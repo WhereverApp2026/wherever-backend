@@ -1,0 +1,32 @@
+{
+  "status": 201,
+  "body": {
+    "accesibilidad": {
+      "apto_ninos": "bool",
+      "pet_friendly": "bool",
+      "silla_ruedas": "bool"
+    },
+    "alergenos": [],
+    "categoria": "string",
+    "creado_en": "string",
+    "descripcion": "string",
+    "documentos": {
+      "comprobante": "bool",
+      "ine": "bool"
+    },
+    "estado": "string",
+    "fotos": [],
+    "horarios": [],
+    "id": "string",
+    "nivel_precio": "number",
+    "nombre": "string",
+    "opciones_dieta": [],
+    "paso_alta": "number",
+    "precio_promedio": "number",
+    "requiere_refresh": "bool",
+    "revision": {},
+    "servicios": [],
+    "verificado": "bool",
+    "version": "number"
+  }
+}

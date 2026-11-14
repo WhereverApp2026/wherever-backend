@@ -22,6 +22,7 @@ type Consent struct {
 	TermsVersion  string        `bson:"version_terminos"`
 	NoticeVersion string        `bson:"version_aviso"`
 	PromoEmail    bool          `bson:"promociones_correo"`
+	BusinessData  bool          `bson:"datos_negocio,omitempty"`
 	AcceptedAt    time.Time     `bson:"fecha_aceptacion"`
 }
 
@@ -94,12 +95,13 @@ type ConsentItem struct {
 	TermsVersion  string    `json:"version_terminos"`
 	NoticeVersion string    `json:"version_aviso_privacidad"`
 	PromoEmail    bool      `json:"promociones_correo"`
+	BusinessData  bool      `json:"datos_negocio,omitempty"`
 	AcceptedAt    time.Time `json:"fecha_aceptacion"`
 }
 
 // Item convierte el documento en su forma pública (sin ids).
 func (c Consent) Item() ConsentItem {
-	return ConsentItem{TermsVersion: c.TermsVersion, NoticeVersion: c.NoticeVersion, PromoEmail: c.PromoEmail, AcceptedAt: c.AcceptedAt.UTC()}
+	return ConsentItem{TermsVersion: c.TermsVersion, NoticeVersion: c.NoticeVersion, PromoEmail: c.PromoEmail, BusinessData: c.BusinessData, AcceptedAt: c.AcceptedAt.UTC()}
 }
 
 // Export devuelve el historial de aceptaciones, de la más nueva a la más vieja.

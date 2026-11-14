@@ -21,6 +21,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
@@ -57,6 +58,8 @@ var expected = map[string][]string{
 	sincronizacion.ActionsCollection:    {"_id_", "ux_usuario_cliente", "ttl_accion"},
 	notificaciones.Collection:           {"_id_", "ix_usuario_creada", "ttl_notificacion"},
 	notificaciones.DevicesCollection:    {"_id_", "ux_token_hash", "ix_usuario_uso"},
+	expediente.Collection:               {"_id_", "ux_documento", "ix_borrar", "ix_conservar", "ix_propietario"},
+	expediente.AccesosCollection:        {"_id_", "ix_acceso_negocio", "ttl_acceso"},
 	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
 	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
@@ -140,6 +143,27 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 	ttl := specs(t, db, errores.Collection)["ttl_errores"]
 	require.NotNil(t, ttl.ExpireAfterSeconds)
 	assert.Equal(t, int32(30*24*3600), *ttl.ExpireAfterSeconds)
+}
+
+// El expediente del negocio (nv-55): un registro por tipo, borrado parcial sobre vigentes y
+// bitácora de accesos que vive 5 años.
+func TestIndexes_ExpedienteNegocio(t *testing.T) {
+	db := freshDB(t)
+	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
+	docs := specs(t, db, expediente.Collection)
+	require.NotNil(t, docs["ux_documento"].Unique)
+	assert.True(t, *docs["ux_documento"].Unique)
+	accesos := specs(t, db, expediente.AccesosCollection)
+	require.NotNil(t, accesos["ttl_acceso"].ExpireAfterSeconds)
+	assert.Equal(t, int32(5*365*24*60*60), *accesos["ttl_acceso"].ExpireAfterSeconds)
+	assert.Contains(t, specs(t, db, negocios.Collection), "ix_revision")
+
+	col := db.Collection(expediente.Collection)
+	negocio := bson.NewObjectID()
+	_, err := col.InsertOne(context.Background(), bson.D{{Key: "negocio_id", Value: negocio}, {Key: "tipo", Value: "ine_frente"}, {Key: "estado", Value: "vigente"}})
+	require.NoError(t, err)
+	_, err = col.InsertOne(context.Background(), bson.D{{Key: "negocio_id", Value: negocio}, {Key: "tipo", Value: "ine_frente"}, {Key: "estado", Value: "vigente"}})
+	assert.True(t, mongodrv.IsDuplicateKeyError(err), "un registro por negocio y tipo")
 }
 
 func TestIndexes_NegociosTextAndPartial(t *testing.T) {

@@ -44,6 +44,15 @@ type Result struct {
 	ExportsFailed int
 	Notified      int
 	NoticeFailed  int
+	// Retained son los registros vencidos que borraron las tareas de retención (nv-55).
+	Retained int
+}
+
+// Tarea es una tarea de retención que corre con el candado del trabajo nocturno (nv-55: el
+// expediente del negocio). Devuelve cuántos registros borró.
+type Tarea interface {
+	Name() string
+	Run(ctx context.Context) (int, error)
 }
 
 // Job es el trabajo nocturno: borra las cuentas vencidas y arma las exportaciones pendientes.
@@ -54,11 +63,18 @@ type Job struct {
 	registry *Registry
 	links    LinkSender
 	log      *slog.Logger
+	tareas   []Tarea
 }
 
 // NewJob recibe todo por constructor.
 func NewJob(rdb *goredis.Client, accounts DueAccounts, exports *Exports, registry *Registry, links LinkSender, log *slog.Logger) *Job {
 	return &Job{rdb: rdb, accounts: accounts, exports: exports, registry: registry, links: links, log: log}
+}
+
+// WithTareas agrega tareas de retención; corren después de los borrados de cuentas.
+func (j *Job) WithTareas(t ...Tarea) *Job {
+	j.tareas = append(j.tareas, t...)
+	return j
 }
 
 // Start programa el trabajo todos los días a esa hora de America/Mexico_City con gocron. La hora
@@ -102,13 +118,25 @@ func (j *Job) RunOnce(ctx context.Context) (Result, error) {
 	res := Result{Ran: true}
 	now := time.Now().UTC()
 	j.deleteDue(ctx, now, &res)
+	j.runTareas(ctx, &res)
 	j.buildExports(ctx, now, &res)
 	j.sendNotices(ctx, now, &res)
 	j.log.InfoContext(ctx, "trabajo nocturno terminado",
 		"cuentas_borradas", res.Deleted, "borrados_fallidos", res.DeleteFailed,
 		"exportaciones", res.Exported, "exportaciones_fallidas", res.ExportsFailed,
-		"avisos", res.Notified, "avisos_fallidos", res.NoticeFailed)
+		"avisos", res.Notified, "avisos_fallidos", res.NoticeFailed, "retenidos_borrados", res.Retained)
 	return res, nil
+}
+
+func (j *Job) runTareas(ctx context.Context, res *Result) {
+	for _, t := range j.tareas {
+		n, err := t.Run(ctx)
+		res.Retained += n
+		if err != nil {
+			// Lo que falló sigue vencido y se reintenta la noche siguiente.
+			j.log.ErrorContext(ctx, "trabajo nocturno: retención incompleta", "tarea", t.Name(), "error", err.Error())
+		}
+	}
 }
 
 func (j *Job) deleteDue(ctx context.Context, now time.Time, res *Result) {

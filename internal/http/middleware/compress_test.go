@@ -27,6 +27,8 @@ func compressApp() *fiber.App {
 	app.Get("/api/v1/usuarios", reply)
 	app.Post("/api/v1/planes/:id/compartir", reply)
 	app.Post("/api/v1/planes/:id/clonar", reply)
+	app.Get("/api/v1/negocios/:id/documentos/:tipo", reply)
+	app.Get("/api/v1/admin/negocios/:id/documentos/:tipo", reply)
 	return app
 }
 
@@ -55,4 +57,6 @@ func TestCompress_LoQueLlevaTokensNoSeComprime(t *testing.T) {
 	assert.Equal(t, "gzip", encodingOf(t, http.MethodGet, "/api/v1/usuarios", "gzip"), "solo se excluye el POST")
 	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/planes/abc/compartir", "gzip"), "el enlace de un plan lleva su código (nv-38)")
 	assert.Equal(t, "gzip", encodingOf(t, http.MethodPost, "/api/v1/planes/abc/clonar", "gzip"))
+	assert.Empty(t, encodingOf(t, http.MethodGet, "/api/v1/negocios/abc/documentos/ine_frente", "gzip"), "el expediente sale descifrado (nv-55)")
+	assert.Empty(t, encodingOf(t, http.MethodGet, "/api/v1/admin/negocios/abc/documentos/datos_fiscales", "gzip"))
 }

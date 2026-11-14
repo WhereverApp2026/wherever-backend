@@ -46,6 +46,7 @@ type Service struct {
 	log       *slog.Logger
 	consents  *usuarios.ConsentRepository
 	versions  Versions
+	retiro    RetiroDatosNegocio
 }
 
 // NewService arma el servicio; falla solo si no puede preparar el hasher.

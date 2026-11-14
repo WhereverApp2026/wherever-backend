@@ -34,7 +34,7 @@ func TestLogger_LineaJSONConCamposParaCloudWatch(t *testing.T) {
 }
 
 func TestLogger_LlavesSensiblesSeOcultan(t *testing.T) {
-	for _, key := range []string{"password", "token", "refresh_token", "authorization", "jwt"} {
+	for _, key := range []string{"password", "token", "refresh_token", "authorization", "jwt", "clabe", "rfc", "razon_social", "archivo"} {
 		raw, _ := line(t, func(l *slog.Logger) { l.Info("x", key, "valor-secreto") })
 		assert.NotContains(t, raw, "valor-secreto", key)
 	}

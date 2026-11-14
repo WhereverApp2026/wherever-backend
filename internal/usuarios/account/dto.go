@@ -171,6 +171,7 @@ type PrivacyResponse struct {
 	NoticeVersion      string    `json:"version_aviso_privacidad"`
 	AcceptedAt         time.Time `json:"fecha_aceptacion"`
 	PromoEmail         bool      `json:"promociones_correo"`
+	BusinessData       bool      `json:"datos_negocio,omitempty"`
 	// ConsentCurrent dice si aceptó las versiones vigentes (nv-19); si es falso, la app vuelve
 	// a pedir la aceptación. No va en "Descargar mis datos".
 	ConsentCurrent *bool `json:"consentimiento_vigente,omitempty"`
@@ -182,6 +183,9 @@ type ConsentRequest struct {
 	TermsVersion  string `json:"version_terminos" validate:"required,max=20"`
 	NoticeVersion string `json:"version_aviso_privacidad" validate:"required,max=20"`
 	PromoEmail    *bool  `json:"promociones_correo"`
+	// BusinessData es el consentimiento expreso `datos_negocio` (nv-55); ausente conserva el
+	// valor y false lo retira (oposición: se borra el expediente del negocio).
+	BusinessData *bool `json:"datos_negocio"`
 }
 
 // ConsentResponse es la aceptación registrada.
@@ -189,13 +193,14 @@ type ConsentResponse struct {
 	TermsVersion   string    `json:"version_terminos"`
 	NoticeVersion  string    `json:"version_aviso_privacidad"`
 	PromoEmail     bool      `json:"promociones_correo"`
+	BusinessData   bool      `json:"datos_negocio,omitempty"`
 	AcceptedAt     time.Time `json:"fecha_aceptacion"`
 	ConsentCurrent bool      `json:"consentimiento_vigente"`
 }
 
 func consentResponse(c usuarios.Consent, current bool) ConsentResponse {
 	return ConsentResponse{TermsVersion: c.TermsVersion, NoticeVersion: c.NoticeVersion, PromoEmail: c.PromoEmail,
-		AcceptedAt: c.AcceptedAt.UTC(), ConsentCurrent: current}
+		BusinessData: c.BusinessData, AcceptedAt: c.AcceptedAt.UTC(), ConsentCurrent: current}
 }
 
 // ProfileResponse es el perfil propio. Nunca lleva password_hash, telefono_hash ni google_id.
@@ -271,6 +276,7 @@ func privacyResponse(p usuarios.Privacy) PrivacyResponse {
 		Location: p.Location, Learning: p.Learning, Mood: p.Mood, SensitiveData: p.SensitiveData, UsageData: p.UsageData,
 		PhoneSearchable: p.PhoneSearchable, UsernameSearchable: p.SearchableByUsername(),
 		TermsVersion: p.TermsVersion, NoticeVersion: p.NoticeVersion, AcceptedAt: p.AcceptedAt, PromoEmail: p.PromoEmail,
+		BusinessData: p.BusinessData,
 	}
 }
 

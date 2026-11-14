@@ -35,6 +35,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -55,6 +57,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/climatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/imagenestest"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/negociostest"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
@@ -74,6 +77,10 @@ type Env struct {
 	Account         *account.Service
 	Cities          *ciudades.Service
 	Negocios        *negocios.Service
+	Alta            *alta.Service          // alta por pasos y revisión (nv-55)
+	Expediente      *expediente.Service    // expediente cifrado (nv-55)
+	Almacen         *negociostest.Almacen  // doble del bucket privado (S3)
+	ImagenesNegocio *negociostest.Imagenes // doble de las fotos del alta (nv-55); el módulo real es Imagenes (nv-45)
 	Planes          *planes.Service
 	Votaciones      *votaciones.Service
 	Chat            *chat.Service
@@ -206,11 +213,20 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
+	almacen := negociostest.NuevoAlmacen()
+	fotosNegocio := negociostest.NuevasImagenes()
+	exp := expediente.NewService(expediente.NewRepository(client.DB()), testCipher(t, cfg.DataKeys), almacen, log)
+	expPrivacy := expediente.NewPrivacy(exp)
+	registry.RegisterPurger(alta.NewPrivacy(businessRepo, businesses))
+	registry.RegisterPurger(expPrivacy)
+	registry.RegisterExporter(expPrivacy)
+	altaSvc := alta.NewService(businessRepo, exp, users, cursor, alta.Config{AvisoVersion: cfg.VersionApp.Aviso}, log).
+		WithImagenes(fotosNegocio).WithFichas(businesses).WithNotifier(notifier)
 	registry.RegisterExporter(images.Privacy)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
-	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso})
+	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}).WithRetiroDatosNegocio(expPrivacy)
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
 	openMeteo := climatest.Nuevo(t)
@@ -228,9 +244,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	chats := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Chat: chats, Moderacion: mods,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log), Mail: mail, Log: log, Logs: logs,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -240,6 +257,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			semantica.NewHandler(sem, v),
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
 			negocios.NewHandler(businesses, v),
+			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos
