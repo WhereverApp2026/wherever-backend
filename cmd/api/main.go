@@ -266,8 +266,6 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
-		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
-		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
 		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
