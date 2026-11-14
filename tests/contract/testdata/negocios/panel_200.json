@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "avance_sello": {
+      "criterios": [
+        {
+          "actual": "number",
+          "cumple": "bool",
+          "meta": "number",
+          "nombre": "string"
+        }
+      ],
+      "elegible": "bool"
+    },
+    "calificacion_semana": "null",
+    "cambio_vs_semana_anterior": "null",
+    "cambios_pendientes": "null",
+    "cuenta_deposito": "null",
+    "cupones_activos": "null",
+    "cupones_canjeados_hoy": "null",
+    "datos_fiscales_completos": "bool",
+    "estado": "string",
+    "llegadas_hoy": "null",
+    "negocio_id": "string",
+    "nombre": "string",
+    "pausado": "null",
+    "proxima_reserva": "null",
+    "resenas_por_responder": "null",
+    "reservas_hoy": "null",
+    "sello_excelencia": "bool"
+  }
+}

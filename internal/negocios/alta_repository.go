@@ -105,27 +105,27 @@ func (r *Repository) ListByOwner(ctx context.Context, owner bson.ObjectID) ([]Bu
 // ApplyIf aplica `$set` (más `actualizado_en` y `version + 1`) si el negocio cumple el filtro
 // y devuelve el documento nuevo. ErrNoAplica si no coincide.
 func (r *Repository) ApplyIf(ctx context.Context, filter, set bson.D) (Business, error) {
-	set = append(set, bson.E{Key: "actualizado_en", Value: time.Now().UTC()})
-	update := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
-	var b Business
-	err := r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&b)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return Business{}, ErrNoAplica
-	}
-	return b, err
+	return r.ChangeIf(ctx, filter, set)
 }
 
-// Queue trae hasta limit+1 negocios del estado, del envío más viejo al más nuevo (ix_revision).
+// Queue trae hasta limit+1 negocios de la cola, del envío más viejo al más nuevo. Con
+// EstadoCambiosPendientes trae los aprobados o pausados con `cambios_pendientes` (nv-56); si no,
+// los del estado (ix_revision).
 func (r *Repository) Queue(ctx context.Context, state string, after *QueuePosition, limit int) ([]Business, error) {
+	sentField := "revision.enviado_en"
 	filter := bson.D{{Key: "estado", Value: state}, {Key: "eliminado_en", Value: bson.D{{Key: "$exists", Value: false}}}}
+	if state == EstadoCambiosPendientes {
+		sentField = "cambios_pendientes.enviado_en"
+		filter = bson.D{{Key: "cambios_pendientes", Value: bson.D{{Key: "$exists", Value: true}}}, {Key: "eliminado_en", Value: bson.D{{Key: "$exists", Value: false}}}}
+	}
 	if after != nil {
 		filter = append(filter, bson.E{Key: "$or", Value: bson.A{
-			bson.D{{Key: "revision.enviado_en", Value: bson.D{{Key: "$gt", Value: after.SentAt}}}},
-			bson.D{{Key: "revision.enviado_en", Value: after.SentAt}, {Key: "_id", Value: bson.D{{Key: "$gt", Value: after.ID}}}},
+			bson.D{{Key: sentField, Value: bson.D{{Key: "$gt", Value: after.SentAt}}}},
+			bson.D{{Key: sentField, Value: after.SentAt}, {Key: "_id", Value: bson.D{{Key: "$gt", Value: after.ID}}}},
 		}})
 	}
 	cur, err := r.col.Find(ctx, filter, options.Find().
-		SetSort(bson.D{{Key: "revision.enviado_en", Value: 1}, {Key: "_id", Value: 1}}).
+		SetSort(bson.D{{Key: sentField, Value: 1}, {Key: "_id", Value: 1}}).
 		SetLimit(int64(limit+1)))
 	if err != nil {
 		return nil, err

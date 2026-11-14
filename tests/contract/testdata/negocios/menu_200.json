@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "body": {
+    "secciones": [
+      {
+        "nombre": "string",
+        "platillos": [
+          {
+            "descripcion": "string",
+            "etiquetas": [
+              "string"
+            ],
+            "foto_url": "null",
+            "id": "string",
+            "nombre": "string",
+            "precio": "number"
+          }
+        ]
+      }
+    ]
+  }
+}

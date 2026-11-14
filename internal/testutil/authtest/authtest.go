@@ -37,6 +37,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -81,6 +83,9 @@ type Env struct {
 	Expediente      *expediente.Service    // expediente cifrado (nv-55)
 	Almacen         *negociostest.Almacen  // doble del bucket privado (S3)
 	ImagenesNegocio *negociostest.Imagenes // doble de las fotos del alta (nv-55); el módulo real es Imagenes (nv-45)
+	Panel           *panel.Service         // panel del negocio (nv-56); las pruebas registran fuentes y observadores
+	Menu            *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
+	PanelTarea      *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
 	Planes          *planes.Service
 	Votaciones      *votaciones.Service
 	Chat            *chat.Service
@@ -223,6 +228,13 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	altaSvc := alta.NewService(businessRepo, exp, users, cursor, alta.Config{AvisoVersion: cfg.VersionApp.Aviso}, log).
 		WithImagenes(fotosNegocio).WithFichas(businesses).WithNotifier(notifier)
 	registry.RegisterExporter(images.Privacy)
+	menuRepo := menu.NewRepository(client.DB())
+	menus := menu.NewService(menuRepo, businessRepo, log).WithImagenes(fotosNegocio)
+	panels := panel.NewService(businessRepo, menuRepo, exp, businesses, log).WithNotifier(notifier)
+	if images.Service != nil {
+		panels.WithImagenes(images.Service)
+	}
+	registry.RegisterExporter(panel.NewPrivacy(businessRepo, menuRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -245,8 +257,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp)), Mail: mail, Log: log, Logs: logs,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels),
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -256,8 +268,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 			semantica.NewHandler(sem, v),
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
+			menu.NewHandler(menus, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que negocios
 			negocios.NewHandler(businesses, v),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
+			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos

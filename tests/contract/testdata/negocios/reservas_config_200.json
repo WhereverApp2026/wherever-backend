@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "body": {
+    "reservas_config": {
+      "acepta_reservas": "bool",
+      "anticipo": {
+        "tipo": "string",
+        "valor": "number"
+      },
+      "capacidad_por_horario": "number",
+      "confirmacion": "string",
+      "duracion_turno_min": "number",
+      "permite_cambios": "bool",
+      "politica_cancelacion": "string"
+    },
+    "version": "number"
+  }
+}

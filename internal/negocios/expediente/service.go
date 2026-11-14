@@ -317,6 +317,19 @@ func (s *Service) Cancelar(ctx context.Context, owner bson.ObjectID) error {
 	if err != nil {
 		return err
 	}
+	return s.cancelar(ctx, rows)
+}
+
+// CancelarNegocio es Cancelar para un solo negocio: la baja desde el panel (nv-56).
+func (s *Service) CancelarNegocio(ctx context.Context, negocio bson.ObjectID) error {
+	rows, err := s.repo.Listar(ctx, negocio)
+	if err != nil {
+		return err
+	}
+	return s.cancelar(ctx, rows)
+}
+
+func (s *Service) cancelar(ctx context.Context, rows []Documento) error {
 	hasta := s.now().UTC().Add(RetencionFiscales)
 	var errs []error
 	for _, d := range rows {

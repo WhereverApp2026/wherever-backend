@@ -22,6 +22,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
@@ -63,6 +64,7 @@ var expected = map[string][]string{
 	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
 	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
+	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -164,6 +166,24 @@ func TestIndexes_ExpedienteNegocio(t *testing.T) {
 	require.NoError(t, err)
 	_, err = col.InsertOne(context.Background(), bson.D{{Key: "negocio_id", Value: negocio}, {Key: "tipo", Value: "ine_frente"}, {Key: "estado", Value: "vigente"}})
 	assert.True(t, mongodrv.IsDuplicateKeyError(err), "un registro por negocio y tipo")
+}
+
+// El menú (nv-56): búsqueda dentro del negocio en español, sin acentos.
+func TestIndexes_Menu(t *testing.T) {
+	db := freshDB(t)
+	require.NoError(t, mongo.EnsureIndexes(context.Background(), db, indexes.All()...))
+	got := specs(t, db, menu.Collection)
+	require.Contains(t, got, "ix_menu")
+	require.Contains(t, got, "ix_menu_texto")
+	cur, err := db.Collection(menu.Collection).Indexes().List(context.Background())
+	require.NoError(t, err)
+	var raw []bson.M
+	require.NoError(t, cur.All(context.Background(), &raw))
+	for _, idx := range raw {
+		if idx["name"] == "ix_menu_texto" {
+			assert.Equal(t, "spanish", idx["default_language"])
+		}
+	}
 }
 
 func TestIndexes_NegociosTextAndPartial(t *testing.T) {

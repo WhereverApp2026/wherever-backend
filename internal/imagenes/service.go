@@ -309,3 +309,25 @@ func idValido(id string) bool {
 	_, err := hex.DecodeString(id)
 	return err == nil
 }
+
+// ErrNoPublicada: la imagen no existe, es ajena o no está publicada.
+var ErrNoPublicada = errors.New("imagen no publicada o ajena")
+
+// Publicada devuelve la dirección de 1080 px de una imagen publicada del dueño. La usan la
+// galería del alta (nv-55) y el menú (nv-56) para guardar solo fotos ya moderadas.
+func (s *Service) Publicada(ctx context.Context, dueno bson.ObjectID, id string) (string, error) {
+	if !idValido(id) {
+		return "", ErrNoPublicada
+	}
+	img, err := s.repo.Buscar(ctx, id, dueno)
+	if errors.Is(err, ErrNotFound) {
+		return "", ErrNoPublicada
+	}
+	if err != nil {
+		return "", err
+	}
+	if img.Estado != EstadoPublicada {
+		return "", ErrNoPublicada
+	}
+	return s.cfg.URLPublica + "/" + clavePublicada(img.ID, LadoGrande), nil
+}

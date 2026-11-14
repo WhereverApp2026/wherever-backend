@@ -39,6 +39,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
@@ -220,7 +222,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
-	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, notifier, registry, log)
+	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, log)
+	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, log)
 	registry.RegisterExporter(imagePrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
@@ -258,8 +261,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
+		// El menú va antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
+		menu.NewHandler(merchant.menu, validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
+		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		// Cola de revisión y reglas (nv-43); el Moderador que las usa lo arma nv-45.
 		moderacion.NewHandler(moderacion.NewService(modRepo, cursor, log), validator),
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
@@ -281,7 +287,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
-	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion), nil
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea), nil
 }
 
 // buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no
