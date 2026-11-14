@@ -3,6 +3,7 @@
   "body": {
     "amistades": [],
     "busquedas_recientes": [],
+    "checkins": [],
     "consentimientos": [],
     "cupones": [],
     "descartes_usuario": [],
@@ -25,6 +26,7 @@
     },
     "pagos": [],
     "planes": [],
+    "resenas": [],
     "reservas": [],
     "sesiones": [
       {

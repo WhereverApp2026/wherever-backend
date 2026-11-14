@@ -34,10 +34,10 @@ const (
 
 // Estados de la cartera.
 const (
-	CarteraGuardado  = "guardado"
-	CarteraEnCanje   = "en_canje"
-	CarteraCanjeado  = "canjeado"
-	CarteraVencido   = "vencido"
+	CarteraGuardado   = "guardado"
+	CarteraEnCanje    = "en_canje"
+	CarteraCanjeado   = "canjeado"
+	CarteraVencido    = "vencido"
 	duracionRelampago = 3 * time.Hour
 	// VidaCodigo es lo que vive el código de canje y la ventana del reintento del negocio.
 	VidaCodigo = 5 * time.Minute
