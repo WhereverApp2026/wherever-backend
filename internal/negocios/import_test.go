@@ -209,6 +209,16 @@ func TestValidateRows_Photos(t *testing.T) {
 	assert.Contains(t, fieldsOf(errs), "fotos")
 }
 
+func TestValidateRows_WithoutPhotosIsValid(t *testing.T) {
+	values := validRowValues()
+	values["fotos"] = ""
+	rows, _, err := Parse(strings.NewReader(csvBody(values)), "csv")
+	require.NoError(t, err)
+	valid, errs := validateRows(rows)
+	assert.Empty(t, errs)
+	assert.Len(t, valid, 1)
+}
+
 func TestValidateRows_DuplicateSlug(t *testing.T) {
 	body := strings.Join(CSVHeader, ",") + "\n" + csvLine(validRowValues()) + "\n" + csvLine(validRowValues()) + "\n"
 	rows, _, err := Parse(strings.NewReader(body), "csv")
