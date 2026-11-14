@@ -27,6 +27,10 @@ const (
 	// KindGroupMessage avisa que hay mensajes nuevos en el chat de un grupo (nv-57); uno por
 	// grupo y persona cada 5 minutos, sin texto ni autor.
 	KindGroupMessage = "mensaje_grupo"
+	// Avisos de momentos (nv-63): solo el id del momento, nunca la imagen ni el texto.
+	KindMomentTagged   = "etiqueta_momento"
+	KindMomentThanked  = "momento_agradecido"
+	KindMomentFeatured = "momento_destacado"
 )
 
 // Límites de la spec.

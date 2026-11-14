@@ -18,6 +18,7 @@
       "reacciones": []
     },
     "moderacion": [],
+    "momentos": [],
     "negocios": [],
     "negocios_expediente": [],
     "notificaciones": {
@@ -26,6 +27,8 @@
     },
     "pagos": [],
     "planes": [],
+    "postales": [],
+    "recuerdos": [],
     "resenas": [],
     "reservas": [],
     "sesiones": [

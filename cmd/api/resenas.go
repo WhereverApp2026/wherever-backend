@@ -10,6 +10,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
@@ -40,12 +41,15 @@ func buildResenas(db *mongodriver.Database, places *negocios.Repository, fichas 
 type iaClientes struct {
 	cupones    *cupones.Service
 	resenas    *resenas.Service
+	postales   *postales.Service
 	moderacion *moderacion.Service
 }
 
 // conectar da la guardia a los títulos de cupones (nv-61) y a las reseñas (nv-62): respuesta
-// sugerida y moderación del texto con los umbrales de `moderacion_reglas`.
+// sugerida y moderación del texto con los umbrales de `moderacion_reglas`; y a los textos de
+// postales y momentos (nv-63).
 func (c iaClientes) conectar(guardia *ia.Guardia, log *slog.Logger) {
 	c.cupones.WithIA(guardia)
 	c.resenas.WithIA(guardia).WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
+	c.postales.WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
 }
