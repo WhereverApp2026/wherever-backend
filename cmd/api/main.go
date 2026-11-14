@@ -42,6 +42,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/cache"
@@ -225,7 +226,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
-	bookings := buildReservas(db, businessRepo, users, redisClient, cursor, registry, log)
+	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, registry, log)
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, log)
 	registry.RegisterExporter(imagePrivacy)
@@ -271,6 +272,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),
+		pagos.NewHandler(bookings.pagos, validator).WithActiveGuard(active),
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
 		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
@@ -290,7 +292,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
-	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea), nil
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, pagos.NewTarea(bookings.pagos)), nil
 }
 
 // buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no

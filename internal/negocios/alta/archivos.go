@@ -170,8 +170,11 @@ func (s *Service) GuardarFiscales(ctx context.Context, claims *middleware.Claims
 	})
 }
 
-// EstadoSinVerificar es el estado de la cuenta hasta que nv-60 la verifique.
-const EstadoSinVerificar = "sin_verificar"
+// Estados de la cuenta de depósito: `sin_verificar` hasta que nv-60 la registra en Stripe.
+const (
+	EstadoSinVerificar = "sin_verificar"
+	EstadoRegistrada   = "registrada"
+)
 
 // GuardarCuenta guarda la CLABE cifrada y deja en `negocios` solo la versión enmascarada.
 func (s *Service) GuardarCuenta(ctx context.Context, claims *middleware.Claims, id string, req CuentaRequest) (negocios.CuentaMascara, error) {
@@ -187,6 +190,15 @@ func (s *Service) GuardarCuenta(ctx context.Context, claims *middleware.Claims, 
 		return negocios.CuentaMascara{}, err
 	}
 	m := negocios.CuentaMascara{Ultimos4: expediente.Enmascarar(c.CLABE), Banco: c.Banco, Titular: c.Titular, Estado: EstadoSinVerificar}
+	if s.deposito != nil {
+		// Si Stripe falla, la cuenta queda sin verificar y se registra al conectar los cobros.
+		externa, err := s.deposito.RegistrarCuenta(ctx, b, c.CLABE, c.Titular)
+		if err != nil {
+			s.log.Warn("alta: la cuenta de depósito no se registró en Stripe", "evento", "cuenta_stripe_fallo", "error", err.Error())
+		} else if externa != "" {
+			m.Estado, m.StripeExternalAccountID = EstadoRegistrada, externa
+		}
+	}
 	if err := s.repo.SetCuentaDeposito(ctx, b.ID, m); err != nil {
 		return negocios.CuentaMascara{}, errStore()
 	}

@@ -62,6 +62,7 @@ type Service struct {
 	imagenes Imagenes
 	fichas   Fichas
 	notifier notificaciones.Notifier
+	deposito Deposito
 	cursor   *pagination.Signer
 	cfg      Config
 	log      *slog.Logger
@@ -77,6 +78,18 @@ func NewService(repo *negocios.Repository, exp *expediente.Service, cuentas Cuen
 }
 
 // WithImagenes conecta la subida de nv-45; sin ella las rutas de fotos responden 503.
+// Deposito registra la CLABE como cuenta externa en Stripe (nv-60). Devuelve el id de la
+// cuenta externa, o "" si el negocio aún no conecta su cuenta (se registra al conectar).
+type Deposito interface {
+	RegistrarCuenta(ctx context.Context, b negocios.Business, clabe, titular string) (string, error)
+}
+
+// WithDeposito conecta el registro en Stripe de la cuenta de depósito (nv-60).
+func (s *Service) WithDeposito(d Deposito) *Service {
+	s.deposito = d
+	return s
+}
+
 func (s *Service) WithImagenes(i Imagenes) *Service {
 	s.imagenes = i
 	return s

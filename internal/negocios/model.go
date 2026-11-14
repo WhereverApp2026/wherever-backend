@@ -131,6 +131,8 @@ type CuentaMascara struct {
 	Banco    string `bson:"banco" json:"banco"`
 	Titular  string `bson:"titular" json:"titular"`
 	Estado   string `bson:"estado" json:"estado"`
+	// StripeExternalAccountID es la cuenta externa en Stripe (nv-60); no sale en JSON.
+	StripeExternalAccountID string `bson:"stripe_external_account_id,omitempty" json:"-"`
 }
 
 // Business es el documento de `negocios`: A2 §1 más los campos de control de A5 §1 que

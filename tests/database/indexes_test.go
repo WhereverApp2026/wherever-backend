@@ -24,6 +24,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
@@ -66,6 +67,8 @@ var expected = map[string][]string{
 	vaca.DebtsCollection:                {"_id_", "ux_deuda_corte", "ix_deudas_grupo", "ix_mis_deudas", "ix_mis_deudas_acreedor"},
 	reservas.Collection:                 {"_id_", "ux_codigo", "ix_mis_reservas", "ix_agenda_negocio", "ix_bloqueos", "ix_recordatorios"},
 	reservas.BloqueosCollection:         {"_id_", "ix_bloqueo_negocio"},
+	pagos.Collection:                    {"_id_", "ux_payment_intent", "ux_idempotency", "ix_pago_reserva", "ix_conciliacion", "ix_pago_usuario", "ttl_conservar_hasta"},
+	pagos.LiquidacionesCollection:       {"_id_", "ux_liquidacion", "ix_liquidacion_estado", "ttl_liquidacion_conservar"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 }
@@ -132,6 +135,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		vaca.ExpensesCollection:          {"ux_id_cliente"},
 		vaca.DebtsCollection:             {"ux_deuda_corte"},
 		reservas.Collection:              {"ux_codigo"},
+		pagos.Collection:                 {"ux_payment_intent", "ux_idempotency"},
+		pagos.LiquidacionesCollection:    {"ux_liquidacion"},
 		errores.Collection:               {"ux_huella"},
 	} {
 		got := specs(t, db, collection)
@@ -140,7 +145,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 			assert.True(t, *got[name].Unique, name)
 		}
 	}
-	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion", asistente.DescartesCollection: "ttl_descarte", chat.NoticeCollection: "ttl_hasta"} {
+	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion", asistente.DescartesCollection: "ttl_descarte", chat.NoticeCollection: "ttl_hasta",
+		pagos.Collection: "ttl_conservar_hasta", pagos.LiquidacionesCollection: "ttl_liquidacion_conservar"} {
 		ttl := specs(t, db, collection)[name]
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)

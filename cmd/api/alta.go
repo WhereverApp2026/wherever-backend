@@ -15,6 +15,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
@@ -57,7 +58,9 @@ func buildAlta(cfg config.Config, db *mongodriver.Database, repo *negocios.Repos
 	registry.RegisterPurger(privacy)
 	registry.RegisterExporter(privacy)
 	svc := alta.NewService(repo, exp, users, cursor, alta.Config{AvisoVersion: cfg.VersionApp.Aviso}, log).
-		WithFichas(fichas).WithNotifier(notifier)
+		WithFichas(fichas).WithNotifier(notifier).WithDeposito(res.pagos)
+	// Al conectar la cuenta de Stripe (nv-60) se registra la CLABE que el dueño ya guardó.
+	res.pagos.WithCLABEs(pagos.CLABEsDe(exp))
 	var fotos alta.Imagenes
 	if images != nil {
 		fotos = fotosPublicadas{svc: images}

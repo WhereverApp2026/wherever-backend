@@ -14,8 +14,9 @@ import (
 // envExamplePath apunta a la plantilla relativa a este paquete.
 const envExamplePath = "../../../configs/.env.example"
 
-// futurePrefixes son claves de integraciones fuera de esta etapa. FCM entró con nv-41.
-var futurePrefixes = []string{"STRIPE_", "AWS_", "PERF_"}
+// futurePrefixes son claves de integraciones fuera de esta etapa. FCM entró con nv-41 y Stripe
+// con nv-60.
+var futurePrefixes = []string{"AWS_", "PERF_"}
 
 // sensitivePatterns detectan valores reales que no deben vivir en Git.
 var sensitivePatterns = map[string]*regexp.Regexp{

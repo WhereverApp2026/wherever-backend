@@ -131,6 +131,9 @@ const (
 	KeyImagenesBucket   = "IMAGENES_BUCKET"
 	KeyImagenesURL      = "IMAGENES_URL"
 	KeyImagenesRegion   = "IMAGENES_REGION"
+	KeyStripeSecretKey  = "STRIPE_SECRET_KEY"     // #nosec G101 -- nombre de la variable, no su valor
+	KeyStripeWebhook    = "STRIPE_WEBHOOK_SECRET" // #nosec G101 -- nombre de la variable, no su valor
+	KeyStripeAPIURL     = "STRIPE_API_URL"
 )
 
 // DefaultImagenesRegion es la región del bucket y de Rekognition (nv-44, nv-45).
@@ -159,6 +162,7 @@ var optionalKeys = []string{
 	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
 	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL, KeyDataKeys,
 	KeyImagenesBucket, KeyImagenesURL, KeyImagenesRegion,
+	KeyStripeSecretKey, KeyStripeWebhook, KeyStripeAPIURL,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -200,6 +204,8 @@ type Config struct {
 	// Imagenes es el bucket y el CloudFront de imágenes (nv-44, nv-45); sin ellos las rutas
 	// de imágenes responden 503.
 	Imagenes Imagenes
+	// Stripe cobra el anticipo de las reservas (nv-60); sin llave las rutas de pago dan 503.
+	Stripe Stripe
 }
 
 // IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
@@ -298,6 +304,11 @@ func Load(getenv func(string) string) (Config, error) {
 			ProjectID:      strings.TrimSpace(getenv(KeyFCMProjectID)),
 			CredentialsB64: strings.TrimSpace(getenv(KeyFCMCredenciales)),
 			BaseURL:        strings.TrimSpace(getenv(KeyFCMURL)),
+		},
+		Stripe: Stripe{
+			SecretKey:     strings.TrimSpace(getenv(KeyStripeSecretKey)),
+			WebhookSecret: strings.TrimSpace(getenv(KeyStripeWebhook)),
+			APIURL:        strings.TrimRight(strings.TrimSpace(getenv(KeyStripeAPIURL)), "/"),
 		},
 		Imagenes: Imagenes{
 			Bucket: strings.TrimSpace(getenv(KeyImagenesBucket)),
@@ -432,6 +443,7 @@ func (c Config) validate() []error {
 	errs = append(errs, c.IA.validate()...)
 	errs = append(errs, c.FCM.validate(c.Env)...)
 	errs = append(errs, c.Imagenes.validate(c.Env)...)
+	errs = append(errs, c.Stripe.validate(c.Env)...)
 	errs = append(errs, c.validateDataKeys()...)
 	return append(errs, c.validateLimits()...)
 }
@@ -668,6 +680,35 @@ func (f FCM) validate(env string) []error {
 	}
 	if f.BaseURL != "" && env == EnvProd {
 		errs = append(errs, fmt.Errorf("%s no se cambia en prod", KeyFCMURL))
+	}
+	return errs
+}
+
+// Stripe son las llaves de Stripe (nv-60), SecureString en Parameter Store. La publicable es de
+// la app, no del backend.
+type Stripe struct {
+	SecretKey     string
+	WebhookSecret string
+	// APIURL apunta al doble de Stripe en pruebas; vacío = la API real.
+	APIURL string
+}
+
+// Enabled dice si hay llave secreta.
+func (s Stripe) Enabled() bool { return s.SecretKey != "" }
+
+// validate: fuera de prod una llave `sk_live_` o `rk_live_` no arranca (nunca se cobra de verdad
+// en dev ni staging); en prod no se aceptan llaves de prueba ni STRIPE_API_URL.
+func (s Stripe) validate(env string) []error {
+	var errs []error
+	live := strings.HasPrefix(s.SecretKey, "sk_live_") || strings.HasPrefix(s.SecretKey, "rk_live_")
+	if live && env != EnvProd {
+		errs = append(errs, fmt.Errorf("%s: una llave live solo se usa en prod", KeyStripeSecretKey))
+	}
+	if env == EnvProd && s.SecretKey != "" && !live {
+		errs = append(errs, fmt.Errorf("%s: en prod la llave debe ser live", KeyStripeSecretKey))
+	}
+	if s.APIURL != "" && env == EnvProd {
+		errs = append(errs, fmt.Errorf("%s no se cambia en prod", KeyStripeAPIURL))
 	}
 	return errs
 }

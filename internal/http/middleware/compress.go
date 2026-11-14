@@ -17,6 +17,12 @@ const (
 	businessPrefix = "/api/v1/negocios/"
 	adminBusiness  = "/api/v1/admin/negocios/"
 	docsSegment    = "/documentos/"
+	// El cobro del anticipo (nv-60) devuelve el `client_secret` de Stripe; el webhook tampoco se
+	// comprime.
+	bookingsPrefix = "/api/v1/reservas/"
+	paySuffix      = "/pago"
+	// StripeWebhookPath es la ruta del webhook de Stripe (nv-60).
+	StripeWebhookPath = "/api/v1/webhooks/stripe"
 )
 
 // Compress comprime las respuestas según Accept-Encoding: detrás de CloudFront sin caché y sin Caddy
@@ -30,12 +36,15 @@ func carriesTokens(c *fiber.Ctx) bool {
 	if strings.HasPrefix(path, authPrefix) {
 		return true
 	}
-	if c.Method() == fiber.MethodGet && strings.Contains(path, docsSegment) &&
-		(strings.HasPrefix(path, businessPrefix) || strings.HasPrefix(path, adminBusiness)) {
-		return true
+	if c.Method() == fiber.MethodGet {
+		return strings.Contains(path, docsSegment) && (strings.HasPrefix(path, businessPrefix) || strings.HasPrefix(path, adminBusiness))
 	}
-	if c.Method() != fiber.MethodPost {
-		return false
-	}
-	return path == registerPath || (strings.HasPrefix(path, plansPrefix) && strings.HasSuffix(path, shareSuffix))
+	return c.Method() == fiber.MethodPost && postCarriesTokens(path)
+}
+
+// postCarriesTokens: registro, enlace de plan, cobro del anticipo y webhook de Stripe.
+func postCarriesTokens(path string) bool {
+	return path == registerPath || path == StripeWebhookPath ||
+		(strings.HasPrefix(path, plansPrefix) && strings.HasSuffix(path, shareSuffix)) ||
+		(strings.HasPrefix(path, bookingsPrefix) && strings.HasSuffix(path, paySuffix))
 }

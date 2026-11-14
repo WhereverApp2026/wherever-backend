@@ -14,6 +14,7 @@
 | Expediente del negocio | 10 | 1 h | `POST /api/v1/negocios/{id}/documentos`, `PUT /api/v1/negocios/{id}/datos-fiscales` y `PUT /api/v1/negocios/{id}/cuenta-deposito` por usuario (`rate:expediente:{usuario}`, ventana fija), para que no se prueben CLABE ni RFC en masa; un `INCR` con TTL por petición | nv-55 |
 | Admin | 200 | 1 min | `POST /api/v1/admin/negocios/importar`, `/api/v1/admin/moderacion/*` y `GET /api/v1/admin/errores` por IP, en la misma cuenta (`rate:admin:{ip}`) | nv-20, nv-43, nv-64 |
 | Reservas | 10 | 1 h | `POST /api/v1/reservas` por usuario (`rate:reservas:{usuario}`, ventana fija); cuenta también las repetidas con la misma `Idempotency-Key`. La disponibilidad solo usa el global | nv-59 |
+| Pagos | 10 | 1 h | `POST /api/v1/reservas/{id}/pago` por usuario (`rate:pagos:{usuario}`, ventana fija). El webhook de Stripe solo cuenta en el global (exento del límite de escrituras por IP) | nv-60 |
 | Writes | 10 | concurrentes por usuario | POST/PUT/PATCH/DELETE | nv-01 (por IP hasta que exista auth) |
 | IA por usuario | 10 generaciones (5 planes: interpretar + itinerario) | 1 h | `POST /api/v1/planes/generar*` por usuario (`rate:ia_usuario:{usuario}`, ventana fija desde la primera); al pasarlo responde el motor de reglas (`fuente: reglas`, nv-33); un acierto de caché no cuenta; sin Redis también | nv-28, nv-33 |
 | Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |

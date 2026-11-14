@@ -10,7 +10,7 @@ import (
 // Redacted reemplaza el valor de cualquier atributo sensible.
 const Redacted = "[REDACTADO]"
 
-var sensitiveKey = regexp.MustCompile(`(?i)(password|contrasena|secret|token|authorization|cookie|jwt|key|uri|dsn|clabe|rfc|razon_social|archivo)`)
+var sensitiveKey = regexp.MustCompile(`(?i)(password|contrasena|secret|token|authorization|cookie|jwt|key|uri|dsn|clabe|rfc|razon_social|archivo|signature)`)
 
 // Un texto libre, como el error de una base, puede traer un correo o una URI con contraseña.
 var (
