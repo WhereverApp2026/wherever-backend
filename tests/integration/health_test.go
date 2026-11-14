@@ -90,3 +90,20 @@ func TestReady_MissingIndexesIs503UntilScriptRuns(t *testing.T) {
 	assert.Equal(t, http.StatusOK, ready.StatusCode)
 	assert.Equal(t, "ok", obj(t, decode(t, ready)["dependencias"])["indices_mongodb"])
 }
+
+// Un resultado correcto se recuerda unos minutos (los índices solo cambian con el script);
+// Reset obliga a volver a revisar y un índice borrado vuelve a dar 503.
+func TestReady_IndicesRecuerdaElResultadoCorrecto(t *testing.T) {
+	ctx := context.Background()
+	db := mongoClient.DB()
+	require.NoError(t, db.Drop(ctx))
+	require.NoError(t, mongo.EnsureIndexes(ctx, db, indexes.All()...))
+	verifier := mongo.NewIndexVerifier(db, indexes.All()...)
+	require.NoError(t, verifier.Ping(ctx))
+
+	require.NoError(t, db.Collection("usuarios").Indexes().DropOne(ctx, "ux_correo"))
+	assert.NoError(t, verifier.Ping(ctx), "dentro de la ventana no vuelve a listar")
+	verifier.Reset()
+	assert.ErrorContains(t, verifier.Ping(ctx), "usuarios.ux_correo")
+	require.NoError(t, mongo.EnsureIndexes(ctx, db, indexes.All()...))
+}

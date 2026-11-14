@@ -696,6 +696,13 @@
 - Operador: nada. Sin variables; `ux_codigo`, `ix_mis_reservas`, `ix_agenda_negocio`, `ix_bloqueos`, `ix_recordatorios` e `ix_bloqueo_negocio` los crea `/indexes` al instalar la imagen.
 - A evitar: INFO commandstats cuenta los comandos de dentro de un script (`EVALSHA` + su `GET` y `DEL` = 3); Upstash cobra el `EVALSHA` como 1. Una `|` dentro de una celda de `docs/endpoints.md` parte la tabla: escribir "o". Las suites con contenedor sí corren en Windows con `docker run --network host -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_RYUK_DISABLED=true` (útil para no esperar al CI).
 
+## /ready: verificador de índices más rápido (2026-11-13)
+- Hallazgo: con más de 20 colecciones, `IndexVerifier` listaba los índices una por una y desde una red lenta (Wi-Fi de la universidad) pasaba el segundo de `/ready`: 503 por tiempo aunque no faltara nada.
+- Decisión: lista las colecciones en paralelo (hasta 8) y recuerda un resultado correcto 5 minutos (`Reset()` con mutex); un error nunca se recuerda. Un índice borrado a mano se nota hasta 5 minutos después (o tras `Reset`).
+- Medido en local contra Atlas: la primera llamada tras arrancar ~1,2 s (abre las conexiones TLS); las siguientes 0,3–0,7 s y luego 0,28 s.
+- Operación: `scripts/indexes` hay que volver a correrlo contra Atlas cada vez que `main` trae colecciones nuevas; el 2026-11-13 faltaban los de `reservas` y `bloqueos_horario` (nv-59).
+- Entorno local de esta máquina: MongoDB en Atlas (agregar la IP pública a Network Access, cambia según la red) y Redis y Neo4j en Docker (`docker compose -f deployments/docker-compose.yml up -d --wait redis neo4j`).
+
 ## NV-60 — Pagos con Stripe (2026-11-14)
 - Estado: paquete `internal/pagos` (modelo, `StripeAPI` con `stripe-go` v86.4.2, repositorio, service, webhook, corte semanal, handler, ARCO), colecciones `pagos` y `liquidaciones`, 7 rutas nuevas y política `pagos` (10/h por usuario). Doble `internal/testutil/stripetest` y armado `pagostest`. Local: build, vet, Unit, `golangci-lint`, critic, `check_sdd` y `check_endpoints` (Docker); además, en Docker con el socket, Integration y Security de pagos y reservas, Database y Contract completas en verde. El resto en el CI. Spec en Borrador con evidencia, sin firma.
 - Decisiones del revisor (Osmar Reséndiz, 2026-11-14): enmienda §3 de la constitución 1.8.0 (Stripe con `stripe-go`) aprobada y aplicada en `.specify/memory/constitution.md` (el espejo solo enlaza); Connect Express con transferencia semanal (confirmar con Stripe México en la cuenta real queda del operador); `comision_pct` inicial 10 %, por negocio; cobros, cuenta de depósito, saldo y liquidaciones en nv-60; pago tardío sin cupo = reembolso completo; comisión proporcional al reembolso; TTL de 5 años.
