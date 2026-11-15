@@ -65,17 +65,20 @@ type Item struct {
 
 // reglasDoc es el documento de moderacion_reglas.
 type reglasDoc struct {
-	ID             string        `bson:"_id"`
-	Cuarentena     float64       `bson:"cuarentena"`
-	Rechazo        float64       `bson:"rechazo"`
-	Palabras       []string      `bson:"palabras"`
-	Version        int           `bson:"version"`
-	ActualizadoPor bson.ObjectID `bson:"actualizado_por"`
-	ActualizadoEn  time.Time     `bson:"actualizado_en"`
+	ID         string   `bson:"_id"`
+	Cuarentena float64  `bson:"cuarentena"`
+	Rechazo    float64  `bson:"rechazo"`
+	Palabras   []string `bson:"palabras"`
+	// Filtros son las reglas por filtro (nv-71) dentro del mismo documento: una lectura y un
+	// solo If-Match para todo el juego de reglas.
+	Filtros        map[string]ReglaFiltro `bson:"filtros,omitempty"`
+	Version        int                    `bson:"version"`
+	ActualizadoPor bson.ObjectID          `bson:"actualizado_por"`
+	ActualizadoEn  time.Time              `bson:"actualizado_en"`
 }
 
 func (d reglasDoc) reglas() Reglas {
-	return Reglas{Cuarentena: d.Cuarentena, Rechazo: d.Rechazo, Palabras: d.Palabras}
+	return Reglas{Cuarentena: d.Cuarentena, Rechazo: d.Rechazo, Palabras: d.Palabras, Filtros: d.Filtros}
 }
 
 // Destino recibe la decisión del administrador para publicar o descartar el recurso de

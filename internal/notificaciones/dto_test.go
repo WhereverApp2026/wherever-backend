@@ -59,3 +59,32 @@ func TestHashToken(t *testing.T) {
 	assert.NotContains(t, h, "token")
 	assert.Equal(t, h, HashToken("token-de-prueba-largo"))
 }
+
+func TestDevicePatch_Validacion(t *testing.T) {
+	v, err := validation.New()
+	require.NoError(t, err)
+	ver, bad := "1.4.0", "1.4"
+	ok := []string{ChannelGroups, ChannelCoupons}
+	dup := []string{ChannelGroups, ChannelGroups}
+	other := []string{"marketing"}
+	empty := []string{}
+	assert.NoError(t, v.Struct(DevicePatch{AppVersion: &ver}))
+	assert.NoError(t, v.Struct(DevicePatch{Channels: &ok}))
+	assert.NoError(t, v.Struct(DevicePatch{Channels: &empty}), "lista vacía = todo apagado salvo reservas")
+	assert.Error(t, v.Struct(DevicePatch{AppVersion: &bad}))
+	assert.Error(t, v.Struct(DevicePatch{Channels: &dup}))
+	assert.Error(t, v.Struct(DevicePatch{Channels: &other}))
+}
+
+func TestDevice_CanalesActivos(t *testing.T) {
+	assert.True(t, Device{}.Allows(ChannelGroups), "sin lista = todos")
+	only := []string{ChannelCoupons}
+	d := Device{Channels: &only}
+	assert.False(t, d.Allows(ChannelGroups))
+	assert.True(t, d.Allows(ChannelCoupons))
+	assert.True(t, d.Allows(ChannelBookings), "reservas siempre pasa")
+	assert.True(t, d.Allows(ChannelOf(KindFriendRequest)), "sin canal siempre pasa")
+	assert.Equal(t, ChannelGroups, ChannelOf(KindGroupMessage))
+	view := newDeviceView(Device{ID: bson.NewObjectID(), Token: "secreto", TokenHash: "hash"})
+	assert.Equal(t, AllChannels(), view.Channels)
+}

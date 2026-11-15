@@ -60,8 +60,13 @@ Filas del Excel copiadas y corregidas:
 - Sin `GET /dispositivos` (la app guarda el id del `Location`); se agrega si el panel de sesiones lo pide.
 - Sin colección `reglas_moderacion` ni palabras por filtro.
 
+## Ejecución (2026-11-14)
+- **Código:** `internal/notificaciones` (`Device.AppVersion`/`Channels`, `Device.Allows`, `ChannelOf`, `Repository.UpdateDevice`/`DeleteDevice`, `RegisterDevice` devuelve el `_id` con `FindOneAndUpdate`, `Location` en `PUT /dispositivos`, decodificación estricta en `PUT /dispositivos/:id`); `internal/moderacion/filtros.go` (`ReglaFiltro`, `Reglas.Decidir`, `validarFiltros`, `AjustarFiltro`, `DesactivarFiltro`) y `Reglas.Filtros` dentro de `moderacion_reglas`.
+- **Decisiones:** solo los avisos de grupo tienen canal hoy (`grupos`); los demás tipos no tienen canal y siempre pasan, igual que `reservas`. `Reglas.Validar` revisa también cada filtro: un `PATCH /reglas` global que deje un filtro con cuarentena ≥ rechazo es 422, y unas reglas inválidas en la base dejan todo en cuarentena como en nv-43. Lista vacía de `canales_activos` = solo `reservas`.
+- **Pruebas:** `internal/moderacion/umbrales_test.go`, `internal/notificaciones/dto_test.go`, `tests/integration/dispositivos_id_test.go`, `tests/integration/moderacion_reglas_filtro_test.go`, `tests/security/dispositivos_reglas_security_test.go`, `tests/contract/dispositivos_reglas_contract_test.go`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-71`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** `{id}` del dispositivo es el `_id`, nunca el token (se mantiene nv-40); el id llega por `Location` sin cambiar el 204; `PUT /dispositivos/{id}` sin `If-Match`; reglas por filtro dentro del documento único de nv-43 (`{id}` = nombre del filtro, sin colección `reglas_moderacion`); `DELETE` desactiva y no borra; `datos_personales` no se puede desactivar.

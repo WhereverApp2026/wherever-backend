@@ -40,6 +40,8 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Get("/reglas", h.verReglas)
 	g.Post("/reglas", h.crearReglas)
 	g.Patch("/reglas", h.ajustarReglas)
+	g.Patch("/reglas/:filtro", h.ajustarFiltro)
+	g.Delete("/reglas/:filtro", h.desactivarFiltro)
 	g.Get("/:id", h.detalle)
 	g.Patch("/:id", h.decidir)
 }
@@ -134,4 +136,28 @@ func (h *Handler) ajustarReglas(c *fiber.Ctx) error {
 	}
 	r, err := h.svc.AjustarReglas(c.UserContext(), subject(c), version, req)
 	return send(c, fiber.StatusOK, r.Version, r, err)
+}
+
+func (h *Handler) ajustarFiltro(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	var req FiltroPatch
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	r, err := h.svc.AjustarFiltro(c.UserContext(), subject(c), c.Params("filtro"), version, req)
+	return send(c, fiber.StatusOK, r.Version, r, err)
+}
+
+func (h *Handler) desactivarFiltro(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	if err := h.svc.DesactivarFiltro(c.UserContext(), subject(c), c.Params("filtro"), version); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

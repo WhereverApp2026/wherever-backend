@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "body": {
+    "app_version": "string",
+    "canales_activos": [
+      "string"
+    ],
+    "id": "string",
+    "plataforma": "string",
+    "ultimo_uso": "string"
+  }
+}

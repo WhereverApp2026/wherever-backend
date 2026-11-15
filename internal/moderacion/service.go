@@ -218,7 +218,7 @@ func (s *Service) CrearReglas(ctx context.Context, subject string, req ReglasReq
 	if err != nil {
 		return ReglasView{}, err
 	}
-	d, err := s.armarReglas(who, Reglas(req))
+	d, err := s.armarReglas(who, Reglas{Cuarentena: req.Cuarentena, Rechazo: req.Rechazo, Palabras: req.Palabras})
 	if err != nil {
 		return ReglasView{}, err
 	}
@@ -245,7 +245,12 @@ func (s *Service) AjustarReglas(ctx context.Context, subject string, version int
 	if err != nil {
 		return ReglasView{}, errStore()
 	}
-	d, err := s.armarReglas(who, req.aplicar(actual.reglas()))
+	return s.guardarReglas(ctx, who, version, req.aplicar(actual.reglas()))
+}
+
+// guardarReglas valida y reemplaza las reglas si siguen en la versión dada.
+func (s *Service) guardarReglas(ctx context.Context, who bson.ObjectID, version int, r Reglas) (ReglasView, error) {
+	d, err := s.armarReglas(who, r)
 	if err != nil {
 		return ReglasView{}, err
 	}
@@ -281,5 +286,5 @@ func (s *Service) armarReglas(who bson.ObjectID, r Reglas) (reglasDoc, error) {
 			palabras = append(palabras, p)
 		}
 	}
-	return reglasDoc{Cuarentena: r.Cuarentena, Rechazo: r.Rechazo, Palabras: palabras, ActualizadoPor: who, ActualizadoEn: s.now().UTC().Truncate(time.Millisecond)}, nil
+	return reglasDoc{Cuarentena: r.Cuarentena, Rechazo: r.Rechazo, Palabras: palabras, Filtros: r.Filtros, ActualizadoPor: who, ActualizadoEn: s.now().UTC().Truncate(time.Millisecond)}, nil
 }
