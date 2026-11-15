@@ -46,8 +46,13 @@ Filas copiadas del Excel (A2): `POST /lugares/{id}/reportes` «Reportar informac
 - Sin cambios automáticos al negocio por muchos reportes (por ejemplo, ocultar un «cerrado_permanente»).
 - Los reportes de reseñas (J7, `POST /resenas/{id}/reportes`) van aparte.
 
+## Ejecución (2026-11-15)
+- **Código:** paquete nuevo `internal/reportesnegocio` (`repository.go`, `service.go`, `handler.go`, `privacy.go`), cableado en `cmd/api/main.go` y en `authtest` (`ModeradorReportes`), en vez de un `reportesnegociotest` aparte.
+- **Drift resuelto:** `If-Match` usa 400 (falta) y 409 (vieja), como el resto de la API (`AGENTS.md` §5); `apperr` no tiene 412 ni 428. Resolver un reporte ya resuelto también es 409. En prod el detalle sin modelo de texto queda «dudoso» y se guarda igual (solo el rechazo es 422): el administrador lo lee en la cola. El tope diario cuenta desde la medianoche de México y el 429 trae `Retry-After` hasta el día siguiente.
+- **Pruebas:** `internal/reportesnegocio/service_test.go`, `tests/integration/reportes_negocio_test.go` (crear, cola, resolver, dueño, tope y ARCO en un solo archivo), `tests/security/reportes_negocio_security_test.go`, `tests/contract/reportes_negocio_contract_test.go`, `tests/database/indexes_test.go`; la exportación ARCO del contrato de usuarios gana `reportes_negocio`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-67`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** `GET /admin/reportes-negocio` agregado; `PATCH` solo administrador; cualquier rol activo puede reportar salvo el dueño; un abierto por persona y negocio (409); 10 al día contados en MongoDB sin Redis; `PurgeAccount` borra también los resueltos; el `PATCH` no edita el negocio.

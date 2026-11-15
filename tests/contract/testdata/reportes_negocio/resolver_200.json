@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "creado_en": "string",
+    "detalle": "string",
+    "estado": "string",
+    "id": "string",
+    "motivo": "string",
+    "negocio": "string",
+    "negocio_id": "string",
+    "resuelto_en": "string",
+    "resuelto_por": "string",
+    "usuario_id": "string",
+    "version": "number"
+  }
+}

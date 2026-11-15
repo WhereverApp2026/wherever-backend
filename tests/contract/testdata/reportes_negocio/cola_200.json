@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "actualizado_en": "string",
+        "creado_en": "string",
+        "detalle": "string",
+        "estado": "string",
+        "id": "string",
+        "motivo": "string",
+        "negocio": "string",
+        "negocio_id": "string",
+        "usuario_id": "string",
+        "version": "number"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}
