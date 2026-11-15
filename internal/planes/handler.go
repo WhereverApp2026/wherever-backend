@@ -3,6 +3,7 @@ package planes
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -32,7 +33,11 @@ func (h *Handler) WithActiveGuard(guard fiber.Handler) *Handler {
 
 // Routes registra /api/v1/planes, todo con JWT. Cumple httpapi.Module. `/paradas/orden`
 // va antes de `/paradas/:parada_id`.
-func (h *Handler) Routes(v1 fiber.Router, _ *middleware.Limiter) {
+func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
+	// Populares es pública y va antes del grupo /planes (que pide sesión) y de /:id.
+	v1.Get("/planes/populares", append(limited(limiter, func(l *middleware.Limiter) fiber.Handler {
+		return l.Window(popularPolicy, popularLimit, time.Minute)
+	}), h.popular)...)
 	g := v1.Group("/planes", middleware.RequireAuth())
 	g.Get("", h.list)
 	g.Get("/:id", h.get)
@@ -44,6 +49,7 @@ func (h *Handler) Routes(v1 fiber.Router, _ *middleware.Limiter) {
 	g.Put("/:id/paradas/orden", h.write(h.reorder)...)
 	g.Patch("/:id/paradas/:parada_id", h.write(h.patchStop)...)
 	g.Delete("/:id/paradas/:parada_id", h.write(h.removeStop)...)
+	h.extraRoutes(g, limiter)
 }
 
 func (h *Handler) write(handler fiber.Handler) []fiber.Handler {
@@ -83,6 +89,7 @@ func send(c *fiber.Ctx, status int, p Plan, err error) error {
 	if err != nil {
 		return err
 	}
+	p.normalize()
 	c.Set(fiber.HeaderETag, `"`+strconv.Itoa(p.Version)+`"`)
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.Status(status).JSON(p)
@@ -197,4 +204,93 @@ func (h *Handler) removeStop(c *fiber.Ctx) error {
 	}
 	p, err := h.svc.RemoveStop(c.UserContext(), subject(c), c.Params("id"), c.Params("parada_id"), version)
 	return send(c, fiber.StatusOK, p, err)
+}
+
+// Límites de los extras de planes (nv-68, docs/rate-limit-matrix.md).
+const (
+	popularPolicy      = "planes_populares"
+	popularLimit       = 60
+	alternativesPolicy = "planes_alternativas"
+	alternativesLimit  = 60
+	packagePolicy      = "planes_paquete"
+	packageLimit       = 30
+)
+
+// extraRoutes registra alternativas, cambiar parada y el paquete sin conexión (nv-68).
+func (h *Handler) extraRoutes(g fiber.Router, limiter *middleware.Limiter) {
+	perUser := func(policy string, limit int) []fiber.Handler {
+		return limited(limiter, func(l *middleware.Limiter) fiber.Handler { return l.WindowUser(policy, limit, time.Hour) })
+	}
+	g.Get("/:id/paradas/:parada_id/alternativas", append(perUser(alternativesPolicy, alternativesLimit), h.alternatives)...)
+	g.Post("/:id/paradas/:parada_id/cambiar", h.write(h.changeStop)...)
+	g.Get("/:id/paquete-offline", append(perUser(packagePolicy, packageLimit), h.offlinePackage)...)
+}
+
+// limited devuelve el limitador de la ruta, o nada sin limitador (scripts/routes).
+func limited(limiter *middleware.Limiter, policy func(*middleware.Limiter) fiber.Handler) []fiber.Handler {
+	if limiter == nil {
+		return nil
+	}
+	return []fiber.Handler{policy(limiter)}
+}
+
+func (h *Handler) popular(c *fiber.Ctx) error {
+	var q PopularQuery
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.Popular(c.UserContext(), q)
+	if err != nil {
+		return err
+	}
+	// El punto va redondeado a ~1 km: CloudFront y el teléfono reutilizan la respuesta.
+	c.Set(fiber.HeaderCacheControl, "public, max-age=300")
+	return c.JSON(out)
+}
+
+func (h *Handler) alternatives(c *fiber.Ctx) error {
+	var q AlternativesQuery
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.Alternatives(c.UserContext(), subject(c), c.Params("id"), c.Params("parada_id"), q)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+func (h *Handler) changeStop(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	var req ChangeStopRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	p, err := h.svc.ChangeStop(c.UserContext(), subject(c), c.Params("id"), c.Params("parada_id"), version, req)
+	return send(c, fiber.StatusOK, p, err)
+}
+
+func (h *Handler) offlinePackage(c *fiber.Ctx) error {
+	out, err := h.svc.Package(c.UserContext(), subject(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	etag := PackageETag(out)
+	c.Set(fiber.HeaderETag, etag)
+	// Puede llevar códigos de reserva: nunca en una caché compartida.
+	c.Set(fiber.HeaderCacheControl, "private, no-store")
+	if c.Get(fiber.HeaderIfNoneMatch) == etag {
+		return c.SendStatus(fiber.StatusNotModified)
+	}
+	return c.JSON(out)
 }

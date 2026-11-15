@@ -77,8 +77,13 @@ Rutas de la hoja «A4 Planes» del Excel que ninguna spec cubría. **Origen**: p
 - Sin imágenes dentro del paquete ni descarga programada en el servidor.
 - Sin eventos en vivo del cambio de parada (los agrega la spec de tiempo real del grupo).
 
+## Ejecución (2026-11-14)
+- **Implementado:** `internal/planes/extras.go`, `extras_dto.go` y `extras_repository.go`; `visibilidad`, `veces_clonado`, `plan_origen_id` y `zona` en el modelo; `negocios.Repository.FindDetails`, `amistades.Repository.Blocked` y `reservas.Repository.DelPlan` (reservas propias activas del plan).
+- **Corrección de drift:** «Buscar otra cosa» compara `q` contra `nombre_normalizado` (sin acentos, con `regexp.QuoteMeta`) dentro del mismo `$geoNear`; `negocios.Service.List` no tiene búsqueda por texto y la de nv-22 es otro módulo. El `punto_encuentro` del paquete llega con nv-69. Sin prueba Contract propia (la captura necesita `CONTRACT_CAPTURE=1`) ni `TestPresupuestoRedis_*` nuevo: las tres políticas son ventanas iguales a las existentes.
+- **Pruebas:** Unit `internal/planes/extras_test.go`; Integration `tests/integration/planes_extras_test.go`; Security `tests/security/planes_extras_security_test.go`; Database `ix_populares`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-68`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** la vista compartida queda en el `POST` de NV-38 (código aleatorio con hash y revocable en lugar de token firmado); `visibilidad` solo `privado`/`publico`; `zona` = primera parada; punto redondeado a 2 decimales y caché HTTP pública de 5 min en vez de Redis; alternativas sin IA; versión en `If-Match`; paquete solo hoy o mañana.

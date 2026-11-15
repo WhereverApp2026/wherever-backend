@@ -250,3 +250,13 @@ func (r *Repository) find(ctx context.Context, filter bson.D, limit int64) ([]Fr
 	}
 	return out, nil
 }
+
+// Blocked dice si a y b tienen un bloqueo, en cualquier sentido (nv-68: un plan público no
+// se muestra ni se copia entre personas bloqueadas).
+func (r *Repository) Blocked(ctx context.Context, a, b bson.ObjectID) (bool, error) {
+	f, ok, err := r.FindByPair(ctx, a, b)
+	if err != nil || !ok {
+		return false, err
+	}
+	return f.Status == StatusBlocked, nil
+}

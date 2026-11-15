@@ -205,6 +205,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
+	// Extras de planes (nv-68): alternativas, populares, planes públicos y paquete sin conexión.
+	planSvc.WithExtras(businessRepo, friendRepo, reservas.NewRepository(db))
 	consentRepo := usuarios.NewConsentRepository(db)
 	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
