@@ -22,7 +22,21 @@ const (
 	OriginManual = "manual"
 	OriginAI     = "ia"
 	OriginRules  = "reglas"
+	// OriginCloned es la copia de un plan público de otra persona (nv-68).
+	OriginCloned = "clonado"
 )
+
+// Visibilidad del plan (nv-68). Los planes de antes no tienen el campo y son privados.
+const (
+	VisibilityPrivate = "privado"
+	VisibilityPublic  = "publico"
+)
+
+// GeoPoint es un punto GeoJSON `[lng, lat]`.
+type GeoPoint struct {
+	Type        string    `bson:"type"`
+	Coordinates []float64 `bson:"coordinates"`
+}
 
 // Movilidades: el mismo catálogo que `preferencias.movilidad_default` de nv-05.
 const (
@@ -73,8 +87,24 @@ type Plan struct {
 	Estado          string        `bson:"estado" json:"-"`
 	Origen          string        `bson:"origen" json:"origen"`
 	Version         int           `bson:"version" json:"version"`
+	// Visibilidad: `publico` lo pueden ver y copiar otras personas, sin saber de quién es.
+	Visibilidad  string         `bson:"visibilidad,omitempty" json:"visibilidad"`
+	VecesClonado int            `bson:"veces_clonado" json:"veces_clonado"`
+	PlanOrigenID *bson.ObjectID `bson:"plan_origen_id,omitempty" json:"plan_origen_id,omitempty"`
+	// Zona es la ubicación de la primera parada; la fija Calculadora.Aplicar (populares).
+	Zona *GeoPoint `bson:"zona,omitempty" json:"-"`
 	// SyncSeq es el número del último cambio en la sincronización del dueño (nv-46).
 	SyncSeq       int64     `bson:"sync_seq" json:"-"`
 	CreadoEn      time.Time `bson:"creado_en" json:"creado_en"`
 	ActualizadoEn time.Time `bson:"actualizado_en" json:"actualizado_en"`
+}
+
+// Public dice si otras personas pueden verlo y copiarlo.
+func (p Plan) Public() bool { return p.Visibilidad == VisibilityPublic }
+
+// normalize deja `visibilidad` explícita en la respuesta (los planes de antes no la tienen).
+func (p *Plan) normalize() {
+	if p.Visibilidad == "" {
+		p.Visibilidad = VisibilityPrivate
+	}
 }

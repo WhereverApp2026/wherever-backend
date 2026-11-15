@@ -1,18 +1,14 @@
-# gates.md — NV-68 Extras de planes: alternativas, cambiar parada, populares y paquete sin conexión
-
-Spec en borrador: sin ejecutar. Integration, Security, Database y Contract las corre el CI del PR (`AGENTS.md` §4). Sin firma.
+# gates.md — NV-68 Extras de planes
 
 | Gate | Criterio | Evidencia | Estado |
 |---|---|---|---|
-| critic B1 | Sin secretos nuevos en Git ni Terraform | — | pendiente |
-| critic B2 | Sin tokens, dueños ni ubicaciones exactas en logs ni respuestas públicas | — | pendiente |
-| critic B3 | Cambios de infraestructura o pipeline aprobados | No aplica | pendiente |
-| critic B4 | Endpoints coinciden con `docs/endpoints.md` | — | pendiente |
-| Build y vet | Sin errores | — | pendiente |
-| Lint | 0 hallazgos | — | pendiente |
-| Unit | Verde | — | pendiente |
-| Integration | `planes_alternativas_test.go`, `planes_populares_test.go`, `planes_paquete_test.go`, presupuesto de Redis | — | pendiente CI |
-| Security | `planes_extras_security_test.go` | — | pendiente CI |
-| Database y Contract | `ix_populares`; `planes_extras_contract_test.go` | — | pendiente CI |
-| Cobertura y Semgrep | ≥ 45 % y 0 hallazgos | — | pendiente CI |
-| SDD | `check_sdd` OK y `Memoria.md` actualizado | `check_sdd` OK al escribir la spec | pendiente |
+| critic B1 | Sin secretos nuevos en Git ni Terraform | `critic-guardrails: PASS` (2026-11-14) | ✅ |
+| critic B2 | Sin tokens ni datos personales en logs | `TestPlanesExtrasSecurity_SesionYPopularesSinDatos`: el punto exacto no llega a los logs | ✅ |
+| critic B3 | Cambios de infraestructura o pipeline aprobados por el revisor (si aplica) | sin cambios; índice nuevo `ix_populares` por `scripts/indexes` | ✅ (no aplica) |
+| critic B4 | Endpoints coinciden con `docs/endpoints.md` | `check_endpoints: OK (220 rutas)` | ✅ |
+| Pruebas | Cinco suites verdes con servicios reales | Local: build, vet, Unit, `golangci-lint` v2.15.0 (0 issues); Integration (`TestPlanesExtras*`, `TestPlanesAPI*`, `TestSync*`, `TestGrupos*`, `TestVotaciones*`), Security y Database en verde. Suites completas en el CI del PR | pendiente (CI) |
+| Cobertura | Mínimo 45 % | `check_coverage` en el CI del PR | pendiente (CI) |
+| Semgrep | 0 hallazgos | lo corre el CI del PR | pendiente (CI) |
+| SDD | `check_sdd` OK y `Memoria.md` actualizado | `SDD-OK`; sección NV-68 en `Memoria.md` | ✅ |
+| Privacidad | Ningún plan popular ni vista pública revela al dueño | `TestPlanesExtras_PopularesYCopiarPublico` (sin dueño ni notas; bloqueado = 404) | ✅ |
+| Versión | Cambiar una parada nunca pisa una edición más nueva | `TestPlanesExtras_AlternativasYCambiarParada` (409 con versión vieja, 400 sin If-Match) | ✅ |

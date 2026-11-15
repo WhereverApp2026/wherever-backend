@@ -23,6 +23,7 @@ type Service struct {
 	graph   Graph
 	sync    Sync
 	members Members
+	extras  extraDeps
 	now     func() time.Time
 	// cursor firma la paginación de GET /planes (nv-17).
 	cursor *pagination.Signer
@@ -156,6 +157,9 @@ func (s *Service) Create(ctx context.Context, subject string, req CreateRequest)
 }
 
 func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
+	if p.Visibilidad == "" {
+		p.Visibilidad = VisibilityPrivate
+	}
 	if err := s.calc.Aplicar(ctx, p); err != nil {
 		return Plan{}, planError(err)
 	}
@@ -169,9 +173,28 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 	return *p, nil
 }
 
-// Get trae el plan para leerlo: del dueño o de un grupo donde quien llama está invitado o
-// confirmado (nv-37). Ajeno, borrado o id mal formado = 404.
+// Get trae el plan para leerlo: del dueño, de un grupo donde quien llama está invitado o
+// confirmado (nv-37) o, si es `publico`, de cualquiera sin bloqueo con el dueño, sin notas
+// (nv-68). Ajeno, borrado o id mal formado = 404.
 func (s *Service) Get(ctx context.Context, subject, rawID string) (Plan, error) {
+	p, err := s.getMember(ctx, subject, rawID)
+	if err == nil {
+		p.normalize()
+		return p, nil
+	}
+	var appErr *apperr.Error
+	if !errors.As(err, &appErr) || appErr.Kind != apperr.KindNotFound {
+		return Plan{}, err
+	}
+	pub, perr := s.publicPlan(ctx, subject, rawID)
+	if perr != nil {
+		return Plan{}, perr
+	}
+	return publicView(pub), nil
+}
+
+// getMember trae el plan del dueño o de un integrante de su grupo.
+func (s *Service) getMember(ctx context.Context, subject, rawID string) (Plan, error) {
 	reader, id, err := ids(subject, rawID)
 	if err != nil {
 		return Plan{}, err
@@ -354,6 +377,10 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string, version int
 // horas en el día nuevo. No copia reservas ni integrantes.
 func (s *Service) Clone(ctx context.Context, subject, rawID string, req CloneRequest) (Plan, error) {
 	src, err := s.getOwned(ctx, subject, rawID)
+	var appErr *apperr.Error
+	if errors.As(err, &appErr) && appErr.Kind == apperr.KindNotFound {
+		return s.clonePublic(ctx, subject, rawID, req)
+	}
 	if err != nil {
 		return Plan{}, err
 	}
@@ -363,7 +390,7 @@ func (s *Service) Clone(ctx context.Context, subject, rawID string, req CloneReq
 	}
 	p := Plan{
 		OwnerID: src.OwnerID, Nombre: src.Nombre, Fecha: src.Fecha, Personas: src.Personas, Presupuesto: src.Presupuesto,
-		Movilidad: src.Movilidad, Origen: src.Origen, Paradas: make([]Parada, len(src.Paradas)),
+		Movilidad: src.Movilidad, Origen: src.Origen, Visibilidad: VisibilityPrivate, Paradas: make([]Parada, len(src.Paradas)),
 	}
 	copy(p.Paradas, src.Paradas)
 	for i := range p.Paradas {

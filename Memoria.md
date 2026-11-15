@@ -752,6 +752,14 @@
 - Pendiente: firma de la spec; el texto del momento no se revisa si la postal se edita después; borrar una imagen con `DELETE /imagenes/{id}` deja la postal sin foto; los `postales_ids` de un recuerdo no se limpian al borrar una postal.
 - A evitar: `negocios.Repository.FindVisibleMany` no trae `nombre`; nv-62 lo usa para `negocio_nombre` en «Por reseñar» (`internal/resenas/checkins.go`), que sale vacío (pendiente fuera de nv-63). En pruebas, `sendWithHeaders` manda `Bearer ` aunque el token esté vacío (401): sin cabeceras usar `sendJSON`. Un plan de prueba con parada en el negocio de `reservastest` puede caer cerrado: usar `placeDoc` (abierto toda la semana).
 
+## NV-68 — Extras de planes (2026-11-14)
+- Estado: rama `nv-68` desde `main` (`96cc43d`), PR contra `main`. Ola 11 (nv-65 a nv-72), en el orden 68 → 69 → 71 → 70 → 65 → 66 → 67 y nv-72 al final (D-1). Falta la firma.
+- Decisión: `visibilidad` (`privado` por omisión, también para los planes de antes vía `normalize`), `veces_clonado`, `plan_origen_id` y `zona` (primera parada, la fija `Calculadora.Aplicar`). `GET /planes/{id}` de un plan público ajeno sin bloqueo devuelve la vista sin notas (el dueño nunca sale en el JSON); copiarlo suma `veces_clonado` con un `$inc`.
+- Decisión: populares por `$geoNear` sobre `ix_populares` (2dsphere + visibilidad + veces_clonado), punto redondeado a 2 decimales y `Cache-Control: public, max-age=300` en vez de caché en Redis.
+- Decisión: alternativas con `negocios.Candidates` (3 km, mismo giro, precio ±1, abierto a la llegada en Mongo y al final de la estancia en Go); con `q`, regex sobre `nombre_normalizado`. `minutos_extra` con `Tramo` hacia las paradas vecinas.
+- Decisión: el paquete usa `getMember` (dueño o integrante; un plan público ajeno no basta), ventana hoy o mañana en México, `ETag` `"{version}-{sync_seq}"` y `no-store`; incluye las reservas activas de quien lo pide (`reservas.Repository.DelPlan`).
+- A evitar: registrar una ruta pública bajo `/planes` después de `v1.Group("/planes", RequireAuth())`: va antes del grupo, como `/planes/populares`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

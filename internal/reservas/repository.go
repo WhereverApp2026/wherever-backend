@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 )
 
@@ -227,6 +228,30 @@ func findAll[T any](ctx context.Context, col *mongo.Collection, filter bson.D, o
 	out := []T{}
 	if err := cur.All(ctx, &out); err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+// DelPlan trae las reservas activas de la persona para un plan, con la forma del paquete sin
+// conexión de nv-68 (el código es lo que muestra el QR).
+func (r *Repository) DelPlan(ctx context.Context, usuario, plan bson.ObjectID) ([]planes.ReservaPaquete, error) {
+	rows, err := findAll[Reserva](ctx, r.col, bson.D{
+		{Key: "usuario_id", Value: usuario}, {Key: "plan_id", Value: plan},
+		{Key: "estado", Value: bson.D{{Key: "$in", Value: activos}}},
+	}, options.Find().SetSort(bson.D{{Key: "fecha_hora", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]planes.ReservaPaquete, 0, len(rows))
+	for _, res := range rows {
+		item := planes.ReservaPaquete{
+			ID: res.ID.Hex(), Codigo: res.Codigo, NegocioID: res.NegocioID.Hex(),
+			FechaHora: res.FechaHora, Personas: res.Personas, Estado: res.Estado,
+		}
+		if res.ParadaID != nil {
+			item.ParadaID = res.ParadaID.Hex()
+		}
+		out = append(out, item)
 	}
 	return out, nil
 }

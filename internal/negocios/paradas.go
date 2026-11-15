@@ -52,3 +52,48 @@ func (r *Repository) FindCards(ctx context.Context, ids []bson.ObjectID, now tim
 	}
 	return out, nil
 }
+
+// FindDetails devuelve la ficha pública (la de GET /lugares/{id}: dirección, teléfono,
+// horario) de los negocios visibles de ids; la usa el paquete sin conexión de un plan
+// (nv-68). Un id que no vuelve no está disponible.
+func (r *Repository) FindDetails(ctx context.Context, ids []bson.ObjectID, now time.Time) ([]PlaceDetail, error) {
+	out := []PlaceDetail{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	filter := append(VisibleFilter(), bson.E{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}})
+	cur, err := r.col.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	var rows []Business
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, b := range rows {
+		out = append(out, toDetail(b, now))
+	}
+	return out, nil
+}
+
+// FindVisibleSummaries es FindVisibleMany con giro, nivel y precio promedio además de la
+// ubicación y el horario: lo que necesitan las alternativas y el cambio de parada (nv-68).
+func (r *Repository) FindVisibleSummaries(ctx context.Context, ids []bson.ObjectID) ([]Business, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	filter := append(VisibleFilter(), bson.E{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}})
+	proj := options.Find().SetProjection(bson.D{
+		{Key: "ubicacion", Value: 1}, {Key: "horario_min", Value: 1}, {Key: "categoria", Value: 1},
+		{Key: "nivel_precio", Value: 1}, {Key: "precio_promedio", Value: 1},
+	})
+	cur, err := r.col.Find(ctx, filter, proj)
+	if err != nil {
+		return nil, err
+	}
+	var out []Business
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

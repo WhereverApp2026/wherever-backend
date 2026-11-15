@@ -50,6 +50,7 @@ type PatchRequest struct {
 	Personas    *int    `json:"personas" validate:"omitempty,min=1,max=20"`
 	Presupuesto *int    `json:"presupuesto" validate:"omitempty,min=0,max=1000000"`
 	Movilidad   *string `json:"movilidad" validate:"omitempty,oneof=a_pie bicicleta auto transporte_publico"`
+	Visibilidad *string `json:"visibilidad" validate:"omitempty,oneof=privado publico"`
 }
 
 // PatchStopRequest es PATCH /planes/{id}/paradas/{parada_id}: mover, cambiar duración,
@@ -154,6 +155,7 @@ func (r PatchRequest) apply(p *Plan) error {
 	setIf(&p.Personas, r.Personas)
 	setIf(&p.Presupuesto, r.Presupuesto)
 	setIf(&p.Movilidad, r.Movilidad)
+	setIf(&p.Visibilidad, r.Visibilidad)
 	return nil
 }
 

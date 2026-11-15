@@ -41,5 +41,12 @@ func (c *Calculadora) Aplicar(ctx context.Context, p *Plan) error {
 		}
 		lugares[b.ID] = Lugar{Lng: b.Location.Coordinates[0], Lat: b.Location.Coordinates[1], Horario: b.ScheduleMin}
 	}
-	return Recalcular(p, lugares, c.velocidades)
+	if err := Recalcular(p, lugares, c.velocidades); err != nil {
+		return err
+	}
+	// La zona es la primera parada: la usa GET /planes/populares (nv-68).
+	if l, ok := lugares[p.Paradas[0].NegocioID]; ok {
+		p.Zona = &GeoPoint{Type: "Point", Coordinates: []float64{l.Lng, l.Lat}}
+	}
+	return nil
 }

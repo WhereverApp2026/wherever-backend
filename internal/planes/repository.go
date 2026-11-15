@@ -26,6 +26,10 @@ func Indexes() []platformmongo.IndexSet {
 			{Keys: bson.D{{Key: "dueno_id", Value: 1}, {Key: "estado", Value: 1}, {Key: "fecha", Value: 1}}, Options: options.Index().SetName("ix_dueno_estado_fecha")},
 			{Keys: bson.D{{Key: "estado", Value: 1}, {Key: "fecha", Value: 1}}, Options: options.Index().SetName("ix_estado_fecha")},
 			{Keys: bson.D{{Key: "dueno_id", Value: 1}, {Key: "sync_seq", Value: 1}}, Options: options.Index().SetName("ix_dueno_sync")},
+			{
+				Keys:    bson.D{{Key: "zona", Value: "2dsphere"}, {Key: "visibilidad", Value: 1}, {Key: "veces_clonado", Value: -1}},
+				Options: options.Index().SetName("ix_populares"),
+			},
 		},
 	}}
 }
@@ -109,7 +113,7 @@ func (r *Repository) UpdateIfVersion(ctx context.Context, p *Plan, version int) 
 		{Key: "movilidad", Value: p.Movilidad}, {Key: "paradas", Value: p.Paradas},
 		{Key: "traslados", Value: p.Traslados}, {Key: "costo_total", Value: p.CostoTotal},
 		{Key: "costo_por_persona", Value: p.CostoPorPersona}, {Key: "actualizado_en", Value: r.now().UTC()},
-		{Key: "sync_seq", Value: p.SyncSeq},
+		{Key: "sync_seq", Value: p.SyncSeq}, {Key: "visibilidad", Value: p.Visibilidad}, {Key: "zona", Value: p.Zona},
 	}
 	filter := append(ownedActive(p.OwnerID, p.ID), bson.E{Key: "version", Value: version})
 	update := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
