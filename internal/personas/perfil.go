@@ -92,21 +92,9 @@ func (s *Service) Profile(ctx context.Context, subject, rawID string) (ProfileRe
 	if err != nil {
 		return ProfileResponse{}, apperr.Validation("datos inválidos", apperr.FieldError{Field: "id", Message: "id inválido"})
 	}
-	notFound := apperr.NotFound("persona no encontrada")
-	u, err := s.profile.profiles.FindByID(ctx, id)
-	if errors.Is(err, usuarios.ErrNotFound) || (err == nil && (u.ID == me || u.Status != usuarios.StatusActive)) {
-		return ProfileResponse{}, notFound
-	}
+	u, rel, err := s.visiblePerson(ctx, me, id)
 	if err != nil {
-		return ProfileResponse{}, errUnavailable(err)
-	}
-	status, mine, err := s.blocks.Relation(ctx, me, id)
-	if err != nil {
-		return ProfileResponse{}, errUnavailable(err)
-	}
-	rel, visible := relationOf(status, mine)
-	if !visible {
-		return ProfileResponse{}, notFound
+		return ProfileResponse{}, err
 	}
 	out := ProfileResponse{Person: newPerson(u), Relation: rel}
 	if rel == RelationFriend {
@@ -115,6 +103,28 @@ func (s *Service) Profile(ctx context.Context, subject, rawID string) (ProfileRe
 		}
 	}
 	return out, nil
+}
+
+// visiblePerson trae a la persona y su relación conmigo. Inexistente, inactiva, propia o con
+// bloqueo en cualquier sentido = el mismo 404.
+func (s *Service) visiblePerson(ctx context.Context, me, id bson.ObjectID) (usuarios.User, string, error) {
+	notFound := apperr.NotFound("persona no encontrada")
+	u, err := s.profile.profiles.FindByID(ctx, id)
+	if errors.Is(err, usuarios.ErrNotFound) || (err == nil && (u.ID == me || u.Status != usuarios.StatusActive)) {
+		return usuarios.User{}, "", notFound
+	}
+	if err != nil {
+		return usuarios.User{}, "", errUnavailable(err)
+	}
+	status, mine, err := s.blocks.Relation(ctx, me, id)
+	if err != nil {
+		return usuarios.User{}, "", errUnavailable(err)
+	}
+	rel, visible := relationOf(status, mine)
+	if !visible {
+		return usuarios.User{}, "", notFound
+	}
+	return u, rel, nil
 }
 
 func (s *Service) friendExtras(ctx context.Context, me bson.ObjectID, u usuarios.User) (*FriendExtras, error) {

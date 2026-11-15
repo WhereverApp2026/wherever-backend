@@ -72,11 +72,17 @@ func TestPersonasPerfil_BasicoCompletoY404(t *testing.T) {
 	blocked := seedAmigo(t, env, "perfil_bloqueado")
 	relacion(t, env, blocker.user, me.user, amistades.StatusBlocked)
 	relacion(t, env, me.user, blocked.user, amistades.StatusBlocked)
+	shape := func(body string) map[string]any {
+		var m map[string]any
+		require.NoError(t, json.Unmarshal([]byte(body), &m), body)
+		delete(m, "traza_id") // cambia en cada petición
+		return m
+	}
 	_, missing := perfil(t, app, me, bson.NewObjectID().Hex())
 	for _, id := range []string{me.id(), inactive.ID.Hex(), blocker.id(), blocked.id()} {
 		status, body := perfil(t, app, me, id)
 		assert.Equal(t, http.StatusNotFound, status, id)
-		assert.JSONEq(t, missing, body)
+		assert.Equal(t, shape(missing), shape(body), "el mismo 404")
 	}
 	status, _ = perfil(t, app, me, "no-es-id")
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
@@ -133,10 +139,10 @@ func TestAmistadesSilencio_MarcaPropiaEIdempotente(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []bson.ObjectID{me.user.ID}, f.MutedBy, "solo mi marca, una vez")
 
-	list := notifCall(t, app, http.MethodGet, "/api/v1/amistades", nil, me.token, http.StatusOK)
-	assert.Equal(t, true, obj(t, list["resultados"].([]any)[0])["silenciado"])
+	mine := notifCall(t, app, http.MethodGet, "/api/v1/amistades", nil, me.token, http.StatusOK)
+	assert.Equal(t, true, obj(t, list(t, mine["resultados"])[0])["silenciado"])
 	theirs := notifCall(t, app, http.MethodGet, "/api/v1/amistades", nil, friend.token, http.StatusOK)
-	assert.Equal(t, false, obj(t, theirs["resultados"].([]any)[0])["silenciado"], "el otro no se entera")
+	assert.Equal(t, false, obj(t, list(t, theirs["resultados"])[0])["silenciado"], "el otro no se entera")
 	status, body := perfil(t, app, friend, me.id())
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `"silenciado":false`)
@@ -223,4 +229,33 @@ func countAll(t *testing.T, env *authtest.Env) int64 {
 		total += n
 	}
 	return total
+}
+
+// nv-70: el perfil cuesta lo mismo que `personas_buscar` (lectura + ventana) y los contactos,
+// por ser POST, una escritura autenticada + ventana.
+func TestPresupuestoRedis_VentanasPorUsuarioNV70(t *testing.T) {
+	env, app := amistadesEnv(t)
+	env.ClearRateLimits(t)
+	me := seedAmigo(t, env, "presupuesto70")
+	other := seedAmigo(t, env, "presupuesto70_otra")
+	read := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, me.token).StatusCode)
+	})
+	search := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/personas/buscar?q=nadie", nil, me.token).StatusCode)
+	})
+	assert.Equal(t, search, commandsOf(t, func() {
+		status, _ := perfil(t, app, me, other.id())
+		assert.Equal(t, http.StatusOK, status)
+	}), "perfil = buscar")
+	write := commandsOf(t, func() {
+		resp := sendJSON(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"datos_sensibles": false}, me.token)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+	window := search - read
+	require.Positive(t, window)
+	assert.Equal(t, write+window, commandsOf(t, func() {
+		status, _ := contactos(t, app, me, []string{"5599999999"})
+		assert.Equal(t, http.StatusOK, status)
+	}), "contactos: escritura autenticada + ventana")
 }
