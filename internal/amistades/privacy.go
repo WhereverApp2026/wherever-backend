@@ -28,9 +28,11 @@ func (p *Privacy) PurgeAccount(ctx context.Context, userID bson.ObjectID) error 
 }
 
 type exportedFriendship struct {
-	PersonID  string    `json:"persona_id"`
-	Status    string    `json:"estado"`
-	Direction string    `json:"direccion"`
+	PersonID  string `json:"persona_id"`
+	Status    string `json:"estado"`
+	Direction string `json:"direccion"`
+	// Muted es solo mi marca (nv-70); la del otro sobre mí nunca se exporta.
+	Muted     bool      `json:"silenciado"`
 	CreatedAt time.Time `json:"creada_en"`
 	UpdatedAt time.Time `json:"actualizada_en"`
 }
@@ -52,7 +54,7 @@ func (p *Privacy) Export(ctx context.Context, userID bson.ObjectID) (any, error)
 			direction = DirectionSent
 		}
 		out = append(out, exportedFriendship{
-			PersonID: f.Other(userID).Hex(), Status: f.Status, Direction: direction,
+			PersonID: f.Other(userID).Hex(), Status: f.Status, Direction: direction, Muted: f.MutedByUser(userID),
 			CreatedAt: f.CreatedAt, UpdatedAt: f.UpdatedAt,
 		})
 	}

@@ -25,6 +25,11 @@ WHERE a.id IN $amigos
 RETURN DISTINCT a.id AS id
 ORDER BY id`
 
+// commonFriendsQuery cuenta los amigos en común de dos personas (perfil, nv-70).
+const commonFriendsQuery = `
+MATCH (:Usuario {id: $a})-[:AMIGO_DE]-(c:Usuario)-[:AMIGO_DE]-(:Usuario {id: $b})
+RETURN count(DISTINCT c) AS comunes`
+
 // Mutual es una persona sugerida y cuántos amigos tiene en común con quien pregunta.
 type Mutual struct {
 	ID     string
@@ -50,6 +55,16 @@ func (d *Driver) MutualFriends(ctx context.Context, id string, exclude []string,
 		out = append(out, Mutual{ID: other, Common: common})
 	}
 	return out, nil
+}
+
+// CommonFriends devuelve cuántos amigos tienen en común a y b.
+func (d *Driver) CommonFriends(ctx context.Context, a, b string) (int64, error) {
+	res, err := d.read(ctx, commonFriendsQuery, map[string]any{"a": a, "b": b})
+	if err != nil || len(res.Records) == 0 {
+		return 0, err
+	}
+	n, _, err := neo4j.GetRecordValue[int64](res.Records[0], "comunes")
+	return n, err
 }
 
 // FriendsAt devuelve, entre friends, los amigos de id que fueron al negocio business.

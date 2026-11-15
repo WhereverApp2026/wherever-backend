@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "amigos_en_comun": "null",
+    "degradado": "bool",
+    "foto_url": "string",
+    "grupos_en_comun": "number",
+    "id": "string",
+    "nivel": "string",
+    "nombre": "string",
+    "nombre_usuario": "string",
+    "relacion": "string",
+    "silenciado": "bool"
+  }
+}

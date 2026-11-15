@@ -774,6 +774,12 @@
 - Decisión: las reglas por filtro viven en el mismo documento `moderacion_reglas` (`filtros`), con un solo `If-Match`; `DELETE` desactiva; `datos_personales` no se apaga. `Reglas.Decidir` reemplaza a `Clasificar(maximo)` en el Moderador.
 - A evitar: convertir `ReglasRequest` a `Reglas` con un cast: dejó de compilar al agregar `Filtros`; arma el struct campo por campo.
 
+## NV-70 — Perfil de persona, silencio y contactos (2026-11-15)
+- Estado: rama `nv-70` desde `main`, PR contra `main`. Falta la firma.
+- Decisión: `GET /personas/{id}` da lo de la búsqueda a cualquiera y, solo entre amigos, nivel, amigos en común (Neo4j, degradado en 3 s), grupos en común y mi silencio; propio, inactivo o bloqueo = el mismo 404.
+- Decisión: silenciar es mi marca en `silenciado_por` (`$addToSet`/`$pull`, sin `If-Match`); bloquear la vacía. Contactos: teléfonos en claro por TLS, HMAC en memoria, una consulta `$in`, respuesta por `indice`; nada se guarda ni se registra.
+- Lección: Docker Desktop se cierra al reiniciar la máquina y Testcontainers falla con «rootless Docker is not supported on Windows»; arráncalo antes de las suites.
+- A evitar: comparar respuestas de error completas entre peticiones: `traza_id` cambia en cada una.
 ## NV-65 — Eventos, ferias y tianguis (2026-11-15)
 - Estado: rama `nv-65` desde `main`, PR contra `main`. Falta la firma. Colección nueva `eventos` con 4 índices: hay que correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
 - Decisión: lista pública con `$geoNear` (`ix_eventos_cerca`), día de México y cursor firmado `inicio|distancia` + id. Publica el administrador o el comerciante con negocio propio aprobado, sin pausa ni baja; edita quien lo creó, el dueño del negocio o un administrador.

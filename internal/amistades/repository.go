@@ -33,13 +33,15 @@ var ErrDuplicate = errors.New("amistades: el par ya existe")
 
 // Friendship es un documento de `amistades`. En `bloqueada`, `de` es quien bloqueó.
 type Friendship struct {
-	ID        bson.ObjectID `bson:"_id"`
-	From      bson.ObjectID `bson:"de"`
-	To        bson.ObjectID `bson:"para"`
-	Status    string        `bson:"estado"`
-	Pair      string        `bson:"par"`
-	CreatedAt time.Time     `bson:"creada_en"`
-	UpdatedAt time.Time     `bson:"actualizada_en"`
+	ID     bson.ObjectID `bson:"_id"`
+	From   bson.ObjectID `bson:"de"`
+	To     bson.ObjectID `bson:"para"`
+	Status string        `bson:"estado"`
+	Pair   string        `bson:"par"`
+	// MutedBy son quienes silenciaron al otro (0 a 2, nv-70); cada quien solo ve su marca.
+	MutedBy   []bson.ObjectID `bson:"silenciado_por,omitempty"`
+	CreatedAt time.Time       `bson:"creada_en"`
+	UpdatedAt time.Time       `bson:"actualizada_en"`
 }
 
 // Other es la otra persona de la relación vista por me.
@@ -144,8 +146,45 @@ func (r *Repository) Block(ctx context.Context, f Friendship, blocker bson.Objec
 	set := bson.D{
 		{Key: "de", Value: blocker}, {Key: "para", Value: f.Other(blocker)},
 		{Key: "estado", Value: StatusBlocked}, {Key: "actualizada_en", Value: now},
+		// Bloquear borra el silencio (nv-70): ya no hay amistad que silenciar.
+		{Key: "silenciado_por", Value: bson.A{}},
 	}
 	return r.update(ctx, filter, set)
+}
+
+// SetMuted pone o quita la marca de me sobre una amistad aceptada en la que participa
+// (`$addToSet`/`$pull`: repetirlo deja lo mismo). false si no participa, no existe o no está
+// aceptada.
+func (r *Repository) SetMuted(ctx context.Context, id, me bson.ObjectID, muted bool) (bool, error) {
+	op := "$pull"
+	if muted {
+		op = "$addToSet"
+	}
+	res, err := r.col.UpdateOne(ctx, bson.D{{Key: "_id", Value: id}, participant(me), {Key: "estado", Value: StatusAccepted}},
+		bson.D{{Key: op, Value: bson.D{{Key: "silenciado_por", Value: me}}}})
+	if err != nil {
+		return false, err
+	}
+	return res.MatchedCount == 1, nil
+}
+
+// Muted dice si me silenció a other (perfil de persona, nv-70).
+func (r *Repository) Muted(ctx context.Context, me, other bson.ObjectID) (bool, error) {
+	f, ok, err := r.FindByPair(ctx, me, other)
+	if err != nil || !ok {
+		return false, err
+	}
+	return f.MutedByUser(me), nil
+}
+
+// MutedByUser dice si me silenció a la otra persona.
+func (f Friendship) MutedByUser(me bson.ObjectID) bool {
+	for _, id := range f.MutedBy {
+		if id == me {
+			return true
+		}
+	}
+	return false
 }
 
 // Reject borra la solicitud pendiente id que recibió receiver: quien envió no se entera.
