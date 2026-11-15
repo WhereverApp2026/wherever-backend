@@ -68,6 +68,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/vistas"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
@@ -240,6 +241,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
 	registry.RegisterExporter(imagePrivacy)
+	views := vistas.NewService(vistas.NewRepository(db), businessRepo, log)
+	viewsPrivacy := vistas.NewPrivacy(vistas.NewRepository(db), businessRepo)
+	registry.RegisterPurger(viewsPrivacy)
+	registry.RegisterExporter(viewsPrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
 	if err != nil {
@@ -276,6 +281,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
+		// Vistos recientemente (nv-66): antes que negocios, por `/lugares/recientes`.
+		vistas.NewHandler(views, validator).WithActiveGuard(active),
 		// El menú y las reseñas (nv-62) van antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
 		menu.NewHandler(merchant.menu, validator).WithActiveGuard(active),
 		resenas.NewHandler(reviews, validator).WithActiveGuard(active),

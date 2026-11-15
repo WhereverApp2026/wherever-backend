@@ -781,6 +781,12 @@
 - Lección: Docker Desktop se cierra al reiniciar la máquina y Testcontainers falla con «rootless Docker is not supported on Windows»; arráncalo antes de las suites.
 - A evitar: comparar respuestas de error completas entre peticiones: `traza_id` cambia en cada una.
 
+## NV-66 — Conteo, afluencia y vistos recientemente (2026-11-15)
+- Estado: rama `nv-66` desde `main`, PR contra `main`. Falta la firma. Colección nueva `historial_vistas` (`ux_vista`, `ix_recientes`, `ttl_vistas`): correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
+- Decisión: el conteo usa los mismos filtros que la lista con `$geoWithin` (CountDocuments no admite `$near`), tope 1000 y 2 s, sin caché. La afluencia lee `afluencia` directo (sin caché de fichas).
+- Decisión: la vista es un `upsert` condicionado a 10 min; una reciente choca con `ux_vista` y no escribe. Tope de 60 lugares por hora contado en MongoDB, sin Redis (429 con `Retry-After: 3600`).
+- A evitar: probar `hora_actual` con un día fijo en un contrato: cambia de forma el día que coincide con hoy.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

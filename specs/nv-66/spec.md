@@ -70,8 +70,13 @@ Filas copiadas del Excel (A2): `GET /lugares/conteo` «Cuenta cuántos resultado
 - Sin escribir `afluencia` (check-ins J7).
 - Sin filtros nuevos en `GET /lugares`.
 
+## Ejecución (2026-11-15)
+- **Código:** `internal/negocios/actividad.go` (`CountQuery`, `Count` con `$geoWithin`/`$centerSphere` y tope 1001 en 2 s, `ParseDay`, `TrafficOf`, `Traffic`) y rutas en `internal/negocios/handler.go`; paquete nuevo `internal/vistas` (repositorio, service, handler, ARCO), registrado antes de negocios.
+- **Decisiones:** registrar la vista es un solo `upsert` cuyo filtro exige la vista anterior de hace más de 10 min; si hay una reciente, el upsert choca con `ux_vista` y no se escribe (sin leer antes). El tope de 60 lugares por hora cuenta los otros lugares vistos en la última hora (volver a uno ya visto no cuenta). Recientes usa `FindCards` (la tarjeta de `GET /lugares`), que ya existía; no hizo falta un `FindVisibleMany` nuevo. La afluencia lee el negocio con `FindVisible` sin pasar por la caché de fichas: la ficha guardada no lleva `afluencia` y agregarla cambiaría la llave de nv-18.
+- **Pruebas:** `internal/negocios/afluencia_test.go`, `internal/vistas/service_test.go`, `tests/integration/lugares_actividad_test.go` (conteo, tope, afluencia, vistas, tope por hora, ARCO y presupuesto de Redis en un solo archivo), `tests/security/vistas_security_test.go`, `tests/contract/lugares_actividad_contract_test.go`, `tests/database/indexes_test.go`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-66`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** `historial_vistas` solo con vistas (búsquedas y descartes ya viven aparte); vistas para cualquier rol activo; límite de vistas contado en MongoDB sin Redis (60/h) y sin escritura antes de 10 min; conteo sin caché ni política propia con tope 1000; `dia` 0 = domingo; estadísticas del negocio fuera y solo anónimas.
