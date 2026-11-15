@@ -34,6 +34,17 @@ type RespondRequest struct {
 	Action string `json:"accion" validate:"required,oneof=aceptar rechazar"`
 }
 
+// MuteRequest es el cuerpo de PUT /amistades/{id}/silencio (nv-70).
+type MuteRequest struct {
+	Muted *bool `json:"silenciado" validate:"required"`
+}
+
+// MuteResponse es la marca propia tras el cambio.
+type MuteResponse struct {
+	ID    string `json:"id"`
+	Muted bool   `json:"silenciado"`
+}
+
 // ListQuery es `?estado=amigos|recibidas|enviadas&q=`.
 type ListQuery struct {
 	Status string `query:"estado" validate:"omitempty,oneof=amigos recibidas enviadas"`
@@ -46,8 +57,10 @@ type Item struct {
 	Status    string          `json:"estado"`
 	Direction string          `json:"direccion"`
 	Person    personas.Person `json:"persona"`
-	CreatedAt time.Time       `json:"creada_en"`
-	UpdatedAt time.Time       `json:"actualizada_en"`
+	// Muted es mi marca de silencio (nv-70); la del otro nunca sale.
+	Muted     bool      `json:"silenciado"`
+	CreatedAt time.Time `json:"creada_en"`
+	UpdatedAt time.Time `json:"actualizada_en"`
 }
 
 // ListResponse es la respuesta de GET /amistades.
@@ -63,7 +76,7 @@ func newItem(f Friendship, me bson.ObjectID, p usuarios.User) Item {
 		direction = DirectionSent
 	}
 	return Item{
-		ID: f.ID.Hex(), Status: f.Status, Direction: direction,
+		ID: f.ID.Hex(), Status: f.Status, Direction: direction, Muted: f.MutedByUser(me),
 		Person:    personas.Person{ID: p.ID.Hex(), Name: p.Name, Username: p.Username, PhotoURL: p.PhotoURL},
 		CreatedAt: f.CreatedAt, UpdatedAt: f.UpdatedAt,
 	}

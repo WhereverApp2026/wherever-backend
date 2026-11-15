@@ -116,6 +116,7 @@ type Env struct {
 	Semantica         *semantica.Service
 	Busquedas         *busquedas.Service
 	Sugerencias       *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
+	Personas          *personas.Service    // igual: perfil sin grafo hasta WithGraph (nv-70)
 	Imagenes          imagenestest.Modulo  // doble del bucket y Rekognition local (nv-45)
 	Mail              *mailer.Memory
 	Log               *slog.Logger
@@ -299,6 +300,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	friends.WithGraph(graph).WithNotifier(notifier)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
+	people.WithProfile(users, friendRepo, groupRepo, nil) // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
 	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
 	require.NoError(t, err)
 	appErrors, err := errores.NewService(errores.NewRepository(client.DB()), cursor)
@@ -310,7 +312,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
-		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
+		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -344,7 +346,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			sincronizacion.NewHandler(sincronizacion.NewService(syncRepo, planRepo, users, cursor), v).
 				WithPending(sincronizacion.NewPending(syncActions, plans, acc, users, v), usuarios.RequireActive(users)),
 			errores.NewHandler(appErrors, v),
-			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)),
+			personas.NewHandler(people).WithActiveGuard(usuarios.RequireActive(users)).WithValidator(v),
 			sugerencias.NewHandler(suggestions).WithActiveGuard(usuarios.RequireActive(users)), // antes que amistades
 			amistades.NewHandler(friends, v).WithActiveGuard(usuarios.RequireActive(users)),
 		},

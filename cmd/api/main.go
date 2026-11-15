@@ -257,7 +257,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	accountSvc.WithRetiroDatosNegocio(business.privacy)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, db, cursor, log)
+	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, db, cursor, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -477,6 +477,7 @@ type graphStores struct {
 type socialDeps struct {
 	users     *usuarios.Repository
 	friends   *amistades.Repository
+	groups    *grupos.Repository
 	places    *negocios.Repository
 	graph     graphStores
 	notifier  notificaciones.Notifier
@@ -512,13 +513,17 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	people.WithProfile(d.users, d.friends, d.groups, nil)
+	if d.graph.driver != nil {
+		people.WithGraph(d.graph.driver)
+	}
 	suggestions, err := sugerencias.NewService(d.friends, d.users, d.places, log)
 	if err != nil {
 		return nil, err
 	}
 	suggestions.WithGraph(d.graph.driver)
 	return []httpapi.Module{
-		personas.NewHandler(people).WithActiveGuard(d.active),
+		personas.NewHandler(people).WithActiveGuard(d.active).WithValidator(d.validator),
 		sugerencias.NewHandler(suggestions).WithActiveGuard(d.active),
 		amistades.NewHandler(friends, d.validator).WithActiveGuard(d.active),
 	}, nil

@@ -71,6 +71,31 @@ func (r *Repository) FindByPhoneSearchable(ctx context.Context, phoneHash string
 	return u, true, nil
 }
 
+// FindByPhonesSearchable busca de una vez por `ux_telefono_hash` las cuentas activas que se
+// dejan encontrar por teléfono (contactos, nv-70). Trae `telefono_hash` solo para ubicar el
+// índice del contacto; nunca sale en la respuesta.
+func (r *Repository) FindByPhonesSearchable(ctx context.Context, hashes []string, exclude []bson.ObjectID) ([]User, error) {
+	out := []User{}
+	if len(hashes) == 0 {
+		return out, nil
+	}
+	filter := bson.D{
+		{Key: "telefono_hash", Value: bson.D{{Key: "$in", Value: hashes}}},
+		{Key: "estado", Value: StatusActive},
+		{Key: "privacidad.buscable_por_telefono", Value: true},
+		{Key: "_id", Value: bson.D{{Key: "$nin", Value: exclude}}},
+	}
+	projection := append(bson.D{{Key: "telefono_hash", Value: 1}}, searchProjection...)
+	cur, err := r.col.Find(ctx, filter, options.Find().SetProjection(projection))
+	if err != nil {
+		return nil, err
+	}
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FindPublicByIDs devuelve lo público (nombre, nombre de usuario y foto) de las cuentas activas
 // con esos ids; las que no existen o no están activas no aparecen (lista de amigos, nv-36).
 func (r *Repository) FindPublicByIDs(ctx context.Context, ids []bson.ObjectID) ([]User, error) {

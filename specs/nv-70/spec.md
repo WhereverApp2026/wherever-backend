@@ -67,8 +67,13 @@ Filas del Excel (hoja «J2 Amigos») copiadas y corregidas:
 - Sin guardar la agenda ni avisar a nadie de que «un contacto se unió».
 - Sin `GET /personas/yo/qr` (fuera desde nv-64).
 
+## Ejecución (2026-11-15)
+- **Código:** `internal/personas/perfil.go` (`Profile`, `visiblePerson`, `Contacts`, `normalizeContacts`), rutas en `internal/personas/handler.go`; `internal/amistades` (`silenciado_por`, `SetMuted`, `Muted`, `PUT /:id/silencio`, `silenciado` en la lista y en ARCO; bloquear vacía las marcas); `usuarios.FindByPhonesSearchable`; `grupos.CommonGroups`; `neo4j.CommonFriends`.
+- **Decisiones:** `grupos_en_comun` cuenta los grupos vivos (no disueltos) donde ninguno de los dos declinó, sin mirar el plan. Los contactos normalizan con el mismo `parsePhone` de la búsqueda de nv-35 (no `account.NormalizePhone`, que crearía un ciclo de paquetes). Con `POST`, contactos cuesta una escritura autenticada más su ventana, no una lectura.
+- **Pruebas:** `internal/personas/perfil_test.go`, `tests/integration/personas_perfil_test.go` (perfil, Neo4j caído, límite, silencio, contactos y presupuesto de Redis en un solo archivo), `tests/security/personas_privacidad_test.go`, `tests/contract/personas_perfil_contract_test.go`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-70`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** teléfonos en claro por TLS y HMAC en el servidor (no `hashes[]` del Excel); `indice` en vez de devolver el número; contactos 10 por día y perfil 120 por hora; bloqueo = 404 (no 403); perfil completo solo para amigos y sin insignias ni momentos; silencio sin `If-Match`.

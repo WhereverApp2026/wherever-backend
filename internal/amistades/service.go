@@ -320,6 +320,27 @@ func (s *Service) Remove(ctx context.Context, subject, rawID string) error {
 	return nil
 }
 
+// Mute silencia o deja de silenciar a un amigo (nv-70). Solo toca mi marca y es idempotente,
+// sin If-Match. Solicitud, bloqueo, ajena o inexistente = 404 igual.
+func (s *Service) Mute(ctx context.Context, subject, rawID string, req MuteRequest) (MuteResponse, error) {
+	me, err := self(subject)
+	if err != nil {
+		return MuteResponse{}, err
+	}
+	id, err := pathID(rawID)
+	if err != nil {
+		return MuteResponse{}, err
+	}
+	ok, err := s.repo.SetMuted(ctx, id, me, *req.Muted)
+	if err != nil {
+		return MuteResponse{}, unavailable(err)
+	}
+	if !ok {
+		return MuteResponse{}, notFound()
+	}
+	return MuteResponse{ID: id.Hex(), Muted: *req.Muted}, nil
+}
+
 // Block bloquea a la otra persona de la relación sin avisarle: deja de verme en la búsqueda y
 // no puede enviarme solicitudes. Bloquear otra vez no cambia nada.
 func (s *Service) Block(ctx context.Context, subject, rawID string) error {

@@ -1,6 +1,8 @@
 package amistades
 
 import (
+	"bytes"
+	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -54,6 +56,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Patch("/:id", chain(h.respond)...)
 	g.Delete("/:id", chain(h.remove)...)
 	g.Post("/:id/bloquear", chain(h.block)...)
+	g.Put("/:id/silencio", chain(h.mute)...)
 }
 
 func subject(c *fiber.Ctx) string {
@@ -117,6 +120,25 @@ func (h *Handler) remove(c *fiber.Ctx) error {
 		return err
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// mute decodifica en estricto: campo de más = 400 (nv-70).
+func (h *Handler) mute(c *fiber.Ctx) error {
+	var req MuteRequest
+	dec := json.NewDecoder(bytes.NewReader(c.Body()))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil || dec.More() {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	if err := h.validator.Struct(req); err != nil {
+		return err
+	}
+	out, err := h.svc.Mute(c.UserContext(), subject(c), c.Params("id"), req)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
 }
 
 func (h *Handler) block(c *fiber.Ctx) error {
