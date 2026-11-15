@@ -77,7 +77,7 @@ func sampleGroup() (Group, bson.ObjectID, bson.ObjectID, bson.ObjectID) {
 func TestNewView_OrganizadorVeATodos(t *testing.T) {
 	g, org, yes, _ := sampleGroup()
 	people := map[bson.ObjectID]usuarios.User{yes: {ID: yes, Name: "Ana", Username: "ana"}}
-	v := newView(g, org, people)
+	v := newView(g, org, people, time.Now())
 	assert.Equal(t, RoleOrganizer, v.MyRole)
 	assert.Len(t, v.Members, 3)
 	require.NotNil(t, v.Summary.Declined)
@@ -91,7 +91,7 @@ func TestNewView_OrganizadorVeATodos(t *testing.T) {
 
 func TestNewView_IntegranteNoVeAQuienDeclino(t *testing.T) {
 	g, _, yes, no := sampleGroup()
-	v := newView(g, yes, nil)
+	v := newView(g, yes, nil, time.Now())
 	assert.Equal(t, StatusConfirmed, v.MyStatus)
 	assert.Len(t, v.Members, 2)
 	assert.Nil(t, v.Summary.Declined)
@@ -99,7 +99,7 @@ func TestNewView_IntegranteNoVeAQuienDeclino(t *testing.T) {
 		assert.NotEqual(t, no.Hex(), m.UserID)
 	}
 	// Quien declinó sí se ve a sí mismo.
-	mine := newView(g, no, nil)
+	mine := newView(g, no, nil, time.Now())
 	assert.Equal(t, StatusDeclined, mine.MyStatus)
 	assert.Len(t, mine.Members, 3)
 }

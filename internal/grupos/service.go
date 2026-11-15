@@ -43,6 +43,7 @@ type Service struct {
 	users   Users
 	cursor  *pagination.Signer
 	share   shareDeps
+	extras  extraDeps
 	now     func() time.Time
 }
 
@@ -165,7 +166,11 @@ func (s *Service) ownPlan(ctx context.Context, me, planID bson.ObjectID) error {
 	return nil
 }
 
+// newGroup crea el grupo del plan; antes quita el grupo disuelto que hubiera (nv-69).
 func (s *Service) newGroup(ctx context.Context, me, planID bson.ObjectID) (Group, error) {
+	if err := s.repo.DropDissolved(ctx, planID); err != nil {
+		return Group{}, err
+	}
 	now := s.now().UTC()
 	g := Group{
 		ID: bson.NewObjectID(), PlanID: planID, OrganizerID: me, Occupied: 1, CreatedAt: now, UpdatedAt: now,
@@ -295,7 +300,7 @@ func (s *Service) views(ctx context.Context, groups []Group, me bson.ObjectID) (
 	}
 	out := make([]View, 0, len(groups))
 	for _, g := range groups {
-		out = append(out, newView(g, me, people))
+		out = append(out, newView(g, me, people, s.now()))
 	}
 	return out, nil
 }
@@ -313,27 +318,47 @@ func (s *Service) Get(ctx context.Context, subject, rawID string) (View, error) 
 	return views[0], nil
 }
 
-// Respond confirma o declina la invitación. Volver a confirmar después de declinar exige
-// cupo. El organizador no responde (422).
+// Respond confirma o declina la invitación y comparte o retira la ubicación (nv-69). Volver
+// a confirmar después de declinar exige cupo. El organizador no responde (422), pero sí
+// comparte su ubicación.
 func (s *Service) Respond(ctx context.Context, subject, rawID string, req RespondRequest) (View, error) {
 	me, g, err := s.load(ctx, subject, rawID)
 	if err != nil {
 		return View{}, err
 	}
-	mine, _ := g.Member(me)
-	if mine.Role == RoleOrganizer {
-		return View{}, invalid("estado", "el organizador no responde a su propio grupo")
+	if req.Status == "" && req.Location == nil && req.Share == nil {
+		return View{}, invalid("estado", "manda estado, ubicacion o compartir_ubicacion")
 	}
-	if mine.Status != req.Status {
-		ok, err := s.repo.SetStatus(ctx, g.ID, me, mine.Status, req.Status, s.now().UTC())
-		if err != nil {
-			return View{}, errStore()
+	if req.Location != nil || req.Share != nil {
+		if err := s.shareLocation(ctx, g, me, req); err != nil {
+			return View{}, err
 		}
-		if !ok {
-			return View{}, s.respondConflict(mine.Status)
+	}
+	if req.Status != "" {
+		if err := s.setStatus(ctx, g, me, req.Status); err != nil {
+			return View{}, err
 		}
 	}
 	return s.view(ctx, g.ID, me)
+}
+
+// setStatus confirma o declina; el organizador no responde (422).
+func (s *Service) setStatus(ctx context.Context, g Group, me bson.ObjectID, status string) error {
+	mine, _ := g.Member(me)
+	if mine.Role == RoleOrganizer {
+		return invalid("estado", "el organizador no responde a su propio grupo")
+	}
+	if mine.Status == status {
+		return nil
+	}
+	ok, err := s.repo.SetStatus(ctx, g.ID, me, mine.Status, status, s.now().UTC())
+	if err != nil {
+		return errStore()
+	}
+	if !ok {
+		return s.respondConflict(mine.Status)
+	}
+	return nil
 }
 
 // respondConflict explica por qué no aplicó: si venía de declinar, el grupo se llenó; si no,

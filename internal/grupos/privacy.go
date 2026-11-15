@@ -34,6 +34,14 @@ type exportedGroup struct {
 	Status    string    `json:"estado"`
 	Since     time.Time `json:"desde"`
 	CreatedAt time.Time `json:"creado_en"`
+	// Location es la ubicación propia que sigue guardada (nv-69); la de los demás nunca sale.
+	Location        *exportedLocation `json:"ubicacion_compartida,omitempty"`
+	LocationExpires *time.Time        `json:"ubicacion_vence,omitempty"`
+}
+
+type exportedLocation struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
 }
 
 // Export devuelve los grupos del usuario con su rol y estado; nada de los demás integrantes.
@@ -45,9 +53,14 @@ func (p *Privacy) Export(ctx context.Context, userID bson.ObjectID) (any, error)
 	out := make([]exportedGroup, 0, len(rows))
 	for _, g := range rows {
 		m, _ := g.Member(userID)
-		out = append(out, exportedGroup{
+		row := exportedGroup{
 			ID: g.ID.Hex(), PlanID: g.PlanID.Hex(), Role: m.Role, Status: m.Status, Since: m.Since, CreatedAt: g.CreatedAt,
-		})
+			LocationExpires: m.LocationExpires,
+		}
+		if m.SharedLocation != nil {
+			row.Location = &exportedLocation{Lat: m.SharedLocation.Lat, Lng: m.SharedLocation.Lng}
+		}
+		out = append(out, row)
 	}
 	return out, nil
 }

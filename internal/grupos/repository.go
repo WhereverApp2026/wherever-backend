@@ -75,14 +75,19 @@ func (r *Repository) findOne(ctx context.Context, filter bson.D) (Group, error) 
 	return g, err
 }
 
-// FindByID trae el grupo.
-func (r *Repository) FindByID(ctx context.Context, id bson.ObjectID) (Group, error) {
-	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}})
+// alive deja fuera los grupos disueltos (nv-69).
+func alive() bson.E {
+	return bson.E{Key: "eliminado_en", Value: bson.D{{Key: "$exists", Value: false}}}
 }
 
-// FindByPlan trae el grupo del plan.
+// FindByID trae el grupo (no disuelto).
+func (r *Repository) FindByID(ctx context.Context, id bson.ObjectID) (Group, error) {
+	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}, alive()})
+}
+
+// FindByPlan trae el grupo del plan (no disuelto).
 func (r *Repository) FindByPlan(ctx context.Context, planID bson.ObjectID) (Group, error) {
-	return r.findOne(ctx, bson.D{{Key: "plan_id", Value: planID}})
+	return r.findOne(ctx, bson.D{{Key: "plan_id", Value: planID}, alive()})
 }
 
 func (r *Repository) updated(ctx context.Context, filter, update bson.D) (bool, error) {
@@ -173,7 +178,7 @@ type Position struct {
 // ListForMember trae hasta limit+1 grupos donde userID es integrante, del más reciente al más
 // viejo. Usa ix_integrante_actualizado.
 func (r *Repository) ListForMember(ctx context.Context, userID bson.ObjectID, after *Position, limit int) ([]Group, error) {
-	filter := bson.D{{Key: "integrantes.usuario_id", Value: userID}}
+	filter := bson.D{{Key: "integrantes.usuario_id", Value: userID}, alive()}
 	if after != nil {
 		filter = append(filter, bson.E{Key: "$or", Value: bson.A{
 			bson.D{{Key: "actualizado_en", Value: bson.D{{Key: "$lt", Value: after.UpdatedAt}}}},
@@ -200,7 +205,7 @@ func (r *Repository) find(ctx context.Context, filter bson.D, opts *options.Find
 // planes.Service para que los integrantes lean el plan (nv-37).
 func (r *Repository) CanRead(ctx context.Context, planID, userID bson.ObjectID) (bool, error) {
 	n, err := r.col.CountDocuments(ctx, bson.D{
-		{Key: "plan_id", Value: planID},
+		{Key: "plan_id", Value: planID}, alive(),
 		elem(bson.D{{Key: "usuario_id", Value: userID}, {Key: "estado", Value: bson.D{{Key: "$in", Value: bson.A{StatusInvited, StatusConfirmed}}}}}),
 	})
 	return n > 0, err
@@ -246,7 +251,7 @@ func (r *Repository) ClearCode(ctx context.Context, groupID, organizer bson.Obje
 
 // FindByCode trae el grupo con ese hash de código (ux_codigo_hash).
 func (r *Repository) FindByCode(ctx context.Context, hash string) (Group, error) {
-	return r.findOne(ctx, bson.D{{Key: "codigo_hash", Value: hash}})
+	return r.findOne(ctx, bson.D{{Key: "codigo_hash", Value: hash}, alive()})
 }
 
 // Join deja a userID confirmado por el enlace: entra nuevo, pasa de invitado a confirmado o

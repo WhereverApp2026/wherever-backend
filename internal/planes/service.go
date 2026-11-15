@@ -23,8 +23,10 @@ type Service struct {
 	graph   Graph
 	sync    Sync
 	members Members
-	extras  extraDeps
-	now     func() time.Time
+	// surprises recorta el plan a la persona sorprendida del grupo (nv-69).
+	surprises Surprises
+	extras    extraDeps
+	now       func() time.Time
 	// cursor firma la paginación de GET /planes (nv-17).
 	cursor *pagination.Signer
 }
@@ -69,7 +71,7 @@ func (noMembers) CanRead(context.Context, bson.ObjectID, bson.ObjectID) (bool, e
 
 // NewService recibe el repositorio y la calculadora por constructor.
 func NewService(repo *Repository, calc *Calculadora) *Service {
-	return &Service{repo: repo, calc: calc, graph: noGraph{}, sync: noSync{}, members: noMembers{}, now: time.Now}
+	return &Service{repo: repo, calc: calc, graph: noGraph{}, sync: noSync{}, members: noMembers{}, surprises: noSurprises{}, now: time.Now}
 }
 
 // WithCursor fija la llave del cursor firmado (nv-17).
@@ -210,8 +212,17 @@ func (s *Service) getMember(ctx context.Context, subject, rawID string) (Plan, e
 	if !ok {
 		return Plan{}, errPlanNotFound()
 	}
-	p, err = s.repo.FindActive(ctx, id)
-	return p, storeErrorOrNil(err)
+	if p, err = s.repo.FindActive(ctx, id); err != nil {
+		return Plan{}, storeErrorOrNil(err)
+	}
+	sp, err := s.surprises.SurpriseFor(ctx, id, reader, s.now())
+	if err != nil {
+		return Plan{}, errStore()
+	}
+	if sp != nil {
+		cut(&p, sp)
+	}
+	return p, nil
 }
 
 // getOwned trae el plan del dueño; es la única entrada de las ediciones, el borrado y el
