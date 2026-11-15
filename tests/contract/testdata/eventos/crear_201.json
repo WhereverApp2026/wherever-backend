@@ -1,0 +1,22 @@
+{
+  "status": 201,
+  "body": {
+    "actualizado_en": "string",
+    "creado_en": "string",
+    "descripcion": "string",
+    "direccion": "string",
+    "estado": "string",
+    "fin": "string",
+    "id": "string",
+    "inicio": "string",
+    "negocio_id": "string",
+    "precio": "number",
+    "tipo": "string",
+    "titulo": "string",
+    "ubicacion": {
+      "lat": "number",
+      "lng": "number"
+    },
+    "version": "number"
+  }
+}
