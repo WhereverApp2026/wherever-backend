@@ -781,6 +781,11 @@
 - Lección: Docker Desktop se cierra al reiniciar la máquina y Testcontainers falla con «rootless Docker is not supported on Windows»; arráncalo antes de las suites.
 - A evitar: comparar respuestas de error completas entre peticiones: `traza_id` cambia en cada una.
 
+## NV-67 — Reportes de información incorrecta (2026-11-15)
+- Estado: rama `nv-67` desde `main`, PR contra `main`. Falta la firma. Colección nueva `reportes_negocio` con 4 índices: correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
+- Decisión: un abierto por persona y negocio lo garantiza `ux_reporte_abierto` (único parcial con `estado = abierto`); 10 al día contados en MongoDB, sin Redis. El dueño no reporta su negocio (403). Cola admin agregada con cursor firmado; resolver solo desde `abierto` y no toca el negocio.
+- Lección: cada colección nueva con `Exporter` cambia la exportación ARCO; hay que recapturar `TestContract_Usuarios` en el mismo PR (le pasó a nv-65).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

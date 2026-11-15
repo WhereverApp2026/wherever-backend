@@ -58,6 +58,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/reportesnegocio"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
@@ -240,6 +241,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
 	registry.RegisterExporter(imagePrivacy)
+	reportRepo := reportesnegocio.NewRepository(db)
+	reports := reportesnegocio.NewService(reportRepo, businessRepo, cursor, log).WithModeracion(moderacion.New(nil, nil, modSvc, log))
+	reportPrivacy := reportesnegocio.NewPrivacy(reportRepo, businessRepo)
+	registry.RegisterPurger(reportPrivacy)
+	registry.RegisterExporter(reportPrivacy)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
 	if err != nil {
@@ -282,6 +288,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// Postales y momentos (nv-63) atienden /lugares/:id/postales, /negocios/:id/momentos y /planes/:id/recuerdo.
 		postales.NewHandler(cards, validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
+		// Reportes de información incorrecta (nv-67): POST /lugares/:id/reportes y la cola admin.
+		reportesnegocio.NewHandler(reports, validator).WithActiveGuard(active),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),

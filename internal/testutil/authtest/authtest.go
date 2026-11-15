@@ -53,6 +53,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
+	"github.com/WhereverApp2026/wherever-backend/internal/reportesnegocio"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/semantica"
@@ -101,6 +102,7 @@ type Env struct {
 	ModeradorResenas  *resenastest.Moderador // doble del moderador de texto de nv-42
 	Postales          *postales.Service      // postales, recuerdos y momentos (nv-63) con las imágenes de Imagenes
 	ModeradorPostales *resenastest.Moderador // doble del moderador de texto de nv-42 para postales y momentos
+	ModeradorReportes *resenastest.Moderador // doble del moderador del detalle de reportes de negocio (nv-67)
 	Planes            *planes.Service
 	Votaciones        *votaciones.Service
 	Chat              *chat.Service
@@ -287,6 +289,11 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(postales.NewPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewRecuerdosPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewMomentosPrivacy(cardRepo))
+	reportRepo := reportesnegocio.NewRepository(client.DB())
+	moderadorReportes := resenastest.NuevoModerador()
+	reports := reportesnegocio.NewService(reportRepo, businessRepo, cursor, log).WithModeracion(moderadorReportes)
+	registry.RegisterPurger(reportesnegocio.NewPrivacy(reportRepo, businessRepo))
+	registry.RegisterExporter(reportesnegocio.NewPrivacy(reportRepo, businessRepo))
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -310,7 +317,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -325,6 +332,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			resenas.NewHandler(reviews, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que negocios
 			postales.NewHandler(cards, v).WithActiveGuard(usuarios.RequireActive(users)),  // antes que negocios y planes
 			negocios.NewHandler(businesses, v),
+			reportesnegocio.NewHandler(reports, v).WithActiveGuard(usuarios.RequireActive(users)),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
 			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
