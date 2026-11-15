@@ -228,6 +228,8 @@ func TestResenas_CrearPublicarYCache(t *testing.T) {
 	pend := list(t, decode(t, resp)["items"])
 	require.Len(t, pend, 1)
 	assert.Equal(t, checkin, obj(t, pend[0])["checkin_id"])
+	require.NotEmpty(t, b.Name)
+	assert.Equal(t, b.Name, obj(t, pend[0])["negocio_nombre"])
 
 	// La ficha queda en caché antes de reseñar.
 	requireStatus(t, sendJSON(t, app, http.MethodGet, "/api/v1/lugares/"+b.ID.Hex(), nil, ""), http.StatusOK)
