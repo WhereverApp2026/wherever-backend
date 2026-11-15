@@ -1,6 +1,9 @@
 package notificaciones
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
@@ -32,6 +35,8 @@ func (h *Handler) Routes(v1 fiber.Router, _ *middleware.Limiter) {
 	d := v1.Group("/dispositivos", middleware.RequireAuth())
 	d.Put("", h.write(h.register)...)
 	d.Delete("", h.write(h.unregister)...)
+	d.Put("/:id", h.write(h.updateDevice)...)
+	d.Delete("/:id", h.write(h.deleteDevice)...)
 
 	n := v1.Group("/notificaciones", middleware.RequireAuth())
 	n.Get("", h.list)
@@ -72,7 +77,34 @@ func (h *Handler) register(c *fiber.Ctx) error {
 	if err := h.bind(c, &req); err != nil {
 		return err
 	}
-	if err := h.svc.RegisterDevice(c.UserContext(), subject(c), req); err != nil {
+	id, err := h.svc.RegisterDevice(c.UserContext(), subject(c), req)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderLocation, "/api/v1/dispositivos/"+id)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// updateDevice decodifica en estricto: campos de más = 400 (nv-71).
+func (h *Handler) updateDevice(c *fiber.Ctx) error {
+	var req DevicePatch
+	dec := json.NewDecoder(bytes.NewReader(c.Body()))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil || dec.More() {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	if err := h.validator.Struct(req); err != nil {
+		return err
+	}
+	out, err := h.svc.UpdateDevice(c.UserContext(), subject(c), c.Params("id"), req)
+	if err != nil {
+		return err
+	}
+	return noStore(c, out)
+}
+
+func (h *Handler) deleteDevice(c *fiber.Ctx) error {
+	if err := h.svc.DeleteDevice(c.UserContext(), subject(c), c.Params("id")); err != nil {
 		return err
 	}
 	return c.SendStatus(fiber.StatusNoContent)

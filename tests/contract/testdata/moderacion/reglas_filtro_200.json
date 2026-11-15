@@ -1,0 +1,62 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "actualizado_por": "string",
+    "cuarentena": "number",
+    "filtros": {
+      "acoso": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "datos_personales": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "desnudez": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "drogas": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "odio": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "sexual": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "spam": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      },
+      "violencia": {
+        "activa": "bool",
+        "cuarentena": "number",
+        "propio": "bool",
+        "rechazo": "number"
+      }
+    },
+    "palabras": [],
+    "por_defecto": "bool",
+    "rechazo": "number",
+    "version": "number"
+  }
+}

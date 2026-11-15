@@ -18,6 +18,35 @@ type DeviceRemoveRequest struct {
 	Token string `json:"token" validate:"required,min=20,max=4096"`
 }
 
+// DevicePatch es el cuerpo de PUT /dispositivos/{id} (nv-71): al menos un campo; los campos
+// de más son 400 (decodificación estricta).
+type DevicePatch struct {
+	AppVersion *string   `json:"app_version" validate:"omitempty,max=20,semver"`
+	Channels   *[]string `json:"canales_activos" validate:"omitempty,max=5,unique,dive,oneof=reservas cupones grupos resenas promociones"`
+}
+
+// DeviceView es un teléfono en la respuesta; nunca lleva el token ni su hash.
+type DeviceView struct {
+	ID         string    `json:"id"`
+	Platform   string    `json:"plataforma"`
+	AppVersion string    `json:"app_version,omitempty"`
+	Channels   []string  `json:"canales_activos"`
+	LastUsed   time.Time `json:"ultimo_uso"`
+}
+
+// AllChannels son los canales cuando el teléfono no mandó lista.
+func AllChannels() []string {
+	return []string{ChannelBookings, ChannelCoupons, ChannelGroups, ChannelReviews, ChannelPromotions}
+}
+
+func newDeviceView(d Device) DeviceView {
+	channels := AllChannels()
+	if d.Channels != nil {
+		channels = *d.Channels
+	}
+	return DeviceView{ID: d.ID.Hex(), Platform: d.Platform, AppVersion: d.AppVersion, Channels: channels, LastUsed: d.LastUsed}
+}
+
 // MarkRequest es el cuerpo de PATCH /notificaciones/{id}.
 type MarkRequest struct {
 	Read *bool `json:"leida" validate:"required"`

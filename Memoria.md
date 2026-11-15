@@ -768,6 +768,12 @@
 - Lección: el runner de GitHub pasó a Python 3.14 y `pip install semgrep==1.95.0` dejó de arrancar (protobuf 4.x). Desde el PR #102 Semgrep corre en su imagen fijada por digest.
 - A evitar: mirar solo el último `ocupados` al unirse; `repo.Join` ya condiciona el cupo en la misma operación.
 
+## NV-71 — Dispositivos por id y reglas por filtro (2026-11-14)
+- Estado: rama `nv-71` desde `main`, PR contra `main`. Falta la firma.
+- Decisión: `{id}` del teléfono es el `_id`, que llega en `Location` de `PUT /dispositivos` (sigue en 204); el token nunca va en la ruta. `canales_activos` filtra el push por teléfono; hoy solo los avisos de grupo tienen canal.
+- Decisión: las reglas por filtro viven en el mismo documento `moderacion_reglas` (`filtros`), con un solo `If-Match`; `DELETE` desactiva; `datos_personales` no se apaga. `Reglas.Decidir` reemplaza a `Clasificar(maximo)` en el Moderador.
+- A evitar: convertir `ReglasRequest` a `Reglas` con un cast: dejó de compilar al agregar `Filtros`; arma el struct campo por campo.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

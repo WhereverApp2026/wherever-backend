@@ -140,24 +140,52 @@ func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) err
 // RegisterDevice guarda el token para userID o renueva su uso. Si el token era de otra
 // cuenta (cambió de sesión en el mismo teléfono), pasa a esta. Una cuenta con 5 teléfonos no
 // registra un sexto (ErrTooManyDevs).
-func (r *Repository) RegisterDevice(ctx context.Context, d Device, now time.Time) error {
-	res, err := r.devices.UpdateOne(ctx, bson.D{{Key: "token_hash", Value: d.TokenHash}, {Key: "usuario_id", Value: d.UserID}},
-		bson.D{{Key: "$set", Value: bson.D{{Key: "ultimo_uso", Value: now}, {Key: "plataforma", Value: d.Platform}}}})
-	if err != nil || res.MatchedCount == 1 {
-		return err
+// Devuelve el `_id` del documento: la app lo recibe en `Location` (nv-71).
+func (r *Repository) RegisterDevice(ctx context.Context, d Device, now time.Time) (bson.ObjectID, error) {
+	var got Device
+	after := options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(bson.D{{Key: "_id", Value: 1}})
+	err := r.devices.FindOneAndUpdate(ctx, bson.D{{Key: "token_hash", Value: d.TokenHash}, {Key: "usuario_id", Value: d.UserID}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "ultimo_uso", Value: now}, {Key: "plataforma", Value: d.Platform}}}}, after).Decode(&got)
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return got.ID, err
 	}
 	n, err := r.devices.CountDocuments(ctx, bson.D{{Key: "usuario_id", Value: d.UserID}, {Key: "token_hash", Value: bson.D{{Key: "$ne", Value: d.TokenHash}}}})
 	if err != nil {
-		return err
+		return bson.ObjectID{}, err
 	}
 	if n >= MaxDevices {
-		return ErrTooManyDevs
+		return bson.ObjectID{}, ErrTooManyDevs
 	}
-	_, err = r.devices.UpdateOne(ctx, bson.D{{Key: "token_hash", Value: d.TokenHash}}, bson.D{
+	err = r.devices.FindOneAndUpdate(ctx, bson.D{{Key: "token_hash", Value: d.TokenHash}}, bson.D{
 		{Key: "$set", Value: bson.D{{Key: "usuario_id", Value: d.UserID}, {Key: "token", Value: d.Token}, {Key: "plataforma", Value: d.Platform}, {Key: "ultimo_uso", Value: now}}},
 		{Key: "$setOnInsert", Value: bson.D{{Key: "_id", Value: bson.NewObjectID()}, {Key: "creado_en", Value: now}}},
-	}, options.UpdateOne().SetUpsert(true))
-	return err
+	}, after.SetUpsert(true)).Decode(&got)
+	return got.ID, err
+}
+
+// UpdateDevice ajusta la versión de la app y los canales de un teléfono propio y renueva su
+// uso; ErrNotFound si no existe o es de otra cuenta (nv-71).
+func (r *Repository) UpdateDevice(ctx context.Context, userID, id bson.ObjectID, set bson.D, now time.Time) (Device, error) {
+	var d Device
+	err := r.devices.FindOneAndUpdate(ctx, bson.D{{Key: "_id", Value: id}, {Key: "usuario_id", Value: userID}},
+		bson.D{{Key: "$set", Value: append(set, bson.E{Key: "ultimo_uso", Value: now})}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&d)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return Device{}, ErrNotFound
+	}
+	return d, err
+}
+
+// DeleteDevice borra un teléfono propio por id; ErrNotFound si no existe o es de otra cuenta.
+func (r *Repository) DeleteDevice(ctx context.Context, userID, id bson.ObjectID) error {
+	res, err := r.devices.DeleteOne(ctx, bson.D{{Key: "_id", Value: id}, {Key: "usuario_id", Value: userID}})
+	if err != nil {
+		return err
+	}
+	if res.DeletedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // RemoveDevice quita el token de la cuenta; ErrNotFound si no era suyo.
