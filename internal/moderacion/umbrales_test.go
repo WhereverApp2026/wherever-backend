@@ -72,3 +72,33 @@ func TestUmbrales_ContenidoVacio(t *testing.T) {
 	require.Equal(t, moderacion.VeredictoCuarentena, res.Veredicto)
 	require.Equal(t, moderacion.FallaVacio, res.Falla)
 }
+
+func ptr(v float64) *float64 { return &v }
+
+// nv-71: cada filtro usa sus umbrales propios, hereda los globales o no cuenta si está inactivo.
+func TestUmbrales_PorFiltro(t *testing.T) {
+	r := moderacion.ReglasPorDefecto()
+	r.Filtros = map[string]moderacion.ReglaFiltro{
+		moderacion.FiltroSpam:      {Cuarentena: ptr(70), Rechazo: ptr(95), Activa: true},
+		moderacion.FiltroViolencia: {Activa: false},
+		moderacion.FiltroDrogas:    {Rechazo: ptr(60), Activa: true},
+	}
+	require.NoError(t, r.Validar())
+	require.Equal(t, moderacion.VeredictoAprobado, r.Decidir(map[string]float64{moderacion.FiltroSpam: 65}), "umbral propio más alto")
+	require.Equal(t, moderacion.VeredictoCuarentena, r.Decidir(map[string]float64{moderacion.FiltroSpam: 90}))
+	require.Equal(t, moderacion.VeredictoAprobado, r.Decidir(map[string]float64{moderacion.FiltroViolencia: 100}), "inactivo")
+	require.Equal(t, moderacion.VeredictoRechazado, r.Decidir(map[string]float64{moderacion.FiltroDrogas: 60}), "rechazo propio, cuarentena heredada")
+	require.Equal(t, moderacion.VeredictoCuarentena, r.Decidir(map[string]float64{moderacion.FiltroOdio: 50}), "sin entrada hereda")
+	require.Equal(t, moderacion.VeredictoRechazado, r.Decidir(map[string]float64{moderacion.FiltroSpam: 10, moderacion.FiltroOdio: 85}), "gana el más severo")
+	require.Equal(t, moderacion.VeredictoAprobado, r.Decidir(nil))
+}
+
+func TestUmbrales_FiltrosInvalidos(t *testing.T) {
+	r := moderacion.ReglasPorDefecto()
+	r.Filtros = map[string]moderacion.ReglaFiltro{moderacion.FiltroSpam: {Cuarentena: ptr(90), Activa: true}}
+	require.Error(t, r.Validar(), "cuarentena propia >= rechazo global")
+	r.Filtros = map[string]moderacion.ReglaFiltro{moderacion.FiltroDatosPersonales: {Activa: false}}
+	require.ErrorIs(t, r.Validar(), moderacion.ErrFiltroObligatorio)
+	r.Filtros = map[string]moderacion.ReglaFiltro{moderacion.FiltroPalabras: {Activa: true}}
+	require.Error(t, r.Validar(), "palabra_bloqueada no es editable")
+}

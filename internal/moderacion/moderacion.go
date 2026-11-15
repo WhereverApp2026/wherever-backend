@@ -128,7 +128,7 @@ func (m *Moderador) Evaluar(ctx context.Context, c Contenido) Resultado {
 			return m.evaluarTexto(ctx, reglas, c.Texto)
 		})
 	}
-	res.Veredicto = reglas.Clasificar(maximo(res.Puntajes))
+	res.Veredicto = reglas.Decidir(res.Puntajes)
 	if res.Falla != "" && res.Veredicto == VeredictoAprobado {
 		res.Veredicto = VeredictoCuarentena
 	}

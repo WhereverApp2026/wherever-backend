@@ -193,21 +193,82 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string) error {
 	return nil
 }
 
-// RegisterDevice guarda el token del teléfono (hasta 5 por cuenta; el sexto es 422).
-func (s *Service) RegisterDevice(ctx context.Context, subject string, req DeviceRequest) error {
+// RegisterDevice guarda el token del teléfono (hasta 5 por cuenta; el sexto es 422) y
+// devuelve el id del documento (nv-71).
+func (s *Service) RegisterDevice(ctx context.Context, subject string, req DeviceRequest) (string, error) {
 	me, err := self(subject)
 	if err != nil {
-		return err
+		return "", err
 	}
 	platform := req.Platform
 	if platform == "" {
 		platform = PlatformAndroid
 	}
 	d := Device{UserID: me, Token: req.Token, TokenHash: HashToken(req.Token), Platform: platform}
-	err = s.repo.RegisterDevice(ctx, d, s.now().UTC())
+	id, err := s.repo.RegisterDevice(ctx, d, s.now().UTC())
 	if errors.Is(err, ErrTooManyDevs) {
-		return apperr.Validation("ya tienes 5 teléfonos registrados; quita uno primero",
+		return "", apperr.Validation("ya tienes 5 teléfonos registrados; quita uno primero",
 			apperr.FieldError{Field: "token", Message: "máximo 5 dispositivos"})
+	}
+	if err != nil {
+		return "", errStore()
+	}
+	return id.Hex(), nil
+}
+
+func deviceID(raw string) (bson.ObjectID, error) {
+	id, err := bson.ObjectIDFromHex(raw)
+	if err != nil {
+		return id, apperr.Validation("datos inválidos", apperr.FieldError{Field: "id", Message: "id inválido"})
+	}
+	return id, nil
+}
+
+func errDeviceNotFound() error { return apperr.NotFound("dispositivo no encontrado") }
+
+// UpdateDevice ajusta un teléfono propio por id (nv-71); sin If-Match, el último gana.
+func (s *Service) UpdateDevice(ctx context.Context, subject, rawID string, req DevicePatch) (DeviceView, error) {
+	me, err := self(subject)
+	if err != nil {
+		return DeviceView{}, err
+	}
+	id, err := deviceID(rawID)
+	if err != nil {
+		return DeviceView{}, err
+	}
+	set := bson.D{}
+	if req.AppVersion != nil {
+		set = append(set, bson.E{Key: "app_version", Value: *req.AppVersion})
+	}
+	if req.Channels != nil {
+		set = append(set, bson.E{Key: "canales_activos", Value: *req.Channels})
+	}
+	if len(set) == 0 {
+		return DeviceView{}, apperr.Validation("datos inválidos", apperr.FieldError{Field: "app_version", Message: "manda app_version o canales_activos"})
+	}
+	d, err := s.repo.UpdateDevice(ctx, me, id, set, s.now().UTC())
+	if errors.Is(err, ErrNotFound) {
+		return DeviceView{}, errDeviceNotFound()
+	}
+	if err != nil {
+		return DeviceView{}, errStore()
+	}
+	return newDeviceView(d), nil
+}
+
+// DeleteDevice quita un teléfono propio por id; repetirlo o el de otra cuenta = 404.
+func (s *Service) DeleteDevice(ctx context.Context, subject, rawID string) error {
+	me, err := self(subject)
+	if err != nil {
+		return err
+	}
+	id, err := deviceID(rawID)
+	if err != nil {
+		return err
+	}
+	err = s.repo.DeleteDevice(ctx, me, id)
+	if errors.Is(err, ErrNotFound) {
+		return errDeviceNotFound()
 	}
 	if err != nil {
 		return errStore()

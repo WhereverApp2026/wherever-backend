@@ -94,6 +94,8 @@ type ReglasView struct {
 	PorDefecto     bool       `json:"por_defecto"`
 	ActualizadoPor string     `json:"actualizado_por,omitempty"`
 	ActualizadoEn  *time.Time `json:"actualizado_en,omitempty"`
+	// Filtros trae los ocho filtros editables con sus umbrales efectivos (nv-71).
+	Filtros map[string]FiltroView `json:"filtros"`
 }
 
 func nuevoResumen(it Item) Resumen {
@@ -120,10 +122,10 @@ func nuevaReglasView(d reglasDoc) ReglasView {
 	if palabras == nil {
 		palabras = []string{}
 	}
-	return ReglasView{Cuarentena: d.Cuarentena, Rechazo: d.Rechazo, Palabras: palabras, Version: d.Version, ActualizadoPor: d.ActualizadoPor.Hex(), ActualizadoEn: &at}
+	return ReglasView{Cuarentena: d.Cuarentena, Rechazo: d.Rechazo, Palabras: palabras, Version: d.Version, ActualizadoPor: d.ActualizadoPor.Hex(), ActualizadoEn: &at, Filtros: filtrosView(d.reglas())}
 }
 
 func reglasPorDefectoView() ReglasView {
 	r := ReglasPorDefecto()
-	return ReglasView{Cuarentena: r.Cuarentena, Rechazo: r.Rechazo, Palabras: r.Palabras, PorDefecto: true}
+	return ReglasView{Cuarentena: r.Cuarentena, Rechazo: r.Rechazo, Palabras: r.Palabras, PorDefecto: true, Filtros: filtrosView(r)}
 }

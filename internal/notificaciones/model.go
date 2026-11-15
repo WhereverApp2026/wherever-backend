@@ -63,8 +63,34 @@ type Device struct {
 	Token     string        `bson:"token"`
 	TokenHash string        `bson:"token_hash"`
 	Platform  string        `bson:"plataforma"`
-	LastUsed  time.Time     `bson:"ultimo_uso"`
-	CreatedAt time.Time     `bson:"creado_en"`
+	// AppVersion y Channels los ajusta PUT /dispositivos/{id} (nv-71). Channels nil = todos.
+	AppVersion string    `bson:"app_version,omitempty"`
+	Channels   *[]string `bson:"canales_activos,omitempty"`
+	LastUsed   time.Time `bson:"ultimo_uso"`
+	CreatedAt  time.Time `bson:"creado_en"`
+}
+
+// Canales de notificación del teléfono (nv-71), los mismos de `preferencias.notificaciones`.
+const (
+	ChannelBookings   = "reservas"
+	ChannelCoupons    = "cupones"
+	ChannelGroups     = "grupos"
+	ChannelReviews    = "resenas"
+	ChannelPromotions = "promociones"
+)
+
+// Allows dice si el teléfono deja pasar el canal. `reservas` y los avisos sin canal siempre
+// pasan: la hoja A1 dice que las reservas no se apagan del todo.
+func (d Device) Allows(channel string) bool {
+	if d.Channels == nil || channel == "" || channel == ChannelBookings {
+		return true
+	}
+	for _, c := range *d.Channels {
+		if c == channel {
+			return true
+		}
+	}
+	return false
 }
 
 // Notifier es lo que usan los demás módulos para avisar. Avisar nunca cambia la respuesta de

@@ -29,6 +29,8 @@ type Reglas struct {
 	// Palabras son palabras o frases; se comparan sin acentos ni mayúsculas y por palabra
 	// completa. Una coincidencia vale 100.
 	Palabras []string
+	// Filtros son las reglas propias de cada filtro (nv-71); sin entrada, hereda los globales.
+	Filtros map[string]ReglaFiltro
 }
 
 // ReglasPorDefecto son las de la spec: 40 y 80, con frases de venta de drogas sin ambigüedad.
@@ -50,7 +52,7 @@ func (r Reglas) Validar() error {
 	if r.Cuarentena < CuarentenaMinima || r.Cuarentena >= r.Rechazo || r.Rechazo > 100 {
 		return fmt.Errorf("%w: se pide %v <= cuarentena (%v) < rechazo (%v) <= 100", ErrReglasInvalid, CuarentenaMinima, r.Cuarentena, r.Rechazo)
 	}
-	return nil
+	return r.validarFiltros()
 }
 
 // Clasificar convierte el puntaje más alto en veredicto.

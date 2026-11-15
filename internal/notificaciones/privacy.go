@@ -34,9 +34,11 @@ func (p *Privacy) PurgeAccount(ctx context.Context, userID bson.ObjectID) error 
 }
 
 type exportedDevice struct {
-	Platform  string    `json:"plataforma"`
-	LastUsed  time.Time `json:"ultimo_uso"`
-	CreatedAt time.Time `json:"creado_en"`
+	Platform   string    `json:"plataforma"`
+	AppVersion string    `json:"app_version,omitempty"`
+	Channels   []string  `json:"canales_activos"`
+	LastUsed   time.Time `json:"ultimo_uso"`
+	CreatedAt  time.Time `json:"creado_en"`
 }
 
 type exported struct {
@@ -59,7 +61,8 @@ func (p *Privacy) Export(ctx context.Context, userID bson.ObjectID) (any, error)
 		out.Notifications = append(out.Notifications, newItem(n))
 	}
 	for _, d := range devices {
-		out.Devices = append(out.Devices, exportedDevice{Platform: d.Platform, LastUsed: d.LastUsed, CreatedAt: d.CreatedAt})
+		view := newDeviceView(d)
+		out.Devices = append(out.Devices, exportedDevice{Platform: d.Platform, AppVersion: d.AppVersion, Channels: view.Channels, LastUsed: d.LastUsed, CreatedAt: d.CreatedAt})
 	}
 	return out, nil
 }
