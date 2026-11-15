@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -240,6 +241,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
 	registry.RegisterExporter(imagePrivacy)
+	events := buildEventos(db, businessRepo, cursor, cfg.Imagenes.URL, modSvc, registry, log)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
 	if err != nil {
@@ -282,6 +284,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// Postales y momentos (nv-63) atienden /lugares/:id/postales, /negocios/:id/momentos y /planes/:id/recuerdo.
 		postales.NewHandler(cards, validator).WithActiveGuard(active),
 		negocios.NewHandler(businessSvc, validator),
+		eventos.NewHandler(events, validator).WithActiveGuard(active),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),

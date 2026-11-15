@@ -774,6 +774,12 @@
 - Decisión: las reglas por filtro viven en el mismo documento `moderacion_reglas` (`filtros`), con un solo `If-Match`; `DELETE` desactiva; `datos_personales` no se apaga. `Reglas.Decidir` reemplaza a `Clasificar(maximo)` en el Moderador.
 - A evitar: convertir `ReglasRequest` a `Reglas` con un cast: dejó de compilar al agregar `Filtros`; arma el struct campo por campo.
 
+## NV-65 — Eventos, ferias y tianguis (2026-11-15)
+- Estado: rama `nv-65` desde `main`, PR contra `main`. Falta la firma. Colección nueva `eventos` con 4 índices: hay que correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
+- Decisión: lista pública con `$geoNear` (`ix_eventos_cerca`), día de México y cursor firmado `inicio|distancia` + id. Publica el administrador o el comerciante con negocio propio aprobado, sin pausa ni baja; edita quien lo creó, el dueño del negocio o un administrador.
+- Decisión: texto dudoso = `en_revision` y cola de nv-43 (en prod siempre, sin modelo de texto); solo el rechazo es 422. `If-Match` con 400/409 como el resto de la API.
+- A evitar: en `docs/endpoints.md`, una barra entre comillas invertidas (`` `a`/`b` ``) se lee como ruta `/` y rompe `check_endpoints`.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

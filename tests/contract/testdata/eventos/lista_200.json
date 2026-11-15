@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "actualizado_en": "string",
+        "creado_en": "string",
+        "descripcion": "string",
+        "direccion": "string",
+        "distancia_m": "number",
+        "estado": "string",
+        "fin": "string",
+        "id": "string",
+        "inicio": "string",
+        "negocio_id": "string",
+        "precio": "number",
+        "tipo": "string",
+        "titulo": "string",
+        "ubicacion": {
+          "lat": "number",
+          "lng": "number"
+        },
+        "version": "number"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}
