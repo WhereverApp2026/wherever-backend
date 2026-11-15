@@ -37,6 +37,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/vistas"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
@@ -81,6 +82,7 @@ var expected = map[string][]string{
 	resenas.Collection:                  {"_id_", "ux_resena_checkin", "ix_resenas_utiles", "ix_resenas_estrellas", "ix_resenas_recientes", "ix_mis_resenas", "ix_resenas_texto", "ix_reportadas"},
 	resenas.UtilesCollection:            {"_id_", "ux_util", "ix_util_usuario"},
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
+	vistas.Collection:                   {"_id_", "ux_vista", "ix_recientes", "ttl_vistas"},
 	postales.Collection:                 {"_id_", "ix_album", "ix_postales_plan", "ix_postales_negocio", "ux_postal_imagen"},
 	eventos.Collection:                  {"_id_", "ix_eventos_cerca", "ix_eventos_fin", "ix_eventos_creador", "ix_eventos_negocio"},
 	postales.RecuerdosCollection:        {"_id_", "ux_recuerdo", "ix_recuerdos_fecha"},
@@ -158,6 +160,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		resenas.Collection:               {"ux_resena_checkin"},
 		resenas.UtilesCollection:         {"ux_util"},
 		postales.Collection:              {"ux_postal_imagen"},
+		vistas.Collection:                {"ux_vista"},
 		postales.RecuerdosCollection:     {"ux_recuerdo"},
 		postales.MomentosCollection:      {"ux_momento_postal"},
 	} {

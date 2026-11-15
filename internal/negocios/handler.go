@@ -41,7 +41,9 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/categorias", h.categories)
 	v1.Get("/lugares", h.list)
 	v1.Get("/lugares/mapa", h.mapa)
+	v1.Get("/lugares/conteo", h.count)
 	v1.Get("/lugares/:id", h.detail)
+	v1.Get("/lugares/:id/afluencia", h.traffic)
 	v1.Post("/admin/negocios/importar",
 		limiter.Window(adminPolicy, adminLimit, adminWindow),
 		middleware.RequireRoles(middleware.RoleAdmin),
@@ -141,4 +143,35 @@ func importBody(c *fiber.Ctx) (io.Reader, string, error) {
 		return bytes.NewReader(c.Body()), "json", nil
 	}
 	return nil, "", apperr.BadRequest("cuerpo no soportado: usa multipart/form-data o application/json")
+}
+
+// count es GET /lugares/conteo (nv-66): orden, cursor o límite = 400.
+func (h *Handler) count(c *fiber.Ctx) error {
+	for _, extra := range []string{"orden", "cursor", "limite"} {
+		if c.Query(extra) != "" {
+			return apperr.BadRequest("el conteo no lleva " + extra)
+		}
+	}
+	var q CountQuery
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.Count(c.UserContext(), q)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+// traffic es GET /lugares/{id}/afluencia (nv-66).
+func (h *Handler) traffic(c *fiber.Ctx) error {
+	out, err := h.svc.Traffic(c.UserContext(), c.Params("id"), c.Query("dia"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(out)
 }

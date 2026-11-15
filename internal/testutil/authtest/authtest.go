@@ -71,6 +71,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/vistas"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
@@ -290,6 +291,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(postales.NewPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewRecuerdosPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewMomentosPrivacy(cardRepo))
+	registry.RegisterPurger(vistas.NewPrivacy(vistas.NewRepository(client.DB()), businessRepo))
+	registry.RegisterExporter(vistas.NewPrivacy(vistas.NewRepository(client.DB()), businessRepo))
 	eventRepo := eventos.NewRepository(client.DB())
 	moderadorEventos := resenastest.NuevoModerador()
 	events := eventos.NewService(eventRepo, businessRepo, cursor, imagenestest.URLPublica, log).WithModeracion(moderadorEventos, mods)
@@ -330,6 +333,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 			semantica.NewHandler(sem, v),
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
+			vistas.NewHandler(vistas.NewService(vistas.NewRepository(client.DB()), businessRepo, log), v).WithActiveGuard(usuarios.RequireActive(users)),
 			menu.NewHandler(menus, v).WithActiveGuard(usuarios.RequireActive(users)),      // antes que negocios
 			resenas.NewHandler(reviews, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que negocios
 			eventos.NewHandler(events, v).WithActiveGuard(usuarios.RequireActive(users)),
