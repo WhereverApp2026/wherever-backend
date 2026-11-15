@@ -208,7 +208,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	modRepo := moderacion.NewRepository(client.DB())
 	notifRepo := notificaciones.NewRepository(client.DB())
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
-	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB()))
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB()))
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	mods := moderacion.NewService(modRepo, cursor, log)
 	images := imagenestest.Build(t, client.DB(), mods, log)
@@ -309,7 +309,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels)), Mail: mail, Log: log, Logs: logs,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -332,7 +332,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos
 			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos
-			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
+			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
 			vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(rdb), cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			planes.NewHandler(plans, v).WithActiveGuard(usuarios.RequireActive(users)),

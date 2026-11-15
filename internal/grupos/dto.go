@@ -24,9 +24,12 @@ type InviteRequest struct {
 	Users []string `json:"usuarios" validate:"required,min=1,max=11,unique,dive,len=24,hexadecimal"`
 }
 
-// RespondRequest es el cuerpo de PATCH /grupos/{id}/integrantes/yo.
+// RespondRequest es el cuerpo de PATCH /grupos/{id}/integrantes/yo. Desde nv-69 cada campo es
+// opcional (al menos uno): `ubicacion` la comparte 6 h y `compartir_ubicacion: false` la retira.
 type RespondRequest struct {
-	Status string `json:"estado" validate:"required,oneof=confirmado declinado"`
+	Status   string         `json:"estado" validate:"omitempty,oneof=confirmado declinado"`
+	Location *LocationInput `json:"ubicacion" validate:"omitempty"`
+	Share    *bool          `json:"compartir_ubicacion"`
 }
 
 // ListQuery es GET /grupos.
@@ -46,6 +49,8 @@ type MemberView struct {
 	Role   string           `json:"rol"`
 	Status string           `json:"estado"`
 	Since  time.Time        `json:"desde"`
+	// SharesLocation dice si su ubicación está vigente; la ubicación nunca sale (nv-69).
+	SharesLocation bool `json:"comparte_ubicacion"`
 }
 
 // Seats es el cupo del grupo.
@@ -63,14 +68,19 @@ type Summary struct {
 
 // View es un grupo visto por quien llama.
 type View struct {
-	ID          string       `json:"id"`
-	PlanID      string       `json:"plan_id"`
-	OrganizerID string       `json:"organizador_id"`
-	MyRole      string       `json:"mi_rol"`
-	MyStatus    string       `json:"mi_estado"`
-	Seats       Seats        `json:"cupo"`
-	Summary     Summary      `json:"resumen"`
-	Members     []MemberView `json:"integrantes"`
+	ID     string `json:"id"`
+	PlanID string `json:"plan_id"`
+	// Name falta si el organizador no le puso nombre: la app usa el del plan (nv-69).
+	Name         string            `json:"nombre,omitempty"`
+	Version      int               `json:"version"`
+	MeetingPoint *MeetingPointView `json:"punto_encuentro,omitempty"`
+	Surprise     *SurpriseView     `json:"sorpresa,omitempty"`
+	OrganizerID  string            `json:"organizador_id"`
+	MyRole       string            `json:"mi_rol"`
+	MyStatus     string            `json:"mi_estado"`
+	Seats        Seats             `json:"cupo"`
+	Summary      Summary           `json:"resumen"`
+	Members      []MemberView      `json:"integrantes"`
 	// LastMessage sale solo a los confirmados: quien está invitado o declinó no lee el chat.
 	LastMessage *LastMessageView `json:"ultimo_mensaje,omitempty"`
 	CreatedAt   time.Time        `json:"creado_en"`
@@ -98,11 +108,12 @@ func lastMessageView(g Group, mine Member) *LastMessageView {
 
 // newView arma la vista de `me`. El organizador ve a todos; los demás no ven a quien
 // declinó (requisito 4).
-func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User) View {
+func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User, now time.Time) View {
 	mine, _ := g.Member(me)
 	organizer := mine.Role == RoleOrganizer
 	v := View{
 		ID: g.ID.Hex(), PlanID: g.PlanID.Hex(), OrganizerID: g.OrganizerID.Hex(),
+		Name: g.Name, Version: g.CurrentVersion(), MeetingPoint: meetingPointView(g.MeetingPoint), Surprise: surpriseView(g.Surprise, me, now),
 		MyRole: mine.Role, MyStatus: mine.Status,
 		Seats:   Seats{Max: MaxMembers, Occupied: g.Occupied},
 		Members: []MemberView{}, LastMessage: lastMessageView(g, mine), CreatedAt: g.CreatedAt, UpdatedAt: g.UpdatedAt,
@@ -120,7 +131,7 @@ func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User) 
 				continue
 			}
 		}
-		v.Members = append(v.Members, memberView(m, people))
+		v.Members = append(v.Members, memberView(m, people, now))
 	}
 	if organizer {
 		v.Summary.Declined = &declined
@@ -128,8 +139,8 @@ func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User) 
 	return v
 }
 
-func memberView(m Member, people map[bson.ObjectID]usuarios.User) MemberView {
-	out := MemberView{UserID: m.UserID.Hex(), Role: m.Role, Status: m.Status, Since: m.Since}
+func memberView(m Member, people map[bson.ObjectID]usuarios.User, now time.Time) MemberView {
+	out := MemberView{UserID: m.UserID.Hex(), Role: m.Role, Status: m.Status, Since: m.Since, SharesLocation: m.Visible(now)}
 	if u, ok := people[m.UserID]; ok {
 		out.Person = &personas.Person{ID: u.ID.Hex(), Name: u.Name, Username: u.Username, PhotoURL: u.PhotoURL}
 	}

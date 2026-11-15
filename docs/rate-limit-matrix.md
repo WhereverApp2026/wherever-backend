@@ -32,7 +32,8 @@
 | Reporte de errores de la app | 30 | 1 h | `POST /api/v1/errores` por usuario (`rate:errores_reporte:{usuario}`, ventana fija) | nv-64 |
 | Invitaciones a grupos | 30 | 1 h | `POST /api/v1/grupos`, `POST /api/v1/grupos/{id}/integrantes` y `POST /api/v1/planes/{id}/invitaciones` por usuario (`rate:grupos_invitacion:{usuario}`, ventana fija); cuenta cada petición, también las rechazadas | nv-37 |
 | Plan compartido | 30 | 1 min | `POST /api/v1/planes/compartidos` por IP (`rate:plan_compartido:{ip}`, ventana fija); vista pública sin sesión | nv-38 |
-| Unirse por enlace | 30 | 1 h | `POST /api/v1/grupos/unirse` por usuario (`rate:grupos_unirse:{usuario}`, ventana fija) | nv-38 |
+| Unirse por enlace | 30 | 1 h | `POST /api/v1/grupos/unirse` y `POST /api/v1/planes/{id}/me-apunto` (nv-69) por usuario (`rate:grupos_unirse:{usuario}`, ventana fija) | nv-38 |
+| Ubicación del grupo | 30 | 1 h | `GET /api/v1/grupos/{id}/punto-encuentro/sugerido` y `/traslados` juntos, por usuario (`rate:grupos_ubicacion:{usuario}`) | nv-69 |
 | Mensajes de chat | 30 | 1 min | `POST /api/v1/grupos/{id}/mensajes` por usuario, contado en MongoDB (mensajes propios con `_id` del último minuto, índice `ix_autor`), **sin Redis**; 429 uniforme con `Retry-After: 60`. Dos envíos en carrera pueden pasar el 31.º: es freno de abuso, no cupo exacto. Los reenvíos con el mismo `id_cliente` no cuentan | nv-57 |
 | Acciones sin conexión | 30 lotes | 1 min | `POST /api/v1/sync/pendientes` por usuario (`rate:sync_pendientes:{usuario}`, ventana fija); un lote de hasta 100 acciones cuesta los mismos 3 comandos | nv-47 |
 | Planes populares | 60 | 1 min | `GET /api/v1/planes/populares` por IP (`rate:planes_populares:{ip}`, ventana fija); sin sesión | nv-68 |

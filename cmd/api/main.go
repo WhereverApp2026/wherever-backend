@@ -201,7 +201,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
-	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo).WithSync(syncRepo)
+	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
@@ -293,7 +293,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),
-		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithNotifier(notifier), validator).WithActiveGuard(active),
+		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), validator).WithActiveGuard(active),
 		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), validator).WithActiveGuard(active),
 		planes.NewHandler(planSvc, validator).WithActiveGuard(active),
@@ -306,7 +306,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
-	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, pagos.NewTarea(bookings.pagos)), nil
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, pagos.NewTarea(bookings.pagos), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), nil
 }
 
 // buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no

@@ -83,6 +83,28 @@ func (r *Repository) FindSuggestableByIDs(ctx context.Context, ids []bson.Object
 	return r.findPublic(ctx, ids, true)
 }
 
+// Mobilities devuelve la `movilidad_default` de las cuentas activas con esos ids (traslados
+// al punto de encuentro, nv-69).
+func (r *Repository) Mobilities(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]string, error) {
+	out := map[bson.ObjectID]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cur, err := r.col.Find(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}, {Key: "estado", Value: StatusActive}},
+		options.Find().SetProjection(bson.D{{Key: "preferencias.movilidad_default", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var rows []User
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, u := range rows {
+		out[u.ID] = u.Preferences.Mobility
+	}
+	return out, nil
+}
+
 func (r *Repository) findPublic(ctx context.Context, ids []bson.ObjectID, searchable bool) ([]User, error) {
 	out := []User{}
 	if len(ids) == 0 {

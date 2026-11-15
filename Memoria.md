@@ -759,6 +759,14 @@
 - Decisión: el paquete usa `getMember` (dueño o integrante; un plan público ajeno no basta), ventana hoy o mañana en México, `ETag` `"{version}-{sync_seq}"` y `no-store`; incluye las reservas activas de quien lo pide (`reservas.Repository.DelPlan`).
 - A evitar: registrar una ruta pública bajo `/planes` después de `v1.Group("/planes", RequireAuth())`: va antes del grupo, como `/planes/populares`.
 
+## NV-69 — Extras de grupos (2026-11-14)
+- Estado: rama `nv-69` desde `nv-68`, PR contra `main` después de fusionar nv-68. Falta la firma.
+- Decisión: disolver es borrado lógico (`eliminado_en`, filtro `alive()` en todas las lecturas); volver a crear o invitar al mismo plan borra el disuelto y crea otro con otro id (`ux_plan` sigue resolviendo la carrera). El chat del disuelto lo borra `chat.DissolvedTask` en el trabajo nocturno.
+- Decisión: la ubicación compartida se guarda a 3 decimales por 6 h y nunca sale (solo `comparte_ubicacion`); el sugerido usa el promedio ajustado a 0.01° y responde sin centro ni distancias.
+- Decisión: la sorpresa se calcula al leer (`Surprise.HidesFrom`) en `planes.getMember` (plan y paquete) y en votaciones; no hay temporizador.
+- Lección: el runner de GitHub pasó a Python 3.14 y `pip install semgrep==1.95.0` dejó de arrancar (protobuf 4.x). Desde el PR #102 Semgrep corre en su imagen fijada por digest.
+- A evitar: mirar solo el último `ocupados` al unirse; `repo.Join` ya condiciona el cupo en la misma operación.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
