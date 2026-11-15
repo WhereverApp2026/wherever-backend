@@ -11,6 +11,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -33,13 +34,14 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sincronizacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/vistas"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
 // All son los índices de todos los módulos; cada módulo nuevo agrega aquí los suyos.
 func All() []mongo.IndexSet {
 	var all []mongo.IndexSet
-	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), usuarios.ConsentIndexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), expediente.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), busquedas.Indexes(), amistades.Indexes(), grupos.Indexes(), favoritos.Indexes(), votaciones.Indexes(), moderacion.Indexes(), notificaciones.Indexes(), sincronizacion.Indexes(), sincronizacion.ActionIndexes(), grafo.Indexes(), chat.Indexes(), errores.Indexes(), vaca.Indexes(), reservas.Indexes(), pagos.Indexes(), cupones.Indexes(), resenas.Indexes(), postales.Indexes(), imagenes.Indexes(), menu.Indexes(), reportesnegocio.Indexes()} {
+	for _, sets := range [][]mongo.IndexSet{usuarios.Indexes(), usuarios.ConsentIndexes(), auth.Indexes(), ciudades.Indexes(), negocios.Indexes(), expediente.Indexes(), privacidad.Indexes(), ia.IndexesUsos(), planes.Indexes(), asistente.Indexes(), recomendaciones.Indexes(), busquedas.Indexes(), amistades.Indexes(), grupos.Indexes(), favoritos.Indexes(), votaciones.Indexes(), moderacion.Indexes(), notificaciones.Indexes(), sincronizacion.Indexes(), sincronizacion.ActionIndexes(), grafo.Indexes(), chat.Indexes(), errores.Indexes(), vaca.Indexes(), reservas.Indexes(), pagos.Indexes(), cupones.Indexes(), resenas.Indexes(), postales.Indexes(), imagenes.Indexes(), menu.Indexes(), eventos.Indexes(), vistas.Indexes(), reportesnegocio.Indexes()} {
 		all = append(all, sets...)
 	}
 	return all

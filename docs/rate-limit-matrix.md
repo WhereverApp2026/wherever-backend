@@ -41,6 +41,7 @@
 | Planes populares | 60 | 1 min | `GET /api/v1/planes/populares` por IP (`rate:planes_populares:{ip}`, ventana fija); sin sesión | nv-68 |
 | Alternativas de parada | 60 | 1 h | `GET /api/v1/planes/{id}/paradas/{parada_id}/alternativas` por usuario (`rate:planes_alternativas:{usuario}`); cada llamada hace un `$geoNear` | nv-68 |
 | Paquete sin conexión | 30 | 1 h | `GET /api/v1/planes/{id}/paquete-offline` por usuario (`rate:planes_paquete:{usuario}`) | nv-68 |
+| Publicar eventos | 10 | 24 h | `POST /api/v1/eventos` por usuario (`rate:eventos_publicar:{usuario}`) | nv-65 |
 | Búsqueda semántica | 30 | 1 min | `GET /api/v1/lugares/semantica` por usuario o, sin token, por IP (`rate:semantica:{sujeto}`, ventana fija); además, cada frase sin caché cuenta un texto del límite de embeddings | nv-51 |
 | Subida de imágenes | 20 / 50 | 1 h / 1 día | `POST /api/v1/imagenes/subida` por usuario (`rate:imagenes_subida:{usuario}` y `rate:imagenes_subida_dia:{usuario}`, ventana fija); cuenta cada formulario firmado, se use o no. El tope diario acota Rekognition (US$0.001 por imagen, cada original se modera una sola vez) a US$1.50 al mes por persona en el peor caso; con solo 20 por hora serían US$14.40 | nv-45 |
 | IA global | 12 llamadas / 400 llamadas | 1 min / 1 día (hora del Pacífico) | llamadas a Gemini de toda la app (`rate:ia_min`, `rate:ia_dia`); al llegar, responde el motor de reglas sin 429. 80 % de lo que AI Studio da al proyecto con `gemini-3.5-flash-lite` (15 por minuto, 500 por día); sin Redis no se llama al proveedor | nv-28 |

@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "body": {
+    "dia": "number",
+    "hora_actual": "null",
+    "horas": [
+      "number"
+    ],
+    "suficiente": "bool"
+  }
+}

@@ -51,8 +51,13 @@ Filas copiadas del Excel (A2): `GET /eventos` «Eventos, ferias y tianguis cerca
 - Sin eventos en `GET /inicio`, sin notificaciones de eventos, sin asistencia ni «me interesa».
 - Sin sincronización sin conexión propia (nv-47 la agrega si hace falta).
 
+## Ejecución (2026-11-15)
+- **Código:** `internal/eventos` (`model.go`, `repository.go` con `$geoNear` y cursor por inicio, distancia e id, `service.go`, `editar.go`, `dto.go`, `handler.go`, `privacy.go`); `cmd/api/eventos.go` (ARCO y destino en la cola); índices en `internal/indexes`; armado de pruebas en `authtest` (`Eventos`, `ModeradorEventos`), como reseñas y postales, en vez de un `eventostest` aparte.
+- **Drift resuelto:** `If-Match` usa 400 (falta) y 409 (vieja) como el resto de la API (`AGENTS.md` §5); `apperr` no tiene 412 ni 428. El texto dudoso de la moderación (en prod siempre, porque no hay modelo de texto: fail-closed como reseñas y postales) no es 422: el evento se guarda con `en_revision: true`, va a la cola de nv-43 y no se muestra hasta que un administrador lo apruebe (rechazado = queda en `borrador`). Solo el rechazo directo es 422. `foto_url` se valida contra `IMAGENES_URL`.
+- **Pruebas:** `internal/eventos/service_test.go`, `tests/integration/eventos_test.go` (lista, permisos, edición, moderación, límite, ARCO y presupuesto de Redis en un solo archivo), `tests/security/eventos_security_test.go`, `tests/contract/eventos_contract_test.go`, `tests/database/indexes_test.go`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-65`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** `creado_por` y `version` nuevos; `lat`/`lng` obligatorios; comerciante solo con negocio aprobado propio; el dueño del negocio también edita; cancelado no se reabre; borrado físico; `eventos_publicar` 10 por día; ARCO conserva los eventos del negocio sin `creado_por`; Inicio sin eventos por ahora.

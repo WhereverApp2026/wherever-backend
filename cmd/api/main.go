@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
@@ -69,6 +70,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios/account"
 	"github.com/WhereverApp2026/wherever-backend/internal/vaca"
+	"github.com/WhereverApp2026/wherever-backend/internal/vistas"
 	"github.com/WhereverApp2026/wherever-backend/internal/votaciones"
 )
 
@@ -246,6 +248,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	reportPrivacy := reportesnegocio.NewPrivacy(reportRepo, businessRepo)
 	registry.RegisterPurger(reportPrivacy)
 	registry.RegisterExporter(reportPrivacy)
+	views := vistas.NewService(vistas.NewRepository(db), businessRepo, log)
+	viewsPrivacy := vistas.NewPrivacy(vistas.NewRepository(db), businessRepo)
+	registry.RegisterPurger(viewsPrivacy)
+	registry.RegisterExporter(viewsPrivacy)
+	events := buildEventos(db, businessRepo, cursor, cfg.Imagenes.URL, modSvc, registry, log)
 
 	recoSvc, err := buildRecomendaciones(recoRepo, users, businessRepo, log)
 	if err != nil {
@@ -282,6 +289,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 		semantica.NewHandler(sem, validator),
 		busquedas.NewHandler(busquedas.NewService(searchRepo, log), validator).WithActiveGuard(active),
+		// Vistos recientemente (nv-66): antes que negocios, por `/lugares/recientes`.
+		vistas.NewHandler(views, validator).WithActiveGuard(active),
 		// El menú y las reseñas (nv-62) van antes que negocios: si no, /lugares/:id atiende /lugares/:id/menu.
 		menu.NewHandler(merchant.menu, validator).WithActiveGuard(active),
 		resenas.NewHandler(reviews, validator).WithActiveGuard(active),
@@ -290,6 +299,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		negocios.NewHandler(businessSvc, validator),
 		// Reportes de información incorrecta (nv-67): POST /lugares/:id/reportes y la cola admin.
 		reportesnegocio.NewHandler(reports, validator).WithActiveGuard(active),
+		eventos.NewHandler(events, validator).WithActiveGuard(active),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),

@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "body": {
+    "exacto": "bool",
+    "total": "number"
+  }
+}

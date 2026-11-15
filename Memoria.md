@@ -780,6 +780,17 @@
 - Decisión: silenciar es mi marca en `silenciado_por` (`$addToSet`/`$pull`, sin `If-Match`); bloquear la vacía. Contactos: teléfonos en claro por TLS, HMAC en memoria, una consulta `$in`, respuesta por `indice`; nada se guarda ni se registra.
 - Lección: Docker Desktop se cierra al reiniciar la máquina y Testcontainers falla con «rootless Docker is not supported on Windows»; arráncalo antes de las suites.
 - A evitar: comparar respuestas de error completas entre peticiones: `traza_id` cambia en cada una.
+## NV-65 — Eventos, ferias y tianguis (2026-11-15)
+- Estado: rama `nv-65` desde `main`, PR contra `main`. Falta la firma. Colección nueva `eventos` con 4 índices: hay que correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
+- Decisión: lista pública con `$geoNear` (`ix_eventos_cerca`), día de México y cursor firmado `inicio|distancia` + id. Publica el administrador o el comerciante con negocio propio aprobado, sin pausa ni baja; edita quien lo creó, el dueño del negocio o un administrador.
+- Decisión: texto dudoso = `en_revision` y cola de nv-43 (en prod siempre, sin modelo de texto); solo el rechazo es 422. `If-Match` con 400/409 como el resto de la API.
+- A evitar: en `docs/endpoints.md`, una barra entre comillas invertidas (`` `a`/`b` ``) se lee como ruta `/` y rompe `check_endpoints`.
+
+## NV-66 — Conteo, afluencia y vistos recientemente (2026-11-15)
+- Estado: rama `nv-66` desde `main`, PR contra `main`. Falta la firma. Colección nueva `historial_vistas` (`ux_vista`, `ix_recientes`, `ttl_vistas`): correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
+- Decisión: el conteo usa los mismos filtros que la lista con `$geoWithin` (CountDocuments no admite `$near`), tope 1000 y 2 s, sin caché. La afluencia lee `afluencia` directo (sin caché de fichas).
+- Decisión: la vista es un `upsert` condicionado a 10 min; una reciente choca con `ux_vista` y no escribe. Tope de 60 lugares por hora contado en MongoDB, sin Redis (429 con `Retry-After: 3600`).
+- A evitar: probar `hora_actual` con un día fijo en un contrato: cambia de forma el día que coincide con hoy.
 
 ## NV-67 — Reportes de información incorrecta (2026-11-15)
 - Estado: rama `nv-67` desde `main`, PR contra `main`. Falta la firma. Colección nueva `reportes_negocio` con 4 índices: correr `scripts/indexes` en Atlas (con permiso) antes de desplegar.
