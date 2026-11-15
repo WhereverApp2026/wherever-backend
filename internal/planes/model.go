@@ -94,6 +94,8 @@ type Plan struct {
 	// Zona es la ubicación de la primera parada; la fija Calculadora.Aplicar (populares).
 	Zona *GeoPoint `bson:"zona,omitempty" json:"-"`
 	// SyncSeq es el número del último cambio en la sincronización del dueño (nv-46).
+	// Sorpresa sale solo a la persona sorprendida del grupo (nv-69); nunca se guarda.
+	Sorpresa      *Sorpresa `bson:"-" json:"sorpresa,omitempty"`
 	SyncSeq       int64     `bson:"sync_seq" json:"-"`
 	CreadoEn      time.Time `bson:"creado_en" json:"creado_en"`
 	ActualizadoEn time.Time `bson:"actualizado_en" json:"actualizado_en"`

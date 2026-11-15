@@ -1,0 +1,44 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "creado_en": "string",
+    "cupo": {
+      "max": "number",
+      "ocupados": "number"
+    },
+    "id": "string",
+    "integrantes": [
+      {
+        "comparte_ubicacion": "bool",
+        "desde": "string",
+        "estado": "string",
+        "persona": {
+          "foto_url": "string",
+          "id": "string",
+          "nombre": "string",
+          "nombre_usuario": "string"
+        },
+        "rol": "string",
+        "usuario_id": "string"
+      }
+    ],
+    "mi_estado": "string",
+    "mi_rol": "string",
+    "organizador_id": "string",
+    "plan_id": "string",
+    "punto_encuentro": {
+      "hora": "string",
+      "lat": "number",
+      "lng": "number",
+      "nombre": "string",
+      "propuesto_por": "string"
+    },
+    "resumen": {
+      "confirmados": "number",
+      "declinados": "number",
+      "invitados": "number"
+    },
+    "version": "number"
+  }
+}

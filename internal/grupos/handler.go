@@ -1,6 +1,8 @@
 package grupos
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,6 +25,10 @@ const (
 	joinPolicy    = "grupos_unirse"
 	joinLimit     = 30
 	joinWindow    = time.Hour
+	// Sugerido y traslados del punto de encuentro, juntos (nv-69).
+	locationPolicy = "grupos_ubicacion"
+	locationLimit  = 30
+	locationWindow = time.Hour
 )
 
 // Handler traduce HTTP ↔ service. No toca la base ni atrapa pánicos (test de arquitectura).
@@ -69,6 +75,106 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Patch("/:id/integrantes/yo", append(h.write(), h.respond)...)
 	g.Delete("/:id/integrantes/yo", append(h.write(), h.leave)...)
 	g.Delete("/:id/integrantes/:usuario_id", append(h.write(), h.remove)...)
+	h.extraRoutes(v1, g, limiter)
+}
+
+// extraRoutes registra los extras de nv-69: editar y disolver, punto de encuentro, sorpresa
+// y «Me apunto» (comparte el límite de unirse por enlace).
+func (h *Handler) extraRoutes(v1, g fiber.Router, limiter *middleware.Limiter) {
+	join := limited(limiter, func(l *middleware.Limiter) fiber.Handler { return l.WindowUser(joinPolicy, joinLimit, joinWindow) })
+	v1.Post("/planes/:id/me-apunto", append([]fiber.Handler{middleware.RequireAuth()}, append(h.write(join...), h.meToo)...)...)
+	v1.Delete("/planes/:id/me-apunto", append([]fiber.Handler{middleware.RequireAuth()}, append(h.write(), h.leavePlan)...)...)
+	g.Patch("/:id", append(h.write(), h.rename)...)
+	g.Delete("/:id", append(h.write(), h.dissolve)...)
+	g.Put("/:id/punto-encuentro", append(h.write(), h.setMeetingPoint)...)
+	g.Put("/:id/sorpresa", append(h.write(), h.setSurprise)...)
+	location := limited(limiter, func(l *middleware.Limiter) fiber.Handler {
+		return l.WindowUser(locationPolicy, locationLimit, locationWindow)
+	})
+	g.Get("/:id/punto-encuentro/sugerido", append(location, h.suggest)...)
+	g.Get("/:id/punto-encuentro/traslados", append(location, h.transfers)...)
+}
+
+// ifMatch lee la versión de `If-Match` (`3`, `"3"` o `W/"3"`). Falta o mal formada = 400.
+func ifMatch(c *fiber.Ctx) (int, error) {
+	raw := strings.Trim(strings.TrimPrefix(strings.TrimSpace(c.Get(fiber.HeaderIfMatch)), "W/"), `"`)
+	version, err := strconv.Atoi(raw)
+	if err != nil || version < 1 {
+		return 0, apperr.BadRequest("falta la cabecera If-Match con la versión del grupo")
+	}
+	return version, nil
+}
+
+func (h *Handler) rename(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	var req RenameRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	v, err := h.svc.Rename(c.UserContext(), subject(c), c.Params("id"), version, req)
+	return send(c, fiber.StatusOK, v, err)
+}
+
+func (h *Handler) dissolve(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	if err := h.svc.Dissolve(c.UserContext(), subject(c), c.Params("id"), version); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *Handler) setMeetingPoint(c *fiber.Ctx) error {
+	var req MeetingPointRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	v, err := h.svc.SetMeetingPoint(c.UserContext(), subject(c), c.Params("id"), req)
+	return send(c, fiber.StatusOK, v, err)
+}
+
+func (h *Handler) setSurprise(c *fiber.Ctx) error {
+	var req SurpriseRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	v, err := h.svc.SetSurprise(c.UserContext(), subject(c), c.Params("id"), req)
+	return send(c, fiber.StatusOK, v, err)
+}
+
+func (h *Handler) suggest(c *fiber.Ctx) error {
+	out, err := h.svc.Suggest(c.UserContext(), subject(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+func (h *Handler) transfers(c *fiber.Ctx) error {
+	out, err := h.svc.Transfers(c.UserContext(), subject(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
+}
+
+func (h *Handler) meToo(c *fiber.Ctx) error {
+	v, err := h.svc.MeToo(c.UserContext(), subject(c), c.Params("id"))
+	return send(c, fiber.StatusOK, v, err)
+}
+
+func (h *Handler) leavePlan(c *fiber.Ctx) error {
+	if err := h.svc.LeavePlan(c.UserContext(), subject(c), c.Params("id")); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // write antepone el guardia de cuenta activa a los handlers dados.
@@ -98,6 +204,7 @@ func send(c *fiber.Ctx, status int, v View, err error) error {
 	if err != nil {
 		return err
 	}
+	c.Set(fiber.HeaderETag, `"`+strconv.Itoa(v.Version)+`"`)
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.Status(status).JSON(v)
 }

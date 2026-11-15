@@ -35,6 +35,44 @@ type Member struct {
 	Status    string         `bson:"estado"`
 	InvitedBy *bson.ObjectID `bson:"invitado_por,omitempty"`
 	Since     time.Time      `bson:"desde"`
+	// SharedLocation es la ubicación que la persona compartió para el punto de encuentro
+	// (nv-69), redondeada a 3 decimales (~110 m) y vigente hasta LocationExpires. Nunca sale
+	// en ninguna respuesta.
+	SharedLocation  *Coords    `bson:"ubicacion_compartida,omitempty"`
+	LocationExpires *time.Time `bson:"ubicacion_vence,omitempty"`
+}
+
+// Coords es una posición `lat`/`lng`.
+type Coords struct {
+	Lat float64 `bson:"lat"`
+	Lng float64 `bson:"lng"`
+}
+
+// MeetingPoint es el punto de encuentro del grupo (nv-69).
+type MeetingPoint struct {
+	Name       string         `bson:"nombre"`
+	Location   Coords         `bson:"ubicacion"`
+	At         time.Time      `bson:"hora"`
+	ProposedBy bson.ObjectID  `bson:"propuesto_por"`
+	BusinessID *bson.ObjectID `bson:"negocio_id,omitempty"`
+}
+
+// Surprise es el modo sorpresa (nv-69): `para` no ve las paradas hasta `revelar_en`. Se
+// decide al leer; no hay trabajo programado.
+type Surprise struct {
+	Active   bool          `bson:"activo"`
+	For      bson.ObjectID `bson:"para_usuario_id"`
+	RevealAt time.Time     `bson:"revelar_en"`
+}
+
+// HidesFrom dice si la sorpresa le oculta las paradas a userID en este momento.
+func (s *Surprise) HidesFrom(userID bson.ObjectID, now time.Time) bool {
+	return s != nil && s.Active && s.For == userID && now.Before(s.RevealAt)
+}
+
+// Visible dice si la ubicación compartida sigue vigente.
+func (m Member) Visible(now time.Time) bool {
+	return m.SharedLocation != nil && m.LocationExpires != nil && now.Before(*m.LocationExpires)
 }
 
 // Group es un documento de `grupos`. `ocupados` cuenta a los integrantes que no declinaron
@@ -50,8 +88,24 @@ type Group struct {
 	CodeExpires *time.Time `bson:"codigo_vence,omitempty"`
 	// LastMessage es el último mensaje del chat (nv-57); solo lo ven los confirmados.
 	LastMessage *LastMessage `bson:"ultimo_mensaje,omitempty"`
-	CreatedAt   time.Time    `bson:"creado_en"`
-	UpdatedAt   time.Time    `bson:"actualizado_en"`
+	// Name es opcional; sin él, la vista usa el nombre del plan (nv-69).
+	Name string `bson:"nombre,omitempty"`
+	// Version sube con cada cambio del organizador (If-Match, nv-69); los grupos de antes no
+	// la tienen y valen 1.
+	Version      int           `bson:"version,omitempty"`
+	DeletedAt    *time.Time    `bson:"eliminado_en,omitempty"`
+	MeetingPoint *MeetingPoint `bson:"punto_encuentro,omitempty"`
+	Surprise     *Surprise     `bson:"sorpresa,omitempty"`
+	CreatedAt    time.Time     `bson:"creado_en"`
+	UpdatedAt    time.Time     `bson:"actualizado_en"`
+}
+
+// CurrentVersion es la versión para If-Match (1 en los grupos de antes de nv-69).
+func (g Group) CurrentVersion() int {
+	if g.Version == 0 {
+		return 1
+	}
+	return g.Version
 }
 
 // LastMessage resume el último mensaje del chat: texto recortado, autor (vacío en avisos del

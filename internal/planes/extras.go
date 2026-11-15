@@ -315,7 +315,7 @@ func (s *Service) Package(ctx context.Context, subject, rawID string) (PackageRe
 		return PackageResponse{}, errStore()
 	}
 	out := PackageResponse{Plan: p, Lugares: details, Reservas: []ReservaPaquete{}, GeneradoEn: now.UTC(), Version: p.Version, SyncSeq: p.SyncSeq}
-	if s.extras.reservas != nil {
+	if s.extras.reservas != nil && p.Sorpresa == nil {
 		me, _ := owner(subject) // getMember ya lo validó
 		if out.Reservas, err = s.extras.reservas.DelPlan(ctx, me, p.ID); err != nil {
 			return PackageResponse{}, errStore()

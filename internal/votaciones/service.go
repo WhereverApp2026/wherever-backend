@@ -244,8 +244,13 @@ func (s *Service) List(ctx context.Context, subject, rawGroupID string) (ListRes
 	if err != nil {
 		return ListResponse{}, errGroupNotFound()
 	}
-	if _, err := s.groupAccess(ctx, me, groupID); err != nil {
+	a, err := s.groupAccess(ctx, me, groupID)
+	if err != nil {
 		return ListResponse{}, err
+	}
+	if a.group.Surprise.HidesFrom(me, s.now()) {
+		// Todas las votaciones son de paradas: a la persona sorprendida no se le listan (nv-69).
+		return ListResponse{Items: []View{}}, nil
 	}
 	rows, err := s.repo.ListByGroup(ctx, groupID)
 	if err != nil {
@@ -285,7 +290,7 @@ func (s *Service) voteAccess(ctx context.Context, subject, rawID string) (Vote, 
 		return Vote{}, access{}, errStore()
 	}
 	a, err := s.groupAccess(ctx, me, v.GroupID)
-	if err != nil {
+	if err != nil || a.group.Surprise.HidesFrom(me, s.now()) {
 		return Vote{}, access{}, errVoteNotFound()
 	}
 	return v, a, nil

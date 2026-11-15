@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "body": {
+    "traslados": [
+      {
+        "costo_estimado": "number",
+        "id": "string",
+        "minutos": "number",
+        "nombre": "string",
+        "propio": "bool"
+      }
+    ]
+  }
+}

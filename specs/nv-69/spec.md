@@ -78,8 +78,14 @@ Rutas de la hoja «J3 Grupos y chat» del Excel que ninguna spec cubría (NV-57 
 - Sin rutas reales con API de mapas: traslados por `Velocidades` y tabla fija.
 - Sin `POST /grupos/unirse/{codigo}` (sigue el `POST` con cuerpo de NV-38).
 
+## Ejecución (2026-11-14)
+- **Código:** `internal/grupos/extras.go` (service), `extras_dto.go`, `extras_repository.go` (`Rename`, `Dissolve`, `DropDissolved`, `SetMeetingPoint`, `SetSurprise`, `ShareLocation`, `PurgeExpiredLocations`, `DissolvedIDs`), `sorpresa.go` (`SurpriseFor`, `LocationsTask`); `internal/planes/sorpresa.go` (recorte en `getMember`, que usan `GET /planes/{id}` y el paquete); `internal/votaciones/service.go` (lista vacía y 404 al votar); `internal/vaca/repository.go` (`HasPending`); `internal/usuarios/search.go` (`Mobilities`); `internal/chat/tarea.go` (`DissolvedTask`).
+- **Drift resuelto:** disolver no deja el documento para siempre: crear o invitar otra vez al mismo plan borra el grupo disuelto (`DropDissolved`) y crea uno con **otro id**, así nadie hereda el chat, las votaciones ni La Vaca. NV-57 no tenía trabajo nocturno de chat: se agrega `chat.DissolvedTask`. La descarga de cambios (NV-46) solo trae planes propios y la persona sorprendida nunca es la dueña, así que no necesita recorte. La vista del grupo no copia el nombre del plan: sin `nombre`, la app usa el del plan. El recorte deja `punto.negocio_id` de la primera parada cuando no hay punto (lo pide la spec).
+- **Decisiones:** cortes de costo `hasta_50`, `50_100`, `100_200`, `mas_200`; auto 4 pesos por km y transporte 15 pesos; movilidad desconocida = a pie. Las tarjetas del sugerido van sin `distancia_m` (`negocios.CardOf`). `ETag` del grupo = `version`.
+- **Pruebas:** `internal/grupos/extras_test.go`, `internal/planes/sorpresa_test.go`, `tests/integration/grupos_extras_test.go` (renombrar y disolver, punto, sugerido y traslados, sorpresa, me-apunto, ARCO y tareas, presupuesto de Redis), `tests/security/grupos_extras_security_test.go`, `tests/contract/grupos_extras_contract_test.go`. Los cuatro archivos de integración de la spec quedaron en uno.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-13), ola por decidir
+- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-69`, sin firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** `PATCH` solo cambia `nombre`; `version` e `If-Match` en grupos; disolver bloqueado por saldos de La Vaca; ubicación guardada a 3 decimales, 6 h y nunca devuelta; centro a cuadrícula de 1 km y sin centro en la respuesta (con 2 personas la fuga queda en ≈3 km); traslados ajenos solo por rango; sorpresa calculada al leer, sin trabajo programado; me-apunto exige plan `publico` y amistad, lleno = 409; unirse sigue en el `POST` de NV-38.

@@ -157,6 +157,12 @@ func (r *Repository) SoftDelete(ctx context.Context, id bson.ObjectID, version i
 	return res.MatchedCount == 1, nil
 }
 
+// HasPending dice si el grupo tiene deudas sin liquidar: con ellas no se disuelve (nv-69).
+func (r *Repository) HasPending(ctx context.Context, groupID bson.ObjectID) (bool, error) {
+	n, err := r.debts.CountDocuments(ctx, bson.D{{Key: "grupo_id", Value: groupID}, {Key: "estado", Value: DebtPending}}, options.Count().SetLimit(1))
+	return n > 0, err
+}
+
 // GroupDebts trae las deudas del grupo en `status` (vacío = todas).
 func (r *Repository) GroupDebts(ctx context.Context, groupID bson.ObjectID, status string) ([]Debt, error) {
 	q := bson.D{{Key: "grupo_id", Value: groupID}}
