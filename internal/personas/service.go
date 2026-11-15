@@ -115,6 +115,8 @@ type Service struct {
 	blocks   Blocks
 	phoneKey []byte
 	log      *slog.Logger
+	// profile es el perfil de persona y los contactos (nv-70).
+	profile profileDeps
 }
 
 // NewService recibe los repositorios y la llave HMAC del teléfono (la misma de nv-05).

@@ -211,6 +211,21 @@ func (r *Repository) CanRead(ctx context.Context, planID, userID bson.ObjectID) 
 	return n > 0, err
 }
 
+// CommonGroups cuenta los grupos vivos donde a y b están y ninguno declinó (perfil de
+// persona, nv-70).
+func (r *Repository) CommonGroups(ctx context.Context, a, b bson.ObjectID) (int64, error) {
+	in := func(id bson.ObjectID) bson.E {
+		return bson.E{Key: "$elemMatch", Value: bson.D{{Key: "usuario_id", Value: id}, {Key: "estado", Value: bson.D{{Key: "$ne", Value: StatusDeclined}}}}}
+	}
+	return r.col.CountDocuments(ctx, bson.D{
+		{Key: "$and", Value: bson.A{
+			bson.D{{Key: "integrantes", Value: bson.D{in(a)}}},
+			bson.D{{Key: "integrantes", Value: bson.D{in(b)}}},
+		}},
+		alive(),
+	})
+}
+
 // ListByUser trae todos los grupos del usuario, para exportarlos.
 func (r *Repository) ListByUser(ctx context.Context, userID bson.ObjectID) ([]Group, error) {
 	return r.find(ctx, bson.D{{Key: "integrantes.usuario_id", Value: userID}}, options.Find().SetSort(bson.D{{Key: "creado_en", Value: 1}}))
