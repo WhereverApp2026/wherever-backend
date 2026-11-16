@@ -73,6 +73,13 @@ const (
 	jwtKeyPlaceholder     = "PLACEHOLDER"
 )
 
+// Consejos del día con IA para toda la app (nv-75): deja al menos 340 de las 400 llamadas
+// diarias a los planes. 0 apaga la IA del consejo.
+const (
+	defaultIAConsejoDia = 60
+	maxIAConsejoDia     = 200
+)
+
 // Claves de entorno que el código usa. Son la fuente para configs/.env.example.
 const (
 	KeyAppEnv           = "APP_ENV"
@@ -119,6 +126,7 @@ const (
 	KeyIAEmbeddingsID   = "IA_EMBEDDINGS_ID"
 	KeyIAEmbLimiteMin   = "IA_EMB_LIMITE_MIN"
 	KeyIAEmbLimiteDia   = "IA_EMB_LIMITE_DIA"
+	KeyIAConsejoDia     = "IA_CONSEJO_DIA"
 	KeyAppVersionMinima = "APP_VERSION_MINIMA"
 	KeyAppVersionActual = "APP_VERSION_ACTUAL"
 	KeyTerminosVersion  = "TERMINOS_VERSION"
@@ -158,7 +166,7 @@ var optionalKeys = []string{
 	KeyMailTimeout, KeyMailWorkers, KeyMailQueueSize, KeyAppLinkBase,
 	KeyJobHour, KeyHideInternals,
 	KeyGeminiAPIKey, KeyIAModeloID, KeyIATimeout, KeyIATopeUSDMes, KeyIAPrecioEntrada, KeyIAPrecioSalida,
-	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia,
+	KeyIALimiteHora, KeyIALimiteMin, KeyIALimiteDia, KeyIAEmbeddingsID, KeyIAEmbLimiteMin, KeyIAEmbLimiteDia, KeyIAConsejoDia,
 	KeyAppVersionMinima, KeyAppVersionActual, KeyTerminosVersion, KeyAvisoVersion, KeyMantenimiento,
 	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL, KeyDataKeys,
 	KeyImagenesBucket, KeyImagenesURL, KeyImagenesRegion,
@@ -230,6 +238,8 @@ type IA struct {
 	// EmbLimiteMin y EmbLimiteDia son los textos vectorizados de toda la app por minuto y por día.
 	EmbLimiteMin int
 	EmbLimiteDia int
+	// ConsejoDia son los consejos del día redactados con IA para toda la app (nv-75); 0 = sin IA.
+	ConsejoDia int
 }
 
 // Enabled indica si hay proveedor de IA configurado.
@@ -352,6 +362,7 @@ func (c *Config) parseNumbers(getenv func(string) string) []error {
 		{KeyIALimiteDia, &c.IA.LimiteDia, defaultIALimiteDia},
 		{KeyIAEmbLimiteMin, &c.IA.EmbLimiteMin, defaultIAEmbLimiteMin},
 		{KeyIAEmbLimiteDia, &c.IA.EmbLimiteDia, defaultIAEmbLimiteDia},
+		{KeyIAConsejoDia, &c.IA.ConsejoDia, defaultIAConsejoDia},
 	}
 	for _, item := range ints {
 		value, err := intOr(getenv(item.key), item.fallback)
@@ -630,6 +641,9 @@ func (i IA) validate() []error {
 	errs = append(errs, validateLimit(KeyIALimiteDia, i.LimiteDia, maxIALimiteDia)...)
 	errs = append(errs, validateLimit(KeyIAEmbLimiteMin, i.EmbLimiteMin, maxIAEmbLimiteMin)...)
 	errs = append(errs, validateLimit(KeyIAEmbLimiteDia, i.EmbLimiteDia, maxIAEmbLimiteDia)...)
+	if i.ConsejoDia < 0 || i.ConsejoDia > maxIAConsejoDia {
+		errs = append(errs, fmt.Errorf("%s debe estar entre 0 y %d", KeyIAConsejoDia, maxIAConsejoDia))
+	}
 	if strings.ContainsAny(i.ModeloID, "/?#: ") {
 		errs = append(errs, fmt.Errorf("%s debe ser solo el nombre del modelo (ej. gemini-3.5-flash-lite)", KeyIAModeloID))
 	}

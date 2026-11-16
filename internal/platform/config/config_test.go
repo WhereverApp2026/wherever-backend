@@ -145,6 +145,7 @@ func TestLoad_IAApagadaSinLlave(t *testing.T) {
 	assert.Equal(t, 10, cfg.IA.LimiteHora, "nv-33: 10 generaciones por usuario y hora (5 planes de dos pasos)")
 	assert.Equal(t, 12, cfg.IA.LimiteMin, "nv-28: 80 %% de 15 por minuto")
 	assert.Equal(t, 400, cfg.IA.LimiteDia, "nv-28: 80 %% de 500 por día")
+	assert.Equal(t, 60, cfg.IA.ConsejoDia, "nv-75: 60 consejos con IA al día dejan 340 llamadas a los planes")
 }
 
 func TestLoad_IATopeYPrecios(t *testing.T) {
@@ -174,6 +175,8 @@ func TestLoad_IARechazaValoresInvalidos(t *testing.T) {
 		"límite por minuto alto": {config.KeyIALimiteMin: "16"},
 		"límite por día alto":    {config.KeyIALimiteDia: "501"},
 		"límite no entero":       {config.KeyIALimiteDia: "mucho"},
+		"consejos negativos":     {config.KeyIAConsejoDia: "-1"},
+		"consejos sobre 200":     {config.KeyIAConsejoDia: "201"},
 		"plazo no positivo":      {config.KeyIATimeout: "0s"},
 		"llave marcador":         {config.KeyGeminiAPIKey: "PLACEHOLDER_GEMINI"},
 		"modelo con models/":     {config.KeyIAModeloID: "models/gemini-3.5-flash-lite"},

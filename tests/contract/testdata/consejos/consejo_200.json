@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "body": {
+    "accion": "string",
+    "dia": "string",
+    "fuente": "string",
+    "texto": "string"
+  }
+}

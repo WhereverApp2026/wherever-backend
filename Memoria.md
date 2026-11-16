@@ -813,6 +813,15 @@
 - Decisión: el repositorio lee reservas, check-ins, reseñas, cupones y favoritos por nombre de colección; `fuentes_test.go` avisa si un módulo cambia nombres o estados.
 - A evitar: `int(constante_float)` no compila si la constante no es entera; usa una constante entera aparte. gosec G115 marca `byte(r)` aunque el `case` limite el rango: va con `#nosec` y su razón.
 
+## NV-75 — Consejo del día y descripción con IA (2026-11-16)
+- Estado: rama `claude/nv-75-a587c9` desde `main` (con nv-74 fusionada), PR contra `main`. Falta la firma. Colección nueva `consejos_negocio` (`ux_consejo_dia`, `ttl_consejos`): correr `scripts/indexes` en Atlas antes de desplegar. Variable nueva `IA_CONSEJO_DIA` con valor por omisión (60): no hace falta en Parameter Store.
+- Decisión (las que proponía la spec): las reglas eligen el hecho y la IA solo lo redacta; consejo al pedirlo, uno por negocio y día en MongoDB con `ux_consejo_dia` como candado (sin Redis); el consejo nunca da 429 ni 503 por la IA; la descripción no se guarda, da 429 en el límite del usuario y plantilla en lo demás; respuestas con `fuente`.
+- Decisión: las colecciones de nv-61, nv-62 y nv-74 se leen por nombre (como nv-74). Una franja floja solo compite si ese bloque tuvo llegadas otro día y ese día tuvo llegadas: así no compara contra horas cerradas. Si el modelo cambia la `accion`, se usa la plantilla.
+- Decisión: el cupo diario se cuenta en `consejos_negocio` (`fuente: ia` de hoy); dos negocios a la vez pueden pasarlo por uno, aceptable frente a 400 llamadas.
+- Upstash: consejo leído 4, generado 4 + 12 (guardia: caché 1, usuario 3, gasto 1, globales 6, guardar 1), descripción 7 + 12. La spec estimaba 14: los límites globales son 6, no 3. `TestPresupuestoRedis_ConsejoNV75` vive en `consejos_test.go` para no chocar con `presupuesto_redis_test.go`.
+- A evitar: en Windows, `python` en modo texto escribe CRLF y `
+` dentro de un heredoc puede volverse salto real; abrir con `newline=''` y revisar el diff. gocyclo marca > 10: partir las reglas en funciones chicas desde el inicio.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

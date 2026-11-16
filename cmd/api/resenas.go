@@ -5,11 +5,13 @@ import (
 
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
@@ -43,12 +45,18 @@ type iaClientes struct {
 	resenas    *resenas.Service
 	postales   *postales.Service
 	moderacion *moderacion.Service
+	consejos   *consejos.Service
+	consejoDia int
+	panel      *panel.Service
 }
 
 // conectar da la guardia a los títulos de cupones (nv-61) y a las reseñas (nv-62): respuesta
 // sugerida y moderación del texto con los umbrales de `moderacion_reglas`; y a los textos de
-// postales y momentos (nv-63).
+// postales y momentos (nv-63); al consejo del día con su cupo (IA_CONSEJO_DIA) y a la descripción
+// del negocio (nv-75).
 func (c iaClientes) conectar(guardia *ia.Guardia, log *slog.Logger) {
+	c.consejos.WithIA(guardia, c.consejoDia)
+	c.panel.WithIA(guardia)
 	c.cupones.WithIA(guardia)
 	c.resenas.WithIA(guardia).WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
 	c.postales.WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)

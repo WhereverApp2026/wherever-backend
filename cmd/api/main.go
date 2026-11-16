@@ -25,6 +25,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
@@ -241,6 +242,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, notifier, registry, log)
+	// Consejo del día (nv-75): la baja del negocio borra sus consejos (panel y ARCO del alta).
+	tipsRepo := consejos.NewRepository(db)
+	tips := consejos.NewService(tipsRepo, businessRepo, log)
+	bookings.observadores = append(bookings.observadores, consejos.NewObservador(tipsRepo))
 	// Estadísticas del negocio (nv-74): la baja borra sus días; no entran en ARCO (sin usuario_id).
 	stats := estadisticas.NewService(estadisticas.NewRepository(db), businessRepo, log)
 	bookings.observadores = append(bookings.observadores, estadisticas.NewObservador(stats))
@@ -281,7 +286,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
-	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, postales: cards, moderacion: modSvc}, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, postales: cards, moderacion: modSvc, consejos: tips, consejoDia: cfg.IA.ConsejoDia, panel: merchant.panel}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -309,6 +314,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		eventos.NewHandler(events, validator).WithActiveGuard(active),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
+		consejos.NewHandler(tips).WithActiveGuard(active),
 		estadisticas.NewHandler(stats, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),
 		cupones.NewHandler(bookings.cupones, validator).WithActiveGuard(active),

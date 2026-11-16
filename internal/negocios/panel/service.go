@@ -51,6 +51,7 @@ type Service struct {
 	fuentes      negocios.PanelFuente
 	futuras      negocios.ReservasFuturas
 	imagenes     Imagenes
+	ia           IA
 	notifier     notificaciones.Notifier
 	zona         *time.Location
 	plazo        time.Duration

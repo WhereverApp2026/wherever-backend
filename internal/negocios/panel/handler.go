@@ -50,6 +50,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Post("/negocios/:id/pausa", with(h.pausa)...)
 	v1.Put("/negocios/:id/reservas-config", with(h.reservas)...)
 	v1.Get("/negocios/:id/qr", with(h.qr)...)
+	v1.Post("/negocios/:id/ia/descripcion", with(h.descripcion)...)
 	v1.Put("/admin/negocios/:id/sello", limiter.Window(politicaAdmin, limiteAdmin, ventanaAdmin), middleware.RequireRoles(middleware.RoleAdmin), h.sello)
 }
 
@@ -159,6 +160,19 @@ func (h *Handler) sello(c *fiber.Ctx) error {
 		return err
 	}
 	out, err := h.svc.Sello(c.UserContext(), claims(c), c.Params("id"), req)
+	if err != nil {
+		return err
+	}
+	return noStore(c, out)
+}
+
+// descripcion es «Que la IA me ayude» (nv-75): no guarda nada.
+func (h *Handler) descripcion(c *fiber.Ctx) error {
+	var req DescripcionRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	out, err := h.svc.Descripcion(c.UserContext(), claims(c), c.Params("id"), req)
 	if err != nil {
 		return err
 	}
