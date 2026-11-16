@@ -15,6 +15,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/busquedas"
 	"github.com/WhereverApp2026/wherever-backend/internal/chat"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
@@ -90,6 +91,7 @@ var expected = map[string][]string{
 	eventos.Collection:                  {"_id_", "ix_eventos_cerca", "ix_eventos_fin", "ix_eventos_creador", "ix_eventos_negocio"},
 	postales.RecuerdosCollection:        {"_id_", "ux_recuerdo", "ix_recuerdos_fecha"},
 	postales.MomentosCollection:         {"_id_", "ix_feed", "ix_etiquetados", "ix_momentos_negocio", "ux_momento_postal"},
+	consejos.Collection:                 {"_id_", "ux_consejo_dia", "ttl_consejos"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -167,6 +169,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		vistas.Collection:                {"ux_vista"},
 		postales.RecuerdosCollection:     {"ux_recuerdo"},
 		postales.MomentosCollection:      {"ux_momento_postal"},
+		consejos.Collection:              {"ux_consejo_dia"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
@@ -175,7 +178,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		}
 	}
 	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion", asistente.DescartesCollection: "ttl_descarte", chat.NoticeCollection: "ttl_hasta",
-		pagos.Collection: "ttl_conservar_hasta", pagos.LiquidacionesCollection: "ttl_liquidacion_conservar"} {
+		pagos.Collection: "ttl_conservar_hasta", pagos.LiquidacionesCollection: "ttl_liquidacion_conservar", consejos.Collection: "ttl_consejos"} {
 		ttl := specs(t, db, collection)[name]
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)

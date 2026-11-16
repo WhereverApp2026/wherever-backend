@@ -23,6 +23,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
+	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
 	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
@@ -106,6 +107,7 @@ type Env struct {
 	ModeradorPostales *resenastest.Moderador // doble del moderador de texto de nv-42 para postales y momentos
 	ModeradorReportes *resenastest.Moderador // doble del moderador del detalle de reportes de negocio (nv-67)
 	Eventos           *eventos.Service       // eventos, ferias y tianguis (nv-65)
+	Consejos          *consejos.Service      // consejo del día (nv-75) con la guardia real sobre el doble
 	ModeradorEventos  *resenastest.Moderador // doble del moderador de texto para eventos
 	Planes            *planes.Service
 	Votaciones        *votaciones.Service
@@ -252,7 +254,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(images.Privacy)
 	menuRepo := menu.NewRepository(client.DB())
 	menus := menu.NewService(menuRepo, businessRepo, log).WithImagenes(fotosNegocio)
-	panels := panel.NewService(businessRepo, menuRepo, exp, businesses, log).WithNotifier(notifier)
+	panels := panel.NewService(businessRepo, menuRepo, exp, businesses, log).WithNotifier(notifier).WithIA(guardia)
 	if images.Service != nil {
 		panels.WithImagenes(images.Service)
 	}
@@ -307,6 +309,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	mods.WithDestino(eventos.TipoCola, events.Destino())
 	registry.RegisterPurger(eventos.NewPrivacy(eventRepo))
 	registry.RegisterExporter(eventos.NewPrivacy(eventRepo))
+	// testutil.Config no fija IA_CONSEJO_DIA: se usa el valor por defecto de producción.
+	tips := consejos.NewService(consejos.NewRepository(client.DB()), businessRepo, log).WithIA(guardia, consejos.CupoPorOmision)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
@@ -330,7 +334,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
@@ -350,6 +354,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			reportesnegocio.NewHandler(reports, v).WithActiveGuard(usuarios.RequireActive(users)),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
+			consejos.NewHandler(tips).WithActiveGuard(usuarios.RequireActive(users)),
 			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
 			pagos.NewHandler(pays, v).WithActiveGuard(usuarios.RequireActive(users)),
 			cupones.NewHandler(coupons, v).WithActiveGuard(usuarios.RequireActive(users)),

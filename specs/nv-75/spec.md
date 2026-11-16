@@ -19,6 +19,7 @@ El dueño recibe en P-47 un consejo del día («Los martes de 4 a 6 tienes poca 
   - cupón activo sin canjes en 14 días → `editar_cupon`;
   - reservas apagadas con visitas altas → `configurar_reservas`;
   - sin datos suficientes (< 7 días con actividad) → `completar_perfil` o `ninguna`.
+  - Implementado (`internal/consejos/reglas.go`): las reglas de estadísticas (franja, aspecto, reservas) piden ≥ 7 días activos en los últimos 28 (sin hoy); las de conteo (reseñas, cupón) siempre aplican. Pesos: reseñas 0.6 + 0.08 por reseña (hasta 5), franja 0.9 × déficit (≥ 40 % y ≥ 20 llegadas), aspecto 0.5 + caída (≥ 0.3 puntos y ≥ 3 reseñas por periodo, tope 1), cupón 0.55, reservas 0.5 (≥ 60 vistas en 28 días), perfil 0.2 (sin descripción o sin fotos). Una franja solo compite si ese bloque tuvo llegadas otro día y ese día tuvo llegadas (así no compara contra horas cerradas). El aspecto compara los últimos 28 días contra los 28 anteriores. Las colecciones de nv-61, nv-62 y nv-74 se leen por nombre, como hace nv-74.
 - **Redacción:** con IA si hay cupo; si no, plantilla por regla. A Gemini solo va el hecho elegido y su contexto agregado (categoría, día y franja, porcentajes, conteos, nombre del aspecto), en `Contexto`; `TextoUsuario` va vacío. Nunca el nombre del negocio, de clientes, ids ni textos de reseñas.
 - **Esquema de salida (nv-26):** `{ texto: string 20–160, accion: enum }`; la `accion` debe ser la del hecho (si el modelo la cambia o falla el esquema tras el reintento de `GenerarValidado`, se usa la plantilla). Instrucciones fijas y versionadas: tono amable, tuteo, sin prometer cifras que no estén en el contexto.
 - **Respuesta:** `{ texto, accion, fuente: "ia" | "reglas", dia }`. `accion` ∈ `crear_cupon`, `ver_resenas`, `responder_resenas`, `editar_cupon`, `configurar_reservas`, `completar_perfil`, `ninguna`; la app la traduce a una pantalla.
@@ -43,7 +44,7 @@ El dueño recibe en P-47 un consejo del día («Los martes de 4 a 6 tienes poca 
 
 ### Costos
 - **Gemini:** consejo ~700 tokens de entrada y ~80 de salida; descripción ~400 y ~120. Con `IA_PRECIO_*` en 0 (capa gratuita) el gasto contado es 0; con facturación (precios de flash-lite), menos de USD 0.0002 por llamada, dentro de `IA_TOPE_USD_MES=5`. Peticiones: ≤ 60 al día por el consejo más las descripciones (acotadas por `IA_LIMITE_HORA`).
-- **Redis:** consejo ya generado = lectura con sesión (política global 3 + revocación 1 ≈ 4). Generación con IA ≈ 4 + límite de usuario 3 + límites globales 3 + caché 2 + gasto 2 ≈ 14 (como generar planes, Memoria nv-28); una vez por negocio y día. Descripción ≈ 14 por llamada (más `Writes` 3 si se cuenta como escritura). `TestPresupuestoRedis_ConsejoNV75` fija ambas cifras.
+- **Redis:** consejo ya generado = lectura con sesión (política global 3 + revocación 1 = 4). Generación con IA = 4 + guardia 12 (caché 1, límite de usuario 3, gasto 1, límites globales 6 —3 por ventana—, guardar en caché 1) = 16; una vez por negocio y día. Descripción = escritura 7 + guardia 12 = 19 por llamada (un acierto de caché = 7 + 1). `TestPresupuestoRedis_ConsejoNV75` (en `tests/integration/consejos_test.go`) fija las tres cifras.
 
 ## Contratos
 | Método | Ruta | Auth | Respuestas |
@@ -59,8 +60,9 @@ Filas copiadas del Excel (A5): `GET /api/v1/negocios/{id}/consejo` «Consejo de 
 - `tests/integration/consejos_test.go`: cada regla con datos sembrados en `estadisticas_diarias`, `resenas` y `cupones`; segunda petición del día no llama al modelo; dos peticiones a la vez = una llamada; `IA_CONSEJO_DIA` agotado = `fuente: reglas`; modelo que cambia la acción o devuelve JSON inválido = plantilla; sin guardia = reglas.
 - `tests/integration/negocios_descripcion_test.go`: 3 palabras = 200 `fuente: ia` con un `ia.Modelo` de prueba; 2 o 4 palabras = 422; Gemini caído = plantilla; límite del usuario = 429; caché por huella.
 - `tests/security/consejos_security_test.go`: 401, 403 consumidor, dueño ajeno = 404; privacidad del contexto (sin nombres, correos, ids ni textos de reseñas); logs sin contexto ni salida.
-- `tests/integration/presupuesto_redis_test.go` (`TestPresupuestoRedis_ConsejoNV75`).
-- `tests/database/indexes_test.go`: `ux_consejo_dia` y TTL. `tests/contract/consejos_contract_test.go`: 200 de ambas rutas.
+- `TestPresupuestoRedis_ConsejoNV75` en `tests/integration/consejos_test.go` (no en `presupuesto_redis_test.go`, para no chocar con otras specs).
+- `tests/database/indexes_test.go`: `ux_consejo_dia` y TTL. `tests/contract/consejos_contract_test.go`: 200 de ambas rutas (`testdata/consejos/`).
+- Unit de la descripción en `internal/negocios/panel/descripcion_test.go`.
 - Unit `internal/consejos`: cada regla y su peso, plantillas, esquema y validación de `palabras`.
 - Prueba en vivo opcional con `GEMINI_API_KEY` (como `internal/ia/vivo_test.go`), fuera del CI.
 
@@ -75,8 +77,8 @@ Filas copiadas del Excel (A5): `GET /api/v1/negocios/{id}/consejo` «Consejo de 
 - Sin traducción ni varias propuestas de descripción.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-16), ola 12; sin código.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/nv-75-a587c9`. Falta la firma.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** reglas eligen el hecho y la IA solo lo redacta; consejo al pedirlo (no nocturno), uno por día en MongoDB con candado por índice único, sin Redis; variable nueva `IA_CONSEJO_DIA=60`; el consejo nunca da 429 ni 503 por IA; la descripción no se guarda, da 429 en el límite del usuario y plantilla en lo demás; respuestas con `fuente`.
+- **Decisiones para el revisor (tomadas como las propone la spec, 2026-11-16):** reglas eligen el hecho y la IA solo lo redacta; consejo al pedirlo (no nocturno), uno por día en MongoDB con candado por índice único, sin Redis; variable nueva `IA_CONSEJO_DIA=60`; el consejo nunca da 429 ni 503 por IA; la descripción no se guarda, da 429 en el límite del usuario y plantilla en lo demás; respuestas con `fuente`.
 - **Detalle:** evidencia en `specs/nv-75/checklists/gates.md` + `Memoria.md` al ejecutar.
