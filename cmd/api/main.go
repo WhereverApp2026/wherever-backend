@@ -28,6 +28,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/estadisticas"
 	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -139,6 +140,7 @@ func run() error {
 	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, jobNotifier, log)
 	waitBookings := startReservas(ctx, mongoClient.DB(), jobNotifier, log)
 	waitCoupons := startCupones(ctx, mongoClient.DB(), log)
+	waitStats := startEstadisticas(ctx, mongoClient.DB(), log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -156,6 +158,7 @@ func run() error {
 	waitVotes()
 	waitBookings()
 	waitCoupons()
+	waitStats()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -238,6 +241,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, notifier, registry, log)
+	// Estadísticas del negocio (nv-74): la baja borra sus días; no entran en ARCO (sin usuario_id).
+	stats := estadisticas.NewService(estadisticas.NewRepository(db), businessRepo, log)
+	bookings.observadores = append(bookings.observadores, estadisticas.NewObservador(stats))
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
 	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
@@ -249,7 +255,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	reportPrivacy := reportesnegocio.NewPrivacy(reportRepo, businessRepo)
 	registry.RegisterPurger(reportPrivacy)
 	registry.RegisterExporter(reportPrivacy)
-	views := vistas.NewService(vistas.NewRepository(db), businessRepo, log)
+	views := vistas.NewService(vistas.NewRepository(db), businessRepo, log).WithContador(stats)
 	viewsPrivacy := vistas.NewPrivacy(vistas.NewRepository(db), businessRepo)
 	registry.RegisterPurger(viewsPrivacy)
 	registry.RegisterExporter(viewsPrivacy)
@@ -303,6 +309,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		eventos.NewHandler(events, validator).WithActiveGuard(active),
 		alta.NewHandler(business.svc, validator).WithActiveGuard(active),
 		panel.NewHandler(merchant.panel, validator).WithActiveGuard(active),
+		estadisticas.NewHandler(stats, validator).WithActiveGuard(active),
 		reservas.NewHandler(bookings.svc, validator).WithActiveGuard(active),
 		cupones.NewHandler(bookings.cupones, validator).WithActiveGuard(active),
 		pagos.NewHandler(bookings.pagos, validator).WithActiveGuard(active),
@@ -325,7 +332,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
-	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, pagos.NewTarea(bookings.pagos), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), nil
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, estadisticas.NewTarea(stats), pagos.NewTarea(bookings.pagos), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), nil
 }
 
 // buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no
