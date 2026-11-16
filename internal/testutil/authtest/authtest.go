@@ -258,9 +258,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	}
 	registry.RegisterExporter(panel.NewPrivacy(businessRepo, menuRepo))
 	bookingRepo := reservas.NewRepository(client.DB())
-	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log)
-	registry.RegisterPurger(reservas.NewPrivacy(bookingRepo))
-	registry.RegisterExporter(reservas.NewPrivacy(bookingRepo))
+	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log).WithNotifier(notifier)
+	bookingPrivacy := reservas.NewPrivacy(bookingRepo).WithNegocios(businessRepo)
+	registry.RegisterPurger(bookingPrivacy)
+	registry.RegisterExporter(bookingPrivacy)
 	stripeDoble := stripetest.New(t)
 	payRepo := pagos.NewRepository(client.DB())
 	pays := pagos.NewService(payRepo, pagos.NewClient(stripetest.SecretKey, stripeDoble.URL), pagos.NewRedis(rdb), pagos.ReservasDe(bookingRepo, bookings),

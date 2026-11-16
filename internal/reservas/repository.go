@@ -36,18 +36,24 @@ func Indexes() []platformmongo.IndexSet {
 		{Collection: BloqueosCollection, Models: []mongo.IndexModel{
 			{Keys: bson.D{{Key: "negocio_id", Value: 1}, {Key: "desde", Value: 1}, {Key: "hasta", Value: 1}}, Options: options.Index().SetName("ix_bloqueo_negocio")},
 		}},
+		{Collection: MensajesCollection, Models: []mongo.IndexModel{
+			{Keys: bson.D{{Key: "reserva_id", Value: 1}, {Key: "creado_en", Value: -1}}, Options: options.Index().SetName("ix_mensajes_reserva")},
+			{Keys: bson.D{{Key: "usuario_id", Value: 1}}, Options: options.Index().SetName("ix_mensajes_usuario")},
+			{Keys: bson.D{{Key: "expira_en", Value: 1}}, Options: options.Index().SetName("ttl_mensajes_reserva").SetExpireAfterSeconds(0)},
+		}},
 	}
 }
 
-// Repository lee y escribe `reservas` y `bloqueos_horario`.
+// Repository lee y escribe `reservas`, `bloqueos_horario` y `mensajes_reserva`.
 type Repository struct {
 	col      *mongo.Collection
 	bloqueos *mongo.Collection
+	mensajes *mongo.Collection
 }
 
 // NewRepository recibe la base por constructor.
 func NewRepository(db *mongo.Database) *Repository {
-	return &Repository{col: db.Collection(Collection), bloqueos: db.Collection(BloqueosCollection)}
+	return &Repository{col: db.Collection(Collection), bloqueos: db.Collection(BloqueosCollection), mensajes: db.Collection(MensajesCollection)}
 }
 
 // Insert guarda la reserva; ErrDuplicate si el código ya existe (ux_codigo).

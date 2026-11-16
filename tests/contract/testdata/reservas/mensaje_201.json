@@ -1,0 +1,9 @@
+{
+  "status": 201,
+  "body": {
+    "creado_en": "string",
+    "id": "string",
+    "reserva_id": "string",
+    "texto": "string"
+  }
+}

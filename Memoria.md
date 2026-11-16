@@ -797,6 +797,14 @@
 - Decisión: un abierto por persona y negocio lo garantiza `ux_reporte_abierto` (único parcial con `estado = abierto`); 10 al día contados en MongoDB, sin Redis. El dueño no reporta su negocio (403). Cola admin agregada con cursor firmado; resolver solo desde `abierto` y no toca el negocio.
 - Lección: cada colección nueva con `Exporter` cambia la exportación ARCO; hay que recapturar `TestContract_Usuarios` en el mismo PR (le pasó a nv-65).
 
+## NV-73 — Mensajes de reserva y recordatorio de 2 h (2026-11-16)
+- Estado: rama `claude/nv-73-87ba71` desde `main`, PR contra `main`. Falta la firma. Colección nueva `mensajes_reserva` (`ix_mensajes_reserva`, `ix_mensajes_usuario`, `ttl_mensajes_reserva`): correr `scripts/indexes` en Atlas (con permiso) antes de desplegar. Sin variables nuevas.
+- Decisión (las que proponía la spec): mensajes solo del negocio al cliente, guardados 90 días y leídos en `GET /reservas/{id}` (solo el cliente; el negocio no); 5 por reserva en 24 h contados en MongoDB; sin moderación con IA; recordatorio dentro de `reservas.Barrer` con `UpdateOne` condicional sobre `recordatorio_en`, sin Redis ni candado. Las reservas hechas con menos de 2 h sí reciben aviso en el siguiente barrido.
+- Decisión: `mensajes` del detalle es `*[]MensajeItem` con `omitempty`: sale `[]` en el detalle del cliente y no aparece en las demás respuestas de reserva (crear, lista, cambiar, agenda), así no cambian sus contratos.
+- Decisión: marcar el recordatorio no sube `version` (no es un cambio del cliente ni del negocio; un `If-Match` vigente sigue sirviendo). Cambiar la hora con `PATCH /reservas/{id}` borra `recordatorio_en`; cambiar solo personas no.
+- Decisión: `backgroundNotifier` en `cmd/api/main.go` arma un solo centro de avisos con push para los trabajos en segundo plano (votaciones y barrido de reservas). Los avisos de reservas van por el canal `reservas` (`ChannelOf`), que el teléfono no apaga.
+- Decisión: la exportación ARCO anida `mensajes[{texto, negocio, creado_en}]` dentro de cada reserva (no es colección nueva en el JSON); `TestContract_Usuarios` no cambia porque esa persona no tiene reservas.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

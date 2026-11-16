@@ -41,7 +41,7 @@ func (h *Handler) WithActiveGuard(guard fiber.Handler) *Handler {
 	return h
 }
 
-// Routes registra las doce rutas de nv-59. Cumple httpapi.Module.
+// Routes registra las doce rutas de nv-59 y el mensaje al cliente de nv-73. Cumple httpapi.Module.
 func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	with := func(first fiber.Handler, fn fiber.Handler) []fiber.Handler {
 		out := []fiber.Handler{first}
@@ -68,6 +68,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/negocios/:id/reservas", with(dueno, h.agenda)...)
 	v1.Post("/negocios/:id/reservas/escanear", with(dueno, h.escanear)...)
 	v1.Patch("/negocios/:id/reservas/:rid", with(dueno, h.estado)...)
+	v1.Post("/negocios/:id/reservas/:rid/mensajes", with(dueno, h.mensaje)...)
 	v1.Post("/negocios/:id/bloqueos", with(dueno, h.crearBloqueo)...)
 	v1.Delete("/negocios/:id/bloqueos/:bid", with(dueno, h.borrarBloqueo)...)
 }
@@ -224,6 +225,23 @@ func (h *Handler) estado(c *fiber.Ctx) error {
 		return err
 	}
 	return sendReserva(c, fiber.StatusOK, out)
+}
+
+// mensaje recorta el texto antes de validarlo: solo espacios = 422.
+func (h *Handler) mensaje(c *fiber.Ctx) error {
+	var req MensajeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	req.Normalizar()
+	if err := h.validator.Struct(&req); err != nil {
+		return err
+	}
+	out, err := h.svc.EnviarMensaje(c.UserContext(), claims(c), c.Params("id"), c.Params("rid"), req)
+	if err != nil {
+		return err
+	}
+	return send(c, fiber.StatusCreated, out)
 }
 
 func (h *Handler) escanear(c *fiber.Ctx) error {

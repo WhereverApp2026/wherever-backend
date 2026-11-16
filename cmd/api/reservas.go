@@ -9,6 +9,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/pagos"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
@@ -30,10 +31,10 @@ type reservasParts struct {
 // arranca, las rutas de pago responden 503 y una reserva con anticipo responde 422
 // `anticipo_no_disponible`.
 func buildReservas(cfg config.Config, db *mongodriver.Database, places *negocios.Repository, users *usuarios.Repository, rdb *goredis.Client,
-	cursor *pagination.Signer, registry *privacidad.Registry, log *slog.Logger) reservasParts {
+	cursor *pagination.Signer, notifier notificaciones.Notifier, registry *privacidad.Registry, log *slog.Logger) reservasParts {
 	repo := reservas.NewRepository(db)
-	svc := reservas.NewService(repo, places, users, reservas.NewRedis(rdb), cursor, log)
-	privacy := reservas.NewPrivacy(repo)
+	svc := reservas.NewService(repo, places, users, reservas.NewRedis(rdb), cursor, log).WithNotifier(notifier)
+	privacy := reservas.NewPrivacy(repo).WithNegocios(places)
 	registry.RegisterPurger(privacy)
 	registry.RegisterExporter(privacy)
 
@@ -59,10 +60,10 @@ func buildReservas(cfg config.Config, db *mongodriver.Database, places *negocios
 		observadores: negocios.Observadores{reservas.NewObservador(svc), cupones.NewObservador(coupons)}}
 }
 
-// startReservas corre el barrido cada 5 minutos (apartados vencidos y `no_asistio`) en cada
-// instancia; solo usa MongoDB.
-func startReservas(ctx context.Context, db *mongodriver.Database, log *slog.Logger) func() {
-	svc := reservas.NewService(reservas.NewRepository(db), negocios.NewRepository(db), nil, nil, nil, log)
+// startReservas corre el barrido cada 5 minutos (apartados vencidos, `no_asistio` y el
+// recordatorio de 2 h de nv-73) en cada instancia; solo usa MongoDB (y FCM para el push).
+func startReservas(ctx context.Context, db *mongodriver.Database, notifier notificaciones.Notifier, log *slog.Logger) func() {
+	svc := reservas.NewService(reservas.NewRepository(db), negocios.NewRepository(db), nil, nil, nil, log).WithNotifier(notifier)
 	barrido := reservas.NewBarrido(svc, log)
 	done := make(chan struct{})
 	go func() {

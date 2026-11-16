@@ -1,0 +1,33 @@
+{
+  "status": 200,
+  "body": {
+    "anticipo": {
+      "monto_centavos": "number",
+      "tipo": "string"
+    },
+    "codigo": "string",
+    "creado_en": "string",
+    "estado": "string",
+    "fecha_hora": "string",
+    "id": "string",
+    "mensajes": [
+      {
+        "creado_en": "string",
+        "id": "string",
+        "texto": "string"
+      }
+    ],
+    "negocio_id": "string",
+    "personas": "number",
+    "politica_cancelacion": {
+      "horas_limite": "number",
+      "porcentaje_antes": "number",
+      "porcentaje_despues": "number",
+      "tipo": "string"
+    },
+    "puede_cambiar": "bool",
+    "puede_cancelar": "bool",
+    "reembolso_centavos": "number",
+    "version": "number"
+  }
+}
