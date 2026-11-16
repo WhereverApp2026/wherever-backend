@@ -20,12 +20,19 @@ type Places interface {
 	FindCards(ctx context.Context, ids []bson.ObjectID, now time.Time) ([]negocios.PlaceItem, error)
 }
 
+// Contador suma la vista contada a las estadísticas del negocio (nv-74). Solo se llama cuando
+// la vista se escribe (pasó la ventana de 10 min).
+type Contador interface {
+	Contar(ctx context.Context, negocio bson.ObjectID, origen string, now time.Time) error
+}
+
 // Service maneja las vistas (nv-66).
 type Service struct {
-	repo   *Repository
-	places Places
-	log    *slog.Logger
-	now    func() time.Time
+	repo     *Repository
+	places   Places
+	contador Contador
+	log      *slog.Logger
+	now      func() time.Time
 }
 
 // NewService recibe sus dependencias por constructor.
@@ -34,6 +41,12 @@ func NewService(repo *Repository, places Places, log *slog.Logger) *Service {
 		log = slog.Default()
 	}
 	return &Service{repo: repo, places: places, log: log, now: time.Now}
+}
+
+// WithContador conecta las estadísticas del negocio (nv-74).
+func (s *Service) WithContador(c Contador) *Service {
+	s.contador = c
+	return s
 }
 
 // VistaRequest es el cuerpo de POST /lugares/{id}/vistas; `origen` es opcional.
@@ -92,10 +105,25 @@ func (s *Service) Registrar(ctx context.Context, subject, rawID string, req Vist
 	if n >= MaxPerHour {
 		return apperr.RateLimited(retryAfterHora)
 	}
-	if _, err := s.repo.Registrar(ctx, me, id, req.Origen, now); err != nil {
+	escrita, err := s.repo.Registrar(ctx, me, id, req.Origen, now)
+	if err != nil {
 		return errStore()
 	}
+	if escrita {
+		s.contar(ctx, id, req.Origen, now)
+	}
 	return nil
+}
+
+// contar suma la vista a las estadísticas del negocio; si falla, la vista ya quedó guardada y
+// solo se registra el evento, sin persona ni lugar.
+func (s *Service) contar(ctx context.Context, negocio bson.ObjectID, origen string, now time.Time) {
+	if s.contador == nil {
+		return
+	}
+	if err := s.contador.Contar(ctx, negocio, origen, now); err != nil {
+		s.log.WarnContext(ctx, "vistas: vista sin contar en estadísticas", "evento", "vista_sin_contar")
+	}
 }
 
 // Recientes devuelve las tarjetas de los lugares vistos, del más reciente al más viejo; los que

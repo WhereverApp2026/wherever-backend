@@ -1,0 +1,64 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "agrupar": "string",
+    "anterior": {
+      "calificacion": "number",
+      "cupones_canjeados": "number",
+      "favoritos_nuevos": "number",
+      "llegadas": "number",
+      "reservas": "number",
+      "vistas_ficha": "number"
+    },
+    "avanzadas": {
+      "aspectos": [
+        {
+          "aspecto": "string",
+          "categoria": "number",
+          "tuyo": "number"
+        }
+      ],
+      "origen": {
+        "busqueda": "number",
+        "cupon": "number",
+        "inicio": "number",
+        "mapa": "number",
+        "plan_ia": "number"
+      },
+      "por_hora": [
+        "number"
+      ]
+    },
+    "cambio": {
+      "cupones_canjeados": "number",
+      "favoritos_nuevos": "number",
+      "llegadas": "number",
+      "reservas": "number",
+      "vistas_ficha": "number"
+    },
+    "desde": "string",
+    "frase": "string",
+    "hasta": "string",
+    "premium_requerido": "bool",
+    "serie": [
+      {
+        "calificacion": "number",
+        "cupones_canjeados": "number",
+        "favoritos_nuevos": "number",
+        "inicio": "string",
+        "llegadas": "number",
+        "reservas": "number",
+        "vistas_ficha": "number"
+      }
+    ],
+    "totales": {
+      "calificacion": "number",
+      "cupones_canjeados": "number",
+      "favoritos_nuevos": "number",
+      "llegadas": "number",
+      "reservas": "number",
+      "vistas_ficha": "number"
+    }
+  }
+}

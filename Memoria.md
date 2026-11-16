@@ -805,6 +805,14 @@
 - Decisión: `backgroundNotifier` en `cmd/api/main.go` arma un solo centro de avisos con push para los trabajos en segundo plano (votaciones y barrido de reservas). Los avisos de reservas van por el canal `reservas` (`ChannelOf`), que el teléfono no apaga.
 - Decisión: la exportación ARCO anida `mensajes[{texto, negocio, creado_en}]` dentro de cada reserva (no es colección nueva en el JSON); `TestContract_Usuarios` no cambia porque esa persona no tiene reservas.
 
+## NV-74 — Estadísticas y reporte mensual del negocio (2026-11-16)
+- Estado: rama `claude/laughing-khorana-71fa8b` desde `main`, PR contra `main`. Falta la firma. Colecciones nuevas `estadisticas_diarias` (`ux_negocio_fecha`) y `estadisticas_categoria` (`ux_categoria_mes`): correr `scripts/indexes` en Atlas (con permiso) antes de desplegar, o `/ready` da 503. Sin variables nuevas ni dependencias.
+- Decisión (las que proponía la spec): vistas contadas en vivo con `$inc` cuando `historial_vistas` escribe (`vistas.Contador`); el resto por un trabajo cada hora en cada instancia, solo MongoDB y con `$set` idempotente sobre hoy y ayer; días anteriores congelados y anónimos; avanzadas solo premium (si no, `avanzadas: null` y 200); categoría solo con ≥ 5 negocios con reseñas en el mes de `hasta`; frase por reglas; PDF con escritor propio (`internal/estadisticas/pdf`).
+- Decisión: `cupones_canjeados` sale de `cupones_usuario.canjeado_en` en el día local, no de `cupones_metricas` (su `dia` es UTC). El top 3 del reporte sí usa `cupones_metricas`.
+- Decisión: el día guarda `aspectos_suma` y `categoria` para promediar rangos y categorías sin releer `resenas`; `estadisticas_relleno` marca qué negocio ya tiene sus 90 días (50 por hora). La tarea nocturna `estadisticas_negocio` resume categorías y borra días de más de 400.
+- Decisión: el repositorio lee reservas, check-ins, reseñas, cupones y favoritos por nombre de colección; `fuentes_test.go` avisa si un módulo cambia nombres o estados.
+- A evitar: `int(constante_float)` no compila si la constante no es entera; usa una constante entera aparte. gosec G115 marca `byte(r)` aunque el `case` limite el rango: va con `#nosec` y su razón.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

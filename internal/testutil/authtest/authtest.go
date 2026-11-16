@@ -25,6 +25,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/estadisticas"
 	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -96,6 +97,7 @@ type Env struct {
 	Panel             *panel.Service         // panel del negocio (nv-56); las pruebas registran fuentes y observadores
 	Menu              *menu.Service          // menú del negocio (nv-56), con las fotos de ImagenesNegocio
 	PanelTarea        *panel.Tarea           // pausas vencidas y avisos pendientes (nv-56)
+	Estadisticas      *estadisticas.Service  // estadísticas y reporte del negocio (nv-74); las vistas cuentan aquí
 	Reservas          *reservas.Service      // reservas (nv-59) con candado e idempotencia en Redis reales
 	Pagos             *pagos.Service         // pagos (nv-60) contra el doble de Stripe
 	Stripe            *stripetest.Server     // doble de la API de Stripe (única interfaz externa simulada)
@@ -270,6 +272,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	altaSvc.WithDeposito(pays)
 	registry.RegisterExporter(pagos.NewPrivacy(payRepo))
 	registry.RegisterExporter(pagos.NewLiquidacionesPrivacy(payRepo))
+	stats := estadisticas.NewService(estadisticas.NewRepository(client.DB()), businessRepo, log)
 	couponRepo := cupones.NewRepository(client.DB())
 	coupons := cupones.NewService(couponRepo, businessRepo, cursor, log).WithIA(guardia)
 	registry.RegisterPurger(cupones.NewPrivacy(couponRepo))
@@ -330,8 +333,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -341,7 +344,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			// semantica y busquedas van antes que negocios: si no, /lugares/:id las atiende.
 			semantica.NewHandler(sem, v),
 			busquedas.NewHandler(searches, v).WithActiveGuard(usuarios.RequireActive(users)),
-			vistas.NewHandler(vistas.NewService(vistas.NewRepository(client.DB()), businessRepo, log), v).WithActiveGuard(usuarios.RequireActive(users)),
+			vistas.NewHandler(vistas.NewService(vistas.NewRepository(client.DB()), businessRepo, log).WithContador(stats), v).WithActiveGuard(usuarios.RequireActive(users)),
 			menu.NewHandler(menus, v).WithActiveGuard(usuarios.RequireActive(users)),      // antes que negocios
 			resenas.NewHandler(reviews, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que negocios
 			eventos.NewHandler(events, v).WithActiveGuard(usuarios.RequireActive(users)),
@@ -350,6 +353,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			reportesnegocio.NewHandler(reports, v).WithActiveGuard(usuarios.RequireActive(users)),
 			alta.NewHandler(altaSvc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			panel.NewHandler(panels, v).WithActiveGuard(usuarios.RequireActive(users)),
+			estadisticas.NewHandler(stats, v).WithActiveGuard(usuarios.RequireActive(users)),
 			reservas.NewHandler(bookings, v).WithActiveGuard(usuarios.RequireActive(users)),
 			pagos.NewHandler(pays, v).WithActiveGuard(usuarios.RequireActive(users)),
 			cupones.NewHandler(coupons, v).WithActiveGuard(usuarios.RequireActive(users)),
