@@ -95,6 +95,8 @@ type ReservaResponse struct {
 	PuedeCancelar     bool       `json:"puede_cancelar"`
 	Version           int        `json:"version"`
 	CreadoEn          time.Time  `json:"creado_en"`
+	// Mensajes solo va en GET /reservas/{id} visto por el cliente (nv-73): los 20 más nuevos.
+	Mensajes *[]MensajeItem `json:"mensajes,omitempty"`
 }
 
 // ReembolsoResponse es el cálculo previo a cancelar.

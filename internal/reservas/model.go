@@ -95,6 +95,7 @@ type Reserva struct {
 	Anticipo        Anticipo       `bson:"anticipo"`
 	Politica        Politica       `bson:"politica_cancelacion"`
 	PagoID          string         `bson:"pago_id,omitempty"`
+	RecordatorioEn  *time.Time     `bson:"recordatorio_en,omitempty"` // aviso de 2 h ya enviado (nv-73)
 	Historial       []Cambio       `bson:"historial"`
 	Version         int            `bson:"version"`
 	CreadoEn        time.Time      `bson:"creado_en"`

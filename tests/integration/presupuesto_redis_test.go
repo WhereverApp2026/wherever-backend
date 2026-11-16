@@ -6,11 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
+	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/reservastest"
 )
@@ -174,4 +176,31 @@ func TestPresupuestoRedis_ReservaNV59(t *testing.T) {
 	assert.Equal(t, 3, commandsOf(t, func() {
 		get(t, app, "/api/v1/lugares/"+b.ID.Hex()+"/disponibilidad?fecha="+reservastest.FechaManana()+"&personas=1")
 	}), "disponibilidad: solo el limitador global")
+}
+
+// nv-73: el mensaje del negocio cuesta lo mismo que cualquier escritura con sesión (el límite
+// de 5 en 24 h va en MongoDB) y el recordatorio del barrido no usa Redis.
+func TestPresupuestoRedis_MensajesReservaNV73(t *testing.T) {
+	env := authEnv(t)
+	env.ClearRateLimits(t)
+	app := env.App()
+	access := registerHTTP(t, app, "presupuesto73@example.com")
+	b, tokenNegocio := dueno(t, env, "presupuesto73-duena@example.com", reservastest.Config{})
+	u, _ := cliente(t, env, "presupuesto73-cliente@example.com")
+	r := reservaSembrada(t, env, u, b, reservastest.Manana(14), reservas.EstadoConfirmada)
+	reservaSembrada(t, env, u, b, time.Now().UTC().Add(time.Hour), reservas.EstadoConfirmada)
+
+	write := commandsOf(t, func() {
+		resp := sendJSON(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"datos_sensibles": false}, access)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+	mensaje := commandsOf(t, func() {
+		requireStatus(t, sendJSON(t, app, http.MethodPost, rutaMensaje(b, r), map[string]any{"texto": "hola"}, tokenNegocio), http.StatusCreated)
+	})
+	t.Logf("POST mensaje: %d comandos", mensaje)
+	assert.Equal(t, write, mensaje, "escritura con sesión, sin política propia")
+	assert.Zero(t, commandsOf(t, func() {
+		_, _, err := env.Reservas.Barrer(context.Background())
+		require.NoError(t, err)
+	}), "el barrido con recordatorio no usa Redis")
 }

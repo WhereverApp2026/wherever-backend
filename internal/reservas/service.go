@@ -13,6 +13,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
@@ -55,6 +56,7 @@ type Service struct {
 	cursor    *pagination.Signer
 	anticipos Anticipos
 	refunder  Refunder
+	notifier  notificaciones.Notifier
 	loc       *time.Location
 	log       *slog.Logger
 	now       func() time.Time
@@ -69,7 +71,15 @@ func NewService(repo *Repository, n Negocios, users Users, redis interface {
 		log = slog.Default()
 	}
 	return &Service{repo: repo, negocios: n, users: users, locker: redis, idem: redis, cursor: cursor,
-		loc: negocios.MexicoCity(), log: log, now: time.Now}
+		notifier: notificaciones.Noop{}, loc: negocios.MexicoCity(), log: log, now: time.Now}
+}
+
+// WithNotifier conecta los avisos del mensaje y del recordatorio (nv-73, canal `reservas`).
+func (s *Service) WithNotifier(n notificaciones.Notifier) *Service {
+	if n != nil {
+		s.notifier = n
+	}
+	return s
 }
 
 // WithAnticipos conecta el cobro del anticipo (nv-60).
@@ -527,7 +537,15 @@ func (s *Service) Detalle(ctx context.Context, cl *middleware.Claims, raw string
 	if err != nil {
 		return ReservaResponse{}, err
 	}
-	return s.response(ctx, r, porNegocio), nil
+	out := s.response(ctx, r, porNegocio)
+	if !porNegocio {
+		ms, err := s.mensajesDe(ctx, r.ID)
+		if err != nil {
+			return ReservaResponse{}, errStore()
+		}
+		out.Mensajes = &ms
+	}
+	return out, nil
 }
 
 // CalcularReembolso dice cuánto se devolvería si la persona cancela ahora.
@@ -573,7 +591,7 @@ func (s *Service) Cambiar(ctx context.Context, cl *middleware.Claims, raw string
 			return errOcupado()
 		}
 		var errC error
-		out, errC = s.guardarCambio(ctx, r.ID, version, hora, personas)
+		out, errC = s.guardarCambio(ctx, r.ID, version, hora, personas, !hora.Equal(r.FechaHora))
 		return errC
 	})
 	if err != nil {
@@ -582,10 +600,15 @@ func (s *Service) Cambiar(ctx context.Context, cl *middleware.Claims, raw string
 	return s.response(ctx, out, false), nil
 }
 
-// guardarCambio escribe la hora y las personas si la versión no cambió.
-func (s *Service) guardarCambio(ctx context.Context, id bson.ObjectID, version int, hora time.Time, personas int) (Reserva, error) {
+// guardarCambio escribe la hora y las personas si la versión no cambió. Si cambió la hora borra
+// `recordatorio_en` para que el aviso de 2 h salga otra vez (nv-73).
+func (s *Service) guardarCambio(ctx context.Context, id bson.ObjectID, version int, hora time.Time, personas int, otraHora bool) (Reserva, error) {
+	var unset []string
+	if otraHora {
+		unset = append(unset, "recordatorio_en")
+	}
 	out, err := s.repo.CambiarSi(ctx, id, []string{EstadoConfirmada, EstadoPendiente}, version,
-		bson.D{{Key: "fecha_hora", Value: hora}, {Key: "personas", Value: personas}}, nil)
+		bson.D{{Key: "fecha_hora", Value: hora}, {Key: "personas", Value: personas}}, nil, unset...)
 	if errors.Is(err, ErrNoAplica) {
 		return Reserva{}, errStale()
 	}

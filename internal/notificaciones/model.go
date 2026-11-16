@@ -31,6 +31,10 @@ const (
 	KindMomentTagged   = "etiqueta_momento"
 	KindMomentThanked  = "momento_agradecido"
 	KindMomentFeatured = "momento_destacado"
+	// Avisos de reservas (nv-73), canal `reservas`: solo ids de la reserva, el negocio y el
+	// mensaje; la app pide el texto con GET /reservas/{id}.
+	KindReservaMensaje      = "reserva_mensaje"
+	KindReservaRecordatorio = "reserva_recordatorio"
 )
 
 // Límites de la spec.

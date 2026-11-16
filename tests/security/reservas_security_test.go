@@ -38,13 +38,14 @@ func rutasReservas(negocio, id string) []rutaReserva {
 		{http.MethodPost, "/api/v1/reservas/" + id + "/cancelar", nil, false},
 		{http.MethodGet, "/api/v1/negocios/" + negocio + "/reservas", nil, true},
 		{http.MethodPatch, "/api/v1/negocios/" + negocio + "/reservas/" + id, map[string]any{"estado": "asistio"}, true},
+		{http.MethodPost, "/api/v1/negocios/" + negocio + "/reservas/" + id + "/mensajes", map[string]any{"texto": "Tu mesa está lista"}, true},
 		{http.MethodPost, "/api/v1/negocios/" + negocio + "/reservas/escanear", map[string]any{"codigo": "ABC234"}, true},
 		{http.MethodPost, "/api/v1/negocios/" + negocio + "/bloqueos", map[string]any{"desde": "2026-12-01T10:00:00Z", "hasta": "2026-12-01T12:00:00Z"}, true},
 		{http.MethodDelete, "/api/v1/negocios/" + negocio + "/bloqueos/" + id, nil, true},
 	}
 }
 
-// Las once rutas con token (todas menos disponibilidad) piden sesión, cuenta activa y el rol.
+// Las doce rutas con token (todas menos disponibilidad) piden sesión, cuenta activa y el rol.
 func TestReservasSecurity_SesionRolYCuentaActiva(t *testing.T) {
 	env := authEnv(t)
 	app := env.App()

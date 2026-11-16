@@ -135,8 +135,9 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	waitGraph := startGraph(ctx, mongoClient.DB(), graphQueue, neo4jDriver, log)
-	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, cfg.FCM, cfg.DataKeys, log)
-	waitBookings := startReservas(ctx, mongoClient.DB(), log)
+	jobNotifier := backgroundNotifier(mongoClient.DB(), cfg.FCM, cfg.DataKeys, log)
+	waitVotes := startVotes(ctx, mongoClient.DB(), graphQueue, jobNotifier, log)
+	waitBookings := startReservas(ctx, mongoClient.DB(), jobNotifier, log)
 	waitCoupons := startCupones(ctx, mongoClient.DB(), log)
 
 	serveErr := make(chan error, 1)
@@ -236,7 +237,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
-	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, registry, log)
+	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, notifier, registry, log)
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
 	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
@@ -561,12 +562,10 @@ func startGraph(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 
 // startVotes cierra cada minuto las votaciones vencidas y aplica su ganadora al plan (nv-39)
 // hasta que ctx termina. Solo usa MongoDB; la función devuelta espera a que termine.
-func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, fcm config.FCM, dataKeys string, log *slog.Logger) func() {
+func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queue, notifier notificaciones.Notifier, log *slog.Logger) func() {
 	planRepo := planes.NewRepository(db)
 	places := negocios.NewRepository(db)
 	plans := planes.NewService(planRepo, planes.NewCalculadora(places, planes.DefaultVelocidades())).WithGraph(queue).WithSync(sincronizacion.NewRepository(db))
-	notifRepo := notificaciones.NewRepository(db)
-	notifier := notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
 	groupRepo := grupos.NewRepository(db)
 	// El resultado también queda en el chat del grupo (nv-57); publicar no usa cursor ni cuentas.
 	posts := chat.NewService(chat.NewRepository(db), groupRepo, planRepo, nil, nil, log)
@@ -578,6 +577,13 @@ func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 		close(done)
 	}()
 	return func() { <-done }
+}
+
+// backgroundNotifier es el centro de avisos con push de los trabajos en segundo plano
+// (votaciones de nv-39 y recordatorio de reservas de nv-73); no usa cursor.
+func backgroundNotifier(db *mongodriver.Database, fcm config.FCM, dataKeys string, log *slog.Logger) notificaciones.Notifier {
+	notifRepo := notificaciones.NewRepository(db)
+	return notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
 }
 
 // fieldCipher arma el llavero de DATA_KEYS (nv-48). config.Load ya lo validó; sin llaves

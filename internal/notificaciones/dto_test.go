@@ -85,6 +85,8 @@ func TestDevice_CanalesActivos(t *testing.T) {
 	assert.True(t, d.Allows(ChannelBookings), "reservas siempre pasa")
 	assert.True(t, d.Allows(ChannelOf(KindFriendRequest)), "sin canal siempre pasa")
 	assert.Equal(t, ChannelGroups, ChannelOf(KindGroupMessage))
+	assert.Equal(t, ChannelBookings, ChannelOf(KindReservaMensaje), "nv-73")
+	assert.Equal(t, ChannelBookings, ChannelOf(KindReservaRecordatorio), "nv-73")
 	view := newDeviceView(Device{ID: bson.NewObjectID(), Token: "secreto", TokenHash: "hash"})
 	assert.Equal(t, AllChannels(), view.Channels)
 }

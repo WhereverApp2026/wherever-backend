@@ -50,7 +50,13 @@ var pushText = map[string]string{
 	KindMomentTagged:     "Te etiquetaron en un momento",
 	KindMomentThanked:    "Un lugar agradeció tu momento",
 	KindMomentFeatured:   "Un lugar destacó tu momento",
+	// nv-73: el push nunca lleva el texto del mensaje.
+	KindReservaMensaje:      "El lugar de tu reserva te escribió",
+	KindReservaRecordatorio: "Tu reserva es en menos de 2 horas",
 }
+
+// bookingKinds van por el canal `reservas`, que el teléfono no puede apagar (nv-71, nv-73).
+var bookingKinds = map[string]bool{KindReservaMensaje: true, KindReservaRecordatorio: true}
 
 type pushJob struct {
 	to   bson.ObjectID
@@ -193,6 +199,9 @@ var groupKinds = map[string]bool{KindPlanInvite: true, KindVoteOpened: true, Kin
 func ChannelOf(kind string) string {
 	if groupKinds[kind] {
 		return ChannelGroups
+	}
+	if bookingKinds[kind] {
+		return ChannelBookings
 	}
 	return ""
 }

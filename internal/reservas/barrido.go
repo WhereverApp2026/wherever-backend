@@ -15,8 +15,9 @@ import (
 // gasta Upstash. El cupo no depende del barrido: el conteo ya ignora apartados vencidos.
 const barridoCada = 5 * time.Minute
 
-// Barrer pasa los apartados vencidos a `expirada` y las confirmadas de días anteriores a
-// `no_asistio`. Devuelve cuántas cambió de cada una.
+// Barrer pasa los apartados vencidos a `expirada`, las confirmadas de días anteriores a
+// `no_asistio` y manda el recordatorio de 2 h (nv-73, Recordar). Devuelve cuántas cambió de
+// las dos primeras.
 func (s *Service) Barrer(ctx context.Context) (expiradas, ausentes int64, err error) {
 	now := s.now().UTC()
 	expiradas, err = s.repo.CambiarVarias(ctx, bson.D{
@@ -31,6 +32,10 @@ func (s *Service) Barrer(ctx context.Context) (expiradas, ausentes int64, err er
 		{Key: "estado", Value: EstadoConfirmada},
 		{Key: "fecha_hora", Value: bson.D{{Key: "$lt", Value: hoy}}},
 	}, EstadoNoAsistio, PorSistema, now)
+	if err != nil {
+		return expiradas, ausentes, err
+	}
+	_, err = s.Recordar(ctx)
 	return expiradas, ausentes, err
 }
 
