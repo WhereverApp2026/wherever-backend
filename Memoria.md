@@ -805,6 +805,23 @@
 - Decisión: `backgroundNotifier` en `cmd/api/main.go` arma un solo centro de avisos con push para los trabajos en segundo plano (votaciones y barrido de reservas). Los avisos de reservas van por el canal `reservas` (`ChannelOf`), que el teléfono no apaga.
 - Decisión: la exportación ARCO anida `mensajes[{texto, negocio, creado_en}]` dentro de cada reserva (no es colección nueva en el JSON); `TestContract_Usuarios` no cambia porque esa persona no tiene reservas.
 
+## NV-74 — Estadísticas y reporte mensual del negocio (2026-11-16)
+- Estado: rama `claude/laughing-khorana-71fa8b` desde `main`, PR contra `main`. Falta la firma. Colecciones nuevas `estadisticas_diarias` (`ux_negocio_fecha`) y `estadisticas_categoria` (`ux_categoria_mes`): correr `scripts/indexes` en Atlas (con permiso) antes de desplegar, o `/ready` da 503. Sin variables nuevas ni dependencias.
+- Decisión (las que proponía la spec): vistas contadas en vivo con `$inc` cuando `historial_vistas` escribe (`vistas.Contador`); el resto por un trabajo cada hora en cada instancia, solo MongoDB y con `$set` idempotente sobre hoy y ayer; días anteriores congelados y anónimos; avanzadas solo premium (si no, `avanzadas: null` y 200); categoría solo con ≥ 5 negocios con reseñas en el mes de `hasta`; frase por reglas; PDF con escritor propio (`internal/estadisticas/pdf`).
+- Decisión: `cupones_canjeados` sale de `cupones_usuario.canjeado_en` en el día local, no de `cupones_metricas` (su `dia` es UTC). El top 3 del reporte sí usa `cupones_metricas`.
+- Decisión: el día guarda `aspectos_suma` y `categoria` para promediar rangos y categorías sin releer `resenas`; `estadisticas_relleno` marca qué negocio ya tiene sus 90 días (50 por hora). La tarea nocturna `estadisticas_negocio` resume categorías y borra días de más de 400.
+- Decisión: el repositorio lee reservas, check-ins, reseñas, cupones y favoritos por nombre de colección; `fuentes_test.go` avisa si un módulo cambia nombres o estados.
+- A evitar: `int(constante_float)` no compila si la constante no es entera; usa una constante entera aparte. gosec G115 marca `byte(r)` aunque el `case` limite el rango: va con `#nosec` y su razón.
+
+## NV-75 — Consejo del día y descripción con IA (2026-11-16)
+- Estado: rama `claude/nv-75-a587c9` desde `main` (con nv-74 fusionada), PR contra `main`. Falta la firma. Colección nueva `consejos_negocio` (`ux_consejo_dia`, `ttl_consejos`): correr `scripts/indexes` en Atlas antes de desplegar. Variable nueva `IA_CONSEJO_DIA` con valor por omisión (60): no hace falta en Parameter Store.
+- Decisión (las que proponía la spec): las reglas eligen el hecho y la IA solo lo redacta; consejo al pedirlo, uno por negocio y día en MongoDB con `ux_consejo_dia` como candado (sin Redis); el consejo nunca da 429 ni 503 por la IA; la descripción no se guarda, da 429 en el límite del usuario y plantilla en lo demás; respuestas con `fuente`.
+- Decisión: las colecciones de nv-61, nv-62 y nv-74 se leen por nombre (como nv-74). Una franja floja solo compite si ese bloque tuvo llegadas otro día y ese día tuvo llegadas: así no compara contra horas cerradas. Si el modelo cambia la `accion`, se usa la plantilla.
+- Decisión: el cupo diario se cuenta en `consejos_negocio` (`fuente: ia` de hoy); dos negocios a la vez pueden pasarlo por uno, aceptable frente a 400 llamadas.
+- Upstash: consejo leído 4, generado 4 + 12 (guardia: caché 1, usuario 3, gasto 1, globales 6, guardar 1), descripción 7 + 12. La spec estimaba 14: los límites globales son 6, no 3. `TestPresupuestoRedis_ConsejoNV75` vive en `consejos_test.go` para no chocar con `presupuesto_redis_test.go`.
+- A evitar: en Windows, `python` en modo texto escribe CRLF y `
+` dentro de un heredoc puede volverse salto real; abrir con `newline=''` y revisar el diff. gocyclo marca > 10: partir las reglas en funciones chicas desde el inicio.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

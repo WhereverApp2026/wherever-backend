@@ -14,6 +14,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/reservas"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/estadisticastest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/reservastest"
 )
 
@@ -203,4 +204,35 @@ func TestPresupuestoRedis_MensajesReservaNV73(t *testing.T) {
 		_, _, err := env.Reservas.Barrer(context.Background())
 		require.NoError(t, err)
 	}), "el barrido con recordatorio no usa Redis")
+}
+
+// nv-74: las estadísticas y el reporte cuestan lo de una lectura con sesión; contar la vista,
+// el trabajo por hora y el nocturno no usan Redis.
+func TestPresupuestoRedis_EstadisticasNV74(t *testing.T) {
+	env := authEnv(t)
+	env.ClearRateLimits(t)
+	app := env.App()
+	ctx := context.Background()
+	access := registerHTTP(t, app, "presupuesto74@example.com")
+	b, tokenNegocio := dueno(t, env, "presupuesto74-duena@example.com", reservastest.Config{})
+
+	read := commandsOf(t, func() {
+		assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, access).StatusCode)
+	})
+	assert.Equal(t, read, commandsOf(t, func() {
+		requireStatus(t, sendJSON(t, app, http.MethodGet, "/api/v1/negocios/"+b.ID.Hex()+"/estadisticas", nil, tokenNegocio), http.StatusOK)
+	}), "GET estadísticas: lectura con sesión")
+	mes := estadisticastest.Dia(time.Now())[:7]
+	assert.Equal(t, read, commandsOf(t, func() {
+		requireStatus(t, sendJSON(t, app, http.MethodGet, "/api/v1/negocios/"+b.ID.Hex()+"/reportes/mensual?mes="+mes, nil, tokenNegocio), http.StatusOK)
+	}), "GET reporte: lectura con sesión, sin caché")
+	assert.Zero(t, commandsOf(t, func() {
+		require.NoError(t, env.Estadisticas.Contar(ctx, b.ID, "mapa", time.Now()))
+		_, err := env.Estadisticas.Recalcular(ctx)
+		require.NoError(t, err)
+		_, err = env.Estadisticas.Rellenar(ctx)
+		require.NoError(t, err)
+		_, err = env.Estadisticas.Nocturno(ctx)
+		require.NoError(t, err)
+	}), "contador y trabajos sin Redis")
 }

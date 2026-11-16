@@ -1,8 +1,8 @@
 # plan.md — NV-74 Estadísticas y reporte mensual del negocio
 
 1. Mapeo
-- Crear: `internal/estadisticas/{model,repository,trabajo,service,handler,dto,fuentes}.go`, `internal/estadisticas/pdf` (escritor mínimo), `internal/testutil/estadisticastest` y pruebas de las cinco suites.
-- Modificar: `internal/vistas` (interfaz `Contador` y `$inc` al escribir una vista), `internal/indexes` + `scripts/indexes` (`ux_negocio_fecha`, `ux_categoria_mes`), `cmd/api` (fuentes, trabajo y observador de baja), `scripts/routes`, `docs/endpoints.md`.
+- Crear: `internal/estadisticas/{model,repository,calculo,reporte,trabajo,service,handler,dto}.go`, `internal/estadisticas/pdf` (escritor mínimo), `internal/testutil/estadisticastest` (sembrar días y leer el texto del PDF), `cmd/api/estadisticas.go` y pruebas de las cinco suites.
+- Modificar: `internal/vistas` (interfaz `Contador` y `$inc` al escribir una vista), `internal/indexes` (`ux_negocio_fecha`, `ux_categoria_mes`, que crea `scripts/indexes`), `cmd/api/main.go` (service, observador de baja, tarea nocturna, trabajo por hora y handler), `internal/testutil/authtest`, `scripts/routes`, `tests/database/indexes_test.go`, `docs/endpoints.md`.
 - Sin cambios: panel de nv-56, variables de entorno, políticas de Redis, `go.mod` (salvo que el revisor elija `gopdf`).
 
 2. Guardarraíles

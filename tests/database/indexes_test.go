@@ -18,6 +18,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
+	"github.com/WhereverApp2026/wherever-backend/internal/estadisticas"
 	"github.com/WhereverApp2026/wherever-backend/internal/eventos"
 	"github.com/WhereverApp2026/wherever-backend/internal/favoritos"
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
@@ -87,6 +88,8 @@ var expected = map[string][]string{
 	menu.Collection:                     {"_id_", "ix_menu", "ix_menu_texto"},
 	reportesnegocio.Collection:          {"_id_", "ix_reportes_negocio", "ix_reportes_cola", "ux_reporte_abierto", "ix_reportes_usuario"},
 	vistas.Collection:                   {"_id_", "ux_vista", "ix_recientes", "ttl_vistas"},
+	estadisticas.Collection:             {"_id_", "ux_negocio_fecha"},
+	estadisticas.CategoriaCollection:    {"_id_", "ux_categoria_mes"},
 	postales.Collection:                 {"_id_", "ix_album", "ix_postales_plan", "ix_postales_negocio", "ux_postal_imagen"},
 	eventos.Collection:                  {"_id_", "ix_eventos_cerca", "ix_eventos_fin", "ix_eventos_creador", "ix_eventos_negocio"},
 	postales.RecuerdosCollection:        {"_id_", "ux_recuerdo", "ix_recuerdos_fecha"},
@@ -167,6 +170,8 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		postales.Collection:              {"ux_postal_imagen"},
 		reportesnegocio.Collection:       {"ux_reporte_abierto"},
 		vistas.Collection:                {"ux_vista"},
+		estadisticas.Collection:          {"ux_negocio_fecha"},
+		estadisticas.CategoriaCollection: {"ux_categoria_mes"},
 		postales.RecuerdosCollection:     {"ux_recuerdo"},
 		postales.MomentosCollection:      {"ux_momento_postal"},
 		consejos.Collection:              {"ux_consejo_dia"},
