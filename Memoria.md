@@ -822,6 +822,11 @@
 - A evitar: en Windows, `python` en modo texto escribe CRLF y `
 ` dentro de un heredoc puede volverse salto real; abrir con `newline=''` y revisar el diff. gocyclo marca > 10: partir las reglas en funciones chicas desde el inicio.
 
+## Infra de imágenes aplicada en AWS (2026-11-17)
+- Estado: bucket `wherever-dev-imagenes-816101201001` y su CloudFront creados con `crear.sh`, sin destruir nada; actualizador reinstalado en las dos instancias.
+- Decisión: `wherever-dev-deployer-imagenes.json` suma `ssm:SendCommand` (solo instancias de `us-east-2` y `AWS-RunShellScript`), `ssm:GetCommandInvocation`/`ListCommandInvocations` y la lectura de la lista de prefijos de CloudFront. Porqué: esos permisos vivían solo en la consola y no en el JSON del repo; al pegar el JSON del repo encima se perdieron.
+- A evitar: nunca pegues un JSON de IAM del repo sobre una política viva sin compararlos antes; si se pierde algo, IAM → *Policy versions* → *Set as default* devuelve la versión anterior.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

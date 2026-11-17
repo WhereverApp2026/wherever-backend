@@ -71,6 +71,38 @@
         "cloudfront:ListDistributions"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "InstalarPorSystemsManager",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ec2:us-east-2:816101201001:instance/*",
+        "arn:aws:ssm:us-east-2::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "LeerResultadoDeComandos",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LeerListaDeCloudFront",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeManagedPrefixLists",
+        "ec2:GetManagedPrefixListEntries"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2"
+        }
+      }
     }
   ]
 }
