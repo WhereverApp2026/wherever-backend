@@ -827,6 +827,10 @@
 - Decisión: `wherever-dev-deployer-imagenes.json` suma `ssm:SendCommand` (solo instancias de `us-east-2` y `AWS-RunShellScript`), `ssm:GetCommandInvocation`/`ListCommandInvocations` y la lectura de la lista de prefijos de CloudFront. Porqué: esos permisos vivían solo en la consola y no en el JSON del repo; al pegar el JSON del repo encima se perdieron.
 - A evitar: nunca pegues un JSON de IAM del repo sobre una política viva sin compararlos antes; si se pierde algo, IAM → *Policy versions* → *Set as default* devuelve la versión anterior.
 
+## Correo por Gmail (2026-11-18)
+- Decisión: correo saliente por SMTP de Gmail con contraseña de aplicación (587, STARTTLS). Porqué: no hay dominio propio para SES y alcanza para el piloto (unos 500 al día). `egress_ports.smtp` abre el 587.
+- Estado: Stripe (entorno de prueba propio, Connect Express en México), Gemini, imágenes y `DATA_KEYS` cargados en Parameter Store y leídos por las dos instancias. Faltan Firebase y el correo.
+
 ## NV-72 — Entrar con Google (2026-11-18)
 - Estado: rama `claude/nv-72-2a46ed` desde `main`, PR contra `main`. Falta la firma y el visto bueno del responsable de A1 a D-1. Sin índices nuevos (`ux_google_id` ya existía). Variable nueva `GOOGLE_CLIENT_ID`, **opcional** fuera de prod: sin ella la API arranca, avisa una vez y `POST /auth/google` da 503. No está en las obligatorias de `deploy-env.sh`: cargarla en `/wherever/dev/` (String) y reiniciar la API cuando exista el cliente OAuth Web.
 - Decisión D-1, camino B: la cuenta nueva no se crea sin `fecha_nacimiento` (18+), `acepta_terminos` y `version_terminos`; si faltan, 422 `registro_incompleto` sin guardar nada. Porqué: ninguna cuenta existe sin la regla de 18 años y no hay marca `perfil_completo` que cada módulo tenga que revisar.

@@ -48,6 +48,7 @@ locals {
     atlas = { port = 27017, why = "MongoDB Atlas (Cluster0)" }
     redis = { port = 6379, why = "Upstash Redis con TLS (nv-11)" }
     neo4j = { port = 7687, why = "Neo4j Aura con TLS (nv-11)" }
+    smtp  = { port = 587, why = "Correo saliente SMTP con STARTTLS (Gmail, nv-06)" }
   }
 }
 

@@ -284,6 +284,14 @@ Reseñas (nv-62): solo quien hizo check-in válido reseña, una vez por visita y
 
 Postales (nv-63): la app dibuja la postal y la tarjeta del recuerdo y las sube por nv-45; el servidor guarda el estilo, modera imagen y textos y decide quién ve qué. Ajeno, sin permiso por visibilidad o bloqueado = 404, nunca 403. El estado de la postal sigue al de su imagen: una foto en revisión deja la postal en moderación hasta que el administrador decide en la cola de nv-43. Postales y momentos se borran de verdad (sin `eliminado_en`). Fuera por ahora: menciones, mapa de la ruta, puntos, reacciones y silenciados.
 
+## Rutas del Excel cubiertas por diseño (sin ruta propia)
+Revisadas el 2026-11-18: el Excel las nombra, pero otra ruta viva ya hace su trabajo. No se programan.
+- `POST /api/v1/interno/moderacion` (A7) — interna: la cola de nv-43 se alimenta desde el paquete (`Service.Encolar`), sin HTTP.
+- `POST /api/v1/postales/subida` (J8) — reemplazada por `POST /api/v1/imagenes/subida` (nv-45) más `POST /api/v1/postales` con el `imagen_id` (nv-63).
+- `POST /api/v1/grupos/unirse/{codigo}` (J3) — reemplazada por `POST /api/v1/grupos/unirse` con `{codigo}` en el cuerpo (nv-38): el código nunca va en la ruta.
+- `GET /api/v1/planes/compartidos/{codigo}` (A4) — reemplazada por `POST /api/v1/planes/compartidos` con `{codigo}` en el cuerpo (nv-38), por la misma razón; el plan propio sigue en `GET /api/v1/planes/{id}`.
+- `GET /api/v1/personas/yo/qr` (J2) — la app dibuja el QR con el código de la persona; quien lo escanea usa `GET /api/v1/personas/codigo/{codigo}` (nv-64).
+
 ## Diferidos (sin ruta en código todavía)
 - `GET /metrics` (Prometheus, red interna) — spec de observabilidad. Hoja J9.
 - `POST /api/v1/errores` y `GET /api/v1/admin/errores` (colección `errores_app`) — spec de observabilidad. Hoja J9.
