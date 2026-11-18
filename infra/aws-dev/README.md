@@ -113,7 +113,7 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 
 ## Correo saliente (SMTP)
 - **Puerto:** `egress_ports.smtp` abre el 587 (STARTTLS). Si el proveedor cambia a 465, cambia el puerto y `SMTP_TLS=tls`.
-- **Proveedor:** Gmail con contraseña de aplicación (`smtp.gmail.com`, 587, `SMTP_TLS=starttls`); unos 500 correos al día. `MAIL_FROM` debe ser la misma cuenta, porque Gmail reescribe el remitente.
+- **Proveedor:** Gmail con contraseña de aplicación (`smtp.gmail.com`, 587, `SMTP_TLS=starttls`); unos 500 correos al día. `MAIL_FROM` debe ser la misma cuenta, porque Gmail reescribe el remitente, y va como correo simple (`cuenta@gmail.com`): con `Nombre <correo>` la API no arranca.
 - **Variables** en `/wherever/dev/`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD` (SecureString), `MAIL_FROM` y `APP_LINK_BASE`.
 - **Aplicar:** `crear.sh` (agrega una regla de salida al Security Group, sin recrear nada) y luego reiniciar la API para que relea Parameter Store.
 
