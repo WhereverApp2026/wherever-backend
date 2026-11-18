@@ -70,7 +70,7 @@ Una cuenta en `eliminacion_pendiente` solo puede llamar `GET /usuarios/yo`, `POS
 - Con dos instancias, el trabajo nocturno procesa cada cuenta una sola vez.
 
 ## Límites
-- **Decisión D-1** heredada de `nv-04`: si se aprueba `perfil_completo`, `nv-05` agrega la regla 403 `perfil_incompleto` y que `PATCH /usuarios/yo` acepte `fecha_nacimiento` solo mientras esté vacía.
+- **Decisión D-1** heredada de `nv-04`: resuelta el 2026-11-18 con el camino B de `specs/nv-72` (sin `perfil_completo`): `nv-05` no cambia.
 - **Decisión D-2 (exportación), aprobada el 2026-11-03.** El JSON no se manda adjunto por correo: se manda un enlace de descarga de un solo uso con vencimiento de 24 h (tipo `descargar_exportacion` en `tokens_un_uso`, ruta `POST /usuarios/exportaciones/descargar`). Mientras no haya proveedor de correo, ese enlace no llega a nadie.
 - **Excepción de stack aprobada**: `gocron` v2.22.0 (MIT) para el trabajo nocturno, registrada en `Memoria.md`.
 - El borrado en cascada real (reservas, reseñas anonimizadas, grupos) y el historial de planes, check-ins y señales se conectan módulo por módulo con `Purger` y `Exporter`; hoy solo existen `usuarios` y `sesiones`. Cada módulo futuro debe registrar los suyos en su spec.

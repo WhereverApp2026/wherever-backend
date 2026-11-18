@@ -20,7 +20,8 @@ const (
 
 // Métodos de inicio de sesión (hoja J1: correo o google).
 const (
-	MethodEmail = "correo"
+	MethodEmail  = "correo"
+	MethodGoogle = "google"
 )
 
 var errNoDocument = errors.New("sin documento")

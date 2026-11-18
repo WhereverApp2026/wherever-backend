@@ -29,6 +29,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	}
 
 	g.Post("/login", limiter.Window("login", loginLimit, loginWindow), h.login)
+	g.Post("/google", perIP("auth_google"), h.google)
 	g.Post("/refresh", perIP("auth_refresh"), h.refresh)
 	// Cerrar sesión no cambia el estado de la cuenta: también se permite con eliminación pendiente.
 	g.Post("/logout", middleware.RequireAuth(), h.logout)

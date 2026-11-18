@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
@@ -35,6 +38,16 @@ func (h *Handler) bind(c *fiber.Ctx, dto any) error {
 	return h.validator.Struct(dto)
 }
 
+// bindStrict es bind con decodificación estricta: campo de más = 400 (nv-72).
+func (h *Handler) bindStrict(c *fiber.Ctx, dto any) error {
+	dec := json.NewDecoder(bytes.NewReader(c.Body()))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dto); err != nil || dec.More() {
+		return apperr.BadRequest("cuerpo JSON inválido")
+	}
+	return h.validator.Struct(dto)
+}
+
 func claims(c *fiber.Ctx) *middleware.Claims {
 	cl, _ := middleware.ClaimsFrom(c)
 	return cl
@@ -50,6 +63,26 @@ func (h *Handler) login(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		return err
+	}
+	return c.JSON(res)
+}
+
+// google entra con Google: 200 si la cuenta ya existía (o se vinculó), 201 si se creó.
+func (h *Handler) google(c *fiber.Ctx) error {
+	var req GoogleRequest
+	if err := h.bindStrict(c, &req); err != nil {
+		return err
+	}
+	res, created, err := h.svc.GoogleSignIn(c.UserContext(), GoogleInput{
+		IDToken: req.IDToken, Device: req.Device.toDevice(), BirthDate: req.BirthDate,
+		AcceptTerms: req.AcceptTerms, TermsVersion: req.TermsVersion, PromoEmail: req.PromoEmail,
+		IP: middleware.ClientIP(c),
+	})
+	if err != nil {
+		return err
+	}
+	if created {
+		c.Status(fiber.StatusCreated)
 	}
 	return c.JSON(res)
 }

@@ -38,6 +38,7 @@ Secretos en Parameter Store (SecureString; nunca en Git ni en Terraform). Ruta `
 | `JOB_HOUR` | `21`: la instancia se apaga a las 22:00; a las 03:00 el trabajo de privacidad nunca correría (nv-15) |
 | `HIDE_INTERNALS` | `true`: servidor público, sin `detalle` ni sondas (nv-15) |
 | `CORS_ALLOWED_ORIGIN`, `SMTP_*`, `MAIL_FROM`, `APP_LINK_BASE` | opcionales |
+| `GOOGLE_CLIENT_ID` | String, opcional: client ID del cliente OAuth «Aplicación web» del proyecto de Firebase. Sin él la API arranca y `POST /auth/google` responde 503; la API lo lee al reiniciar (nv-72) |
 | `APP_VERSION_MINIMA`, `APP_VERSION_ACTUAL` | String, semver `X.Y.Z`; la mínima en `0.0.0` no bloquea a nadie y nunca es mayor que la actual (nv-16) |
 | `TERMINOS_VERSION`, `AVISO_VERSION` | String; `2026-10` y `2026-11` hoy (nv-16) |
 | `MODO_MANTENIMIENTO` | String, `false`; ver [Mantenimiento](#mantenimiento-spec-nv-16) |

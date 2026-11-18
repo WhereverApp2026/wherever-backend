@@ -22,7 +22,7 @@ API REST en Go (Fiber) para Wherever, desarrollada con **Spec Driven Development
 | `nv-05` | Usuarios, perfil, gustos y privacidad (A1) |
 | `nv-06` | Correo saliente: SMTP, envío en segundo plano y plantillas |
 
-Estado: `nv-04` aprobada; `nv-05` y `nv-06` ejecutadas (Borrador con evidencia); `nv-00…nv-03` en Borrador con evidencia. En `nv-04` falta `POST /auth/google` (espera la decisión D-1).
+Estado: `nv-04` aprobada; `nv-05` y `nv-06` ejecutadas (Borrador con evidencia); `nv-00…nv-03` en Borrador con evidencia. `POST /auth/google` (T7 de `nv-04`) llegó con `nv-72` (D-1 camino B).
 
 ## Arranque local
 1. `cp configs/.env.example .env` y poner un `JWT_KEY` propio de 32 bytes o más.

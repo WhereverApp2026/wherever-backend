@@ -21,6 +21,17 @@ type LoginRequest struct {
 	Device   DeviceInput `json:"dispositivo" validate:"required"`
 }
 
+// GoogleRequest es el cuerpo de POST /auth/google (nv-72). Los datos de registro solo hacen
+// falta si el correo no tiene cuenta (D-1 camino B); si faltan, 422 `registro_incompleto`.
+type GoogleRequest struct {
+	IDToken      string      `json:"id_token" validate:"required,max=4096"`
+	Device       DeviceInput `json:"dispositivo" validate:"required"`
+	BirthDate    string      `json:"fecha_nacimiento" validate:"omitempty,adult"`
+	AcceptTerms  *bool       `json:"acepta_terminos"`
+	TermsVersion string      `json:"version_terminos" validate:"omitempty,max=20"`
+	PromoEmail   bool        `json:"promociones_correo"`
+}
+
 // RefreshRequest es el cuerpo de POST /auth/refresh.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required,max=128"`

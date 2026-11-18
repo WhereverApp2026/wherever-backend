@@ -66,6 +66,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/sugerencias"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/climatest"
+	"github.com/WhereverApp2026/wherever-backend/internal/testutil/googletest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/iatest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/imagenestest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/negociostest"
@@ -128,6 +129,7 @@ type Env struct {
 	Sugerencias       *sugerencias.Service // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
 	Personas          *personas.Service    // igual: perfil sin grafo hasta WithGraph (nv-70)
 	Imagenes          imagenestest.Modulo  // doble del bucket y Rekognition local (nv-45)
+	Google            *googletest.Emisor   // doble de Google: firma id_token y sirve sus llaves (nv-72)
 	Mail              *mailer.Memory
 	Log               *slog.Logger
 	Logs              *testutil.LogBuffer
@@ -180,6 +182,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	}, log)
 	require.NoError(t, err)
 	svc.WithSyncMailer(sync)
+	google := googletest.Nuevo(t)
+	verifier, err := auth.NewGoogleVerifier(context.Background(), googletest.ClientID, google.Cliente())
+	require.NoError(t, err)
+	svc.WithGoogle(verifier)
 	v, err := validation.New()
 	require.NoError(t, err)
 
@@ -338,7 +344,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Log: log, Logs: logs,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Google: google, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),

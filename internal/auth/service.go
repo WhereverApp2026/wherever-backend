@@ -51,6 +51,8 @@ type Service struct {
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 	log        *slog.Logger
+	// google valida los id_token de POST /auth/google (nv-72); nil = la ruta da 503.
+	google GoogleVerifier
 }
 
 // NewService arma el servicio; falla solo si no puede preparar el hash falso.

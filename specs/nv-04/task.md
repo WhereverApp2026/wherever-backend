@@ -25,7 +25,7 @@
 - **Crear**: `PUT /auth/password`, cierre de otras sesiones.
 - **Verificar**: sesiones ajenas revocadas, la actual sigue.
 
-## T7 — Google (condicionada a D-1)
+## T7 — Google (hecha en `specs/nv-72`, D-1 resuelta con el camino B el 2026-11-18)
 - **Crear**: validación de `id_token`, alta de cuenta, `Integration/Google 3`.
 - **Verificar**: 201 y 200, `id_token` inválido 401.
 

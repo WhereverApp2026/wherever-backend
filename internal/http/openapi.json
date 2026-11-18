@@ -3,7 +3,7 @@
   "info": {
     "title": "Wherever API",
     "version": "v1",
-    "description": "Arquitectura base (nv-01), autenticación (nv-04, hoja J1) y usuarios, perfil y privacidad (nv-05, hoja A1). POST /auth/google queda diferido (D-1)."
+    "description": "Arquitectura base (nv-01), autenticación (nv-04, hoja J1) y usuarios, perfil y privacidad (nv-05, hoja A1). Entrar con Google (nv-72)."
   },
   "paths": {
     "/health": {
@@ -201,6 +201,61 @@
             "$ref": "#/components/responses/Error"
           },
           "423": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "summary": "Entra con Google (id_token). 200 si la cuenta existía o se vinculó; 201 si se creó. Sin cuenta y sin fecha_nacimiento, acepta_terminos y version_terminos → 422 registro_incompleto (faltantes en campos[]) sin guardar nada (nv-72)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Cuenta nueva y tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
             "$ref": "#/components/responses/Error"
           },
           "429": {
@@ -1578,6 +1633,39 @@
           },
           "dispositivo": {
             "$ref": "#/components/schemas/Dispositivo"
+          }
+        }
+      },
+      "GoogleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id_token",
+          "dispositivo"
+        ],
+        "properties": {
+          "id_token": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "dispositivo": {
+            "$ref": "#/components/schemas/Dispositivo"
+          },
+          "fecha_nacimiento": {
+            "type": "string",
+            "format": "date",
+            "description": "Solo para crear la cuenta; 18 años o más"
+          },
+          "acepta_terminos": {
+            "type": "boolean",
+            "description": "Solo para crear la cuenta; debe ser true"
+          },
+          "version_terminos": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "promociones_correo": {
+            "type": "boolean"
           }
         }
       },

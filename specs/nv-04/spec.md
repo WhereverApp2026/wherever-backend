@@ -64,13 +64,14 @@ Respuesta de tokens: `{access_token, refresh_token, expira_en, usuario}`. Cuerpo
 
 ## Límites
 - **Decisión D-1 (Google sin fecha de nacimiento).** `usuarios.fecha_nacimiento` es obligatoria y Google no la entrega. Propuesta: la cuenta nueva por Google nace con `fecha_nacimiento` vacía y `perfil_completo = false`, y `nv-05` bloquea (403 `perfil_incompleto`) las acciones que exigen mayoría de edad hasta que `PATCH /usuarios/yo` la complete. Requiere el visto bueno del responsable de A1 y un ajuste a la hoja A1. Hasta que se decida, `/auth/google` se implementa en la última tarea.
+  - **Resuelta (2026-11-18, revisor Osmar Reséndiz): camino B de `specs/nv-72`**, no esta propuesta. La cuenta nueva por Google no se crea sin `fecha_nacimiento` (18+), `acepta_terminos` y `version_terminos`: si faltan, 422 `registro_incompleto` y no se guarda nada. No existe `perfil_completo`. Implementada en nv-72.
 - **Excepciones de stack** (constitución §3, regla de excepción de `nv-00`): `google.golang.org/api/idtoken` para validar Google. Se registra en `Memoria.md` con licencia (Apache-2.0) y mantenimiento.
 - El proveedor real de correo (SMTP o servicio) queda como deuda: `nv-04` entrega la interfaz, el buzón de pruebas y el `LogMailer`.
 - Sin roles de comerciante ni administrador usados todavía (llegan con sus módulos), sin 2FA, sin Apple/Facebook, sin captcha.
 - Un refresh enviado dos veces en paralelo desde el mismo teléfono se leería como reutilización. La app móvil debe serializar la renovación (un solo `Authenticator` en vuelo); queda como requisito de la spec móvil, no se resuelve aquí.
 
 ## Aprobación y Control de Cambios
-- **Estado:** ✅ Aprobada (T1–T6 y T8). T7 (Google) sigue pendiente de la decisión D-1 y se aprueba aparte cuando se ejecute.
+- **Estado:** ✅ Aprobada (T1–T6 y T8). T7 (Google) se ejecutó en `specs/nv-72` tras resolver D-1 (camino B, 2026-11-18).
 - **Revisores:** Osmar Reséndiz (único integrante de backend; la hoja J1 la diseñó Jorge Alberto Rodríguez Enriquez)
 - **Fecha:** 2026-11-02 (ejecución y aprobación)
 - [x] CHECKLIST_PR.md OK
