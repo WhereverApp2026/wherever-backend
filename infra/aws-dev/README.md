@@ -111,8 +111,11 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 - **`destruir.sh`** vacía y borra el bucket (`force_destroy`): las imágenes se pierden y la URL de imágenes cambia al recrear.
 - **Costo:** dentro de la capa gratuita de CloudFront (1 TB y 10 millones de peticiones al mes); S3 unos centavos al mes para el piloto.
 
-## Pendiente: correo
-La salida solo abre 443, 80 y 27017. Cuando se elija proveedor SMTP, agrega su puerto (587 o 465) a `egress_ports` en `main.tf` y vuelve a aplicar.
+## Correo saliente (SMTP)
+- **Puerto:** `egress_ports.smtp` abre el 587 (STARTTLS). Si el proveedor cambia a 465, cambia el puerto y `SMTP_TLS=tls`.
+- **Proveedor:** Gmail con contraseña de aplicación (`smtp.gmail.com`, 587, `SMTP_TLS=starttls`); unos 500 correos al día. `MAIL_FROM` debe ser la misma cuenta, porque Gmail reescribe el remitente, y va como correo simple (`cuenta@gmail.com`): con `Nombre <correo>` la API no arranca.
+- **Variables** en `/wherever/dev/`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD` (SecureString), `MAIL_FROM` y `APP_LINK_BASE`.
+- **Aplicar:** `crear.sh` (agrega una regla de salida al Security Group, sin recrear nada) y luego reiniciar la API para que relea Parameter Store.
 
 ## Memoria de la instancia
 `t3.micro` (1 GB): API 192 MB y 2 GB de swap.
