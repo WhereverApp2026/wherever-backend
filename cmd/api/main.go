@@ -175,15 +175,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	db := mongoClient.DB()
 	users := usuarios.NewRepository(db).WithCipher(fieldCipher(cfg.DataKeys, log))
 	authRepo := auth.NewRepository(db)
-	authSvc, err := auth.NewService(users, authRepo, redisClient, mail.requests, auth.Config{
-		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
-		AccessTTL:  cfg.AccessTTL,
-		RefreshTTL: cfg.RefreshTTL,
-	}, log)
+	authSvc, err := buildAuth(cfg, users, authRepo, redisClient, mail, log)
 	if err != nil {
-		return nil, nil, fmt.Errorf("auth: %w", err)
+		return nil, nil, err
 	}
-	authSvc.WithSyncMailer(mail.sync)
 	citySvc := ciudades.NewService(ciudades.NewRepository(db))
 	businessRepo := negocios.NewRepository(db)
 	businessSvc, cursor, err := buildBusinesses(cfg, businessRepo, users, redisClient, db, log)
@@ -353,6 +348,30 @@ func buildRecomendaciones(repo *recomendaciones.Repository, users recomendacione
 		return nil, fmt.Errorf("recomendaciones: %w", err)
 	}
 	return svc, nil
+}
+
+// buildAuth arma el módulo auth (nv-04) con el mailer y el verificador de Google (nv-72). Sin
+// GOOGLE_CLIENT_ID (solo fuera de prod) avisa una vez y POST /auth/google responde 503: el
+// arranque no se cae.
+func buildAuth(cfg config.Config, users *usuarios.Repository, repo *auth.Repository, rdb *goredis.Client, mail mailers, log *slog.Logger) (*auth.Service, error) {
+	svc, err := auth.NewService(users, repo, rdb, mail.requests, auth.Config{
+		JWT:        middleware.JWTConfig{Key: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+		AccessTTL:  cfg.AccessTTL,
+		RefreshTTL: cfg.RefreshTTL,
+	}, log)
+	if err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
+	svc.WithSyncMailer(mail.sync)
+	if cfg.GoogleClientID == "" {
+		log.Warn("sin GOOGLE_CLIENT_ID: POST /api/v1/auth/google responde 503")
+		return svc, nil
+	}
+	verifier, err := auth.NewGoogleVerifier(context.Background(), cfg.GoogleClientID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("auth google: %w", err)
+	}
+	return svc.WithGoogle(verifier), nil
 }
 
 // buildImagenes arma la subida de fotos (nv-45) con S3 y Rekognition por el rol de la

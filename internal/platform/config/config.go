@@ -142,6 +142,9 @@ const (
 	KeyStripeSecretKey  = "STRIPE_SECRET_KEY"     // #nosec G101 -- nombre de la variable, no su valor
 	KeyStripeWebhook    = "STRIPE_WEBHOOK_SECRET" // #nosec G101 -- nombre de la variable, no su valor
 	KeyStripeAPIURL     = "STRIPE_API_URL"
+	// KeyGoogleClientID es el cliente OAuth «Web» de Google que firma la audiencia de los
+	// id_token de Android e iOS (nv-72). No es secreto (va en la app), pero no se hardcodea.
+	KeyGoogleClientID = "GOOGLE_CLIENT_ID"
 )
 
 // DefaultImagenesRegion es la región del bucket y de Rekognition (nv-44, nv-45).
@@ -171,6 +174,7 @@ var optionalKeys = []string{
 	KeyFCMProjectID, KeyFCMCredenciales, KeyFCMURL, KeyDataKeys,
 	KeyImagenesBucket, KeyImagenesURL, KeyImagenesRegion,
 	KeyStripeSecretKey, KeyStripeWebhook, KeyStripeAPIURL,
+	KeyGoogleClientID,
 }
 
 // Keys devuelve todas las claves que la configuración lee.
@@ -214,6 +218,9 @@ type Config struct {
 	Imagenes Imagenes
 	// Stripe cobra el anticipo de las reservas (nv-60); sin llave las rutas de pago dan 503.
 	Stripe Stripe
+	// GoogleClientID valida la audiencia de POST /auth/google (nv-72); vacío = la ruta da 503.
+	// Opcional fuera de prod: su falta no tumba el arranque.
+	GoogleClientID string
 }
 
 // IA es la configuración de la IA generativa (nv-26). Sin llave o sin modelo, la IA queda
@@ -315,6 +322,7 @@ func Load(getenv func(string) string) (Config, error) {
 			CredentialsB64: strings.TrimSpace(getenv(KeyFCMCredenciales)),
 			BaseURL:        strings.TrimSpace(getenv(KeyFCMURL)),
 		},
+		GoogleClientID: strings.TrimSpace(getenv(KeyGoogleClientID)),
 		Stripe: Stripe{
 			SecretKey:     strings.TrimSpace(getenv(KeyStripeSecretKey)),
 			WebhookSecret: strings.TrimSpace(getenv(KeyStripeWebhook)),
@@ -455,6 +463,9 @@ func (c Config) validate() []error {
 	errs = append(errs, c.FCM.validate(c.Env)...)
 	errs = append(errs, c.Imagenes.validate(c.Env)...)
 	errs = append(errs, c.Stripe.validate(c.Env)...)
+	if c.IsProd() && c.GoogleClientID == "" {
+		errs = append(errs, fmt.Errorf("en prod %s es obligatorio: sin él no se puede entrar con Google", KeyGoogleClientID))
+	}
 	errs = append(errs, c.validateDataKeys()...)
 	return append(errs, c.validateLimits()...)
 }

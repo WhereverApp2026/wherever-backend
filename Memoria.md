@@ -75,7 +75,7 @@
 
 ## Ejecución nv-04 (2026-11-02)
 - Estado: aprobada por Osmar Reséndiz el 2026-11-02 (PR #6), salvo T7. T1–T6 y T8 ejecutadas en la rama `nv-04-auth` (sale de `main` con nv-03). Once endpoints de J1, colecciones `sesiones` y `tokens_un_uso`, `usuarios` mínimo, mailer en memoria y de log, índices por script y suites Database y Contract nuevas. T7 (Google) diferida. Spec en Borrador con evidencia, sin firma.
-- Decisión D-1 (pendiente, no tomada aquí): Google sin `fecha_nacimiento`. Hasta que el responsable de A1 (Alexander Dominguez Zarate) apruebe la propuesta de la spec, no hay `/auth/google` ni la dependencia `google.golang.org/api/idtoken` (excepción de stack, Apache-2.0, mantenida por Google) ni `GOOGLE_CLIENT_ID`.
+- Decisión D-1 (resuelta el 2026-11-18 en nv-72 con el camino B; aquí quedó pendiente): Google sin `fecha_nacimiento`. Hasta que el responsable de A1 (Alexander Dominguez Zarate) apruebe la propuesta de la spec, no hay `/auth/google` ni la dependencia `google.golang.org/api/idtoken` (excepción de stack, Apache-2.0, mantenida por Google) ni `GOOGLE_CLIENT_ID`.
 - Decisión: llaves `jwt_revocado:{jti}` y `login_fallos:{correo}` aunque la spec nv-04 decía `blacklist:/attempts:/lockout:`. Porqué: la constitución §6 y la alineación del 2026-10-29 fijan esos nombres; nv-01 ya usa `jwt_revocado:`. El bloqueo es la misma llave con 5 o más y su TTL da los minutos del 423.
 - Decisión: índices declarados por módulo (`Indexes()`), reunidos en `internal/indexes` y creados solo por `scripts/indexes` (`make indexes`). Porqué: constitución §5; el plan decía "en el arranque".
 - Decisión: `sesiones` guarda `jti_vigente` (subido a la hoja J1 en la v3 del Excel junto con `refresh_hash_previo`; su vencimiento se calcula con `ultimo_uso` + vida del access, sin campo extra); al cerrar una, todas, por reutilización o al cambiar contraseña se revoca el access vigente de cada sesión, y al rotar el refresh el access anterior. Porqué: sin eso un teléfono "cerrado" seguía entrando hasta 15 min.
@@ -831,10 +831,21 @@
 - Decisión: correo saliente por SMTP de Gmail con contraseña de aplicación (587, STARTTLS). Porqué: no hay dominio propio para SES y alcanza para el piloto (unos 500 al día). `egress_ports.smtp` abre el 587.
 - Estado: Stripe (entorno de prueba propio, Connect Express en México), Gemini, imágenes y `DATA_KEYS` cargados en Parameter Store y leídos por las dos instancias. Faltan Firebase y el correo.
 
+## NV-72 — Entrar con Google (2026-11-18)
+- Estado: rama `claude/nv-72-2a46ed` desde `main`, PR contra `main`. Falta la firma y el visto bueno del responsable de A1 a D-1. Sin índices nuevos (`ux_google_id` ya existía). Variable nueva `GOOGLE_CLIENT_ID`, **opcional** fuera de prod: sin ella la API arranca, avisa una vez y `POST /auth/google` da 503. No está en las obligatorias de `deploy-env.sh`: cargarla en `/wherever/dev/` (String) y reiniciar la API cuando exista el cliente OAuth Web.
+- Decisión D-1, camino B: la cuenta nueva no se crea sin `fecha_nacimiento` (18+), `acepta_terminos` y `version_terminos`; si faltan, 422 `registro_incompleto` sin guardar nada. Porqué: ninguna cuenta existe sin la regla de 18 años y no hay marca `perfil_completo` que cada módulo tenga que revisar.
+- Decisión: `faltantes[]` va en `campos[]` del error uniforme (`mensaje: registro_incompleto`) y el 409 dice `cuenta_vinculada` en `mensaje`. Porqué: el cuerpo de error es uno solo (nv-01) y así lo hacen los 409 de cupones.
+- Excepción de stack: `google.golang.org/api/idtoken` v0.316.0 (Apache-2.0, mantenida por Google; trae `cloud.google.com/go/auth`, `x/oauth2` y sube `grpc` a v1.85.0 como indirecta). `govulncheck` no suma avisos por ella, así que no se cambió a `go-oidc`.
+- Decisión: vincular por correo; si el correo no estaba verificado se borra `password_hash` y se cierran sus sesiones (cuenta preparada por otra persona). `LinkGoogle` filtra `google_id` inexistente: dos peticiones a la vez no se pisan (la segunda = 409). Una cuenta bloqueada no se vincula (401).
+- Decisión: las pruebas usan el verificador **real**; `internal/testutil/googletest` firma con un par RSA local y su cliente HTTP redirige la descarga de llaves a un servidor local. Porqué: así se prueban `idtoken` y las reglas propias (`iss`, `sub`, `email_verified`), no un doble.
+- Decisión: `usuarios.NewConsumer` arma la cuenta inicial para el registro (nv-05) y para Google; el registro ya lo usa.
+- A evitar: `idtoken` no pone plazo a la descarga de llaves ni revisa `iss`; el cliente lleva 5 s y `identityFromClaims` revisa `iss`. Su error de red llega como `*url.Error` (503); el resto es token malo (401). Una respuesta no 200 de Google la convierte en error `keysTransport`.
+- A evitar: en Docker con un worktree, `git` no funciona dentro del contenedor (la ruta del `.git` es de Windows) y critic da un PASS falso (sin archivos que revisar). Correr `scripts/critic-guardrails.sh` en Git Bash. B2 marca cualquier identificador con «token» en un `errors.New` (p. ej. `ErrGoogleToken`): nómbralo sin esa palabra.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
-- D-1: cuenta nueva por Google sin `fecha_nacimiento` (propuesta en `specs/nv-04/spec.md`; dueño A1).
+- ~~D-1: cuenta nueva por Google sin `fecha_nacimiento`~~ — resuelta el 2026-11-18: camino B de `specs/nv-72` (falta el visto bueno del dueño de A1 en el PR).
 - Proveedor de correo (SMTP o servicio) y su remitente (`MAIL_FROM`).
 - Firma de `nv-00…nv-03`: siguen en Borrador con evidencia. Desde nv-04 el revisor es Osmar Reséndiz (único integrante de backend; el Excel nombra a Jorge Alberto Rodríguez Enriquez para las hojas J y a Alexander Dominguez Zarate para las A como responsables del diseño).
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.

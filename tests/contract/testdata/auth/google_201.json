@@ -1,0 +1,17 @@
+{
+  "status": 201,
+  "body": {
+    "access_token": "string",
+    "expira_en": "string",
+    "refresh_token": "string",
+    "usuario": {
+      "correo": "string",
+      "correo_verificado": "bool",
+      "id": "string",
+      "nombre": "string",
+      "roles": [
+        "string"
+      ]
+    }
+  }
+}

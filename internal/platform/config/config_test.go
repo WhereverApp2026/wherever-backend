@@ -79,6 +79,7 @@ func prodMail(overrides map[string]string) map[string]string {
 		config.KeyAppLinkBase:    "https://wherever.test",
 		config.KeyImagenesBucket: "wherever-prod-imagenes",
 		config.KeyImagenesURL:    "https://imagenes.wherever.test",
+		config.KeyGoogleClientID: "wherever-prod.apps.googleusercontent.com",
 	}
 	for k, v := range overrides {
 		values[k] = v
@@ -232,6 +233,19 @@ func TestLoad_Imagenes(t *testing.T) {
 	}
 	_, err = config.Load(testutil.Env(prodMail(map[string]string{config.KeyImagenesBucket: "", config.KeyImagenesURL: ""})))
 	assert.ErrorContains(t, err, config.KeyImagenesBucket, "obligatorias en prod")
+}
+
+func TestLoad_GoogleClientID(t *testing.T) {
+	cfg, err := config.Load(testutil.Env(nil))
+	require.NoError(t, err, "fuera de prod la API arranca sin GOOGLE_CLIENT_ID (nv-72)")
+	assert.Empty(t, cfg.GoogleClientID)
+
+	cfg, err = config.Load(testutil.Env(map[string]string{config.KeyAppEnv: config.EnvStaging, config.KeyGoogleClientID: " web.apps.googleusercontent.com "}))
+	require.NoError(t, err)
+	assert.Equal(t, "web.apps.googleusercontent.com", cfg.GoogleClientID)
+
+	_, err = config.Load(testutil.Env(prodMail(map[string]string{config.KeyGoogleClientID: ""})))
+	assert.Error(t, err, "en prod es obligatorio")
 }
 
 func TestLoad_Stripe(t *testing.T) {

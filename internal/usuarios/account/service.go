@@ -81,13 +81,8 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (auth.TokenRes
 	if err != nil {
 		return auth.TokenResponse{}, err
 	}
-	user := usuarios.User{
-		Name: strings.TrimSpace(req.Name), NormalizedName: text.Normalize(req.Name), Email: req.Email,
-		PasswordHash: hash, BirthDate: &birth, Roles: []string{middleware.RoleConsumer}, Mode: usuarios.ModeExplore,
-		Preferences: usuarios.DefaultPreferences(),
-		Privacy:     usuarios.Privacy{TermsVersion: req.TermsVersion, AcceptedAt: now, PromoEmail: req.PromoEmail},
-		Points:      usuarios.WelcomePoints, Level: usuarios.InitialLevel, Status: usuarios.StatusActive,
-	}
+	user := usuarios.NewConsumer(req.Name, req.Email, birth, req.TermsVersion, req.PromoEmail, now)
+	user.PasswordHash = hash
 	if err := s.users.Create(ctx, &user); err != nil {
 		return auth.TokenResponse{}, s.userError(err)
 	}

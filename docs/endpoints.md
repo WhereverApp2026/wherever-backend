@@ -18,6 +18,7 @@
 | GET | `/api/v1/probe/lenta` (no-prod): tarda 45 s | no | global | 200/408/404 | nv-12 |
 | GET | `/docs` y `/openapi.json` (solo dev) | no | — | 200/404 | nv-01 |
 | POST | `/api/v1/auth/login` → `{correo, password, dispositivo{modelo, sistema, app_version}}` → tokens. Argon2id; 5 fallos del mismo correo (exista o no) → 423 con minutos restantes | no | login 5/5 min por IP | 200/400/401/422/423/429/503 | nv-04 (J1) |
+| POST | `/api/v1/auth/google` → `{id_token, dispositivo{modelo, sistema, app_version}, fecha_nacimiento?, acepta_terminos?, version_terminos?, promociones_correo?}` → tokens (misma respuesta de login). Valida el `id_token` con las llaves de Google (`aud` = `GOOGLE_CLIENT_ID`, `iss`, `exp`, `email_verified`); cualquier falla = 401 igual. Entra por `google_id`; si no, vincula la cuenta del mismo correo (sin verificar: borra `password_hash` y cierra sus sesiones); correo ya vinculado a otro `google_id` = 409 `cuenta_vinculada`. Sin cuenta: crea solo con fecha (18+), términos aceptados y versión (201); si faltan, 422 `registro_incompleto` con los faltantes en `campos[]` y no guarda nada (D-1 camino B). Campo de más = 400. Sin `GOOGLE_CLIENT_ID` o Google caído = 503 | no | 10/min por IP (`auth_google`) | 200/201/400/401/409/422/429/503 | nv-72 (J1) |
 | POST | `/api/v1/auth/refresh` → `{refresh_token}` → tokens nuevos; rota el refresh y uno ya rotado revoca la familia | refresh_token | 10/min por IP | 200/400/401/422/429/503 | nv-04 (J1) |
 | POST | `/api/v1/auth/logout` → cierra la sesión actual (`revocada_en` + `jwt_revocado:{jti}`) | JWT | global | 204/401/503 | nv-04 (J1) |
 | POST | `/api/v1/auth/logout-todos` → cierra todas las sesiones del usuario | JWT | global | 204/401/503 | nv-04 (J1) |
@@ -292,7 +293,6 @@ Revisadas el 2026-11-18: el Excel las nombra, pero otra ruta viva ya hace su tra
 - `GET /api/v1/personas/yo/qr` (J2) — la app dibuja el QR con el código de la persona; quien lo escanea usa `GET /api/v1/personas/codigo/{codigo}` (nv-64).
 
 ## Diferidos (sin ruta en código todavía)
-- `POST /api/v1/auth/google` (`{id_token, dispositivo{}}` → 200 con tokens, 201 si es cuenta nueva) — nv-04 T7, espera la decisión D-1 (cuenta sin `fecha_nacimiento`) y la excepción de stack `google.golang.org/api/idtoken`. Hoja J1.
 - `GET /metrics` (Prometheus, red interna) — spec de observabilidad. Hoja J9.
 - `POST /api/v1/errores` y `GET /api/v1/admin/errores` (colección `errores_app`) — spec de observabilidad. Hoja J9.
 

@@ -55,6 +55,8 @@ var (
 	ErrPhoneTaken      = errors.New("el teléfono ya está registrado")
 	ErrUsernameTaken   = errors.New("el nombre de usuario ya está en uso")
 	ErrVersionConflict = errors.New("la versión no coincide")
+	// ErrGoogleTaken: ese `google_id` ya es de otra cuenta (ux_google_id, nv-72).
+	ErrGoogleTaken = errors.New("la cuenta de Google ya está vinculada")
 )
 
 // City es la ciudad elegida a mano (`ciudad {id, nombre}`).
@@ -397,6 +399,8 @@ func mapDuplicate(err error) error {
 		return ErrPhoneTaken
 	case isDuplicate(err, "ux_nombre_usuario"):
 		return ErrUsernameTaken
+	case isDuplicate(err, "ux_google_id"):
+		return ErrGoogleTaken
 	default:
 		return err
 	}

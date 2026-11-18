@@ -22,6 +22,7 @@ func compressApp() *fiber.App {
 	reply := func(c *fiber.Ctx) error { return c.SendString(longBody) }
 	app.Get("/api/v1/ciudades", reply)
 	app.Post("/api/v1/auth/login", reply)
+	app.Post("/api/v1/auth/google", reply)
 	app.Get("/api/v1/auth/sesiones", reply)
 	app.Post("/api/v1/usuarios", reply)
 	app.Get("/api/v1/usuarios", reply)
@@ -52,6 +53,7 @@ func TestCompress_RespetaAcceptEncoding(t *testing.T) {
 
 func TestCompress_LoQueLlevaTokensNoSeComprime(t *testing.T) {
 	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/auth/login", "gzip"))
+	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/auth/google", "gzip"), "entrar con Google devuelve tokens (nv-72)")
 	assert.Empty(t, encodingOf(t, http.MethodGet, "/api/v1/auth/sesiones", "gzip"))
 	assert.Empty(t, encodingOf(t, http.MethodPost, "/api/v1/usuarios", "gzip"), "el registro devuelve tokens")
 	assert.Equal(t, "gzip", encodingOf(t, http.MethodGet, "/api/v1/usuarios", "gzip"), "solo se excluye el POST")
