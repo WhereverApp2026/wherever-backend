@@ -63,7 +63,7 @@ func TestErroresSecurity_SinDatosPersonalesNiSecretos(t *testing.T) {
 	user := env.CreateUser(t, "reporta-seg@wherever.test")
 	token := testutil.ValidTokenFor(t, user.ID.Hex(), "jti-reporta-seg", middleware.RoleConsumer)
 	msg := "fallo con reporta-seg@wherever.test tarjeta 4111 1111 1111 1111 tel +525511112222 " +
-		"mongodb://admin:" + "clave-secreta@db.local/x AIzaSyA1234567890abcdefghijklmnopqrstuv " +
+		"mongodb://admin:" + "clave-secreta@db.local/x " + "AIzaSy" + "A1234567890abcdefghijklmnopqrstuv " +
 		"Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJhLWZhbHNh"
 	require.Equal(t, http.StatusAccepted, send(t, app, http.MethodPost, erroresPath, appError(msg), token).status)
 
