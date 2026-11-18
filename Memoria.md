@@ -840,7 +840,7 @@
 - Decisión: las pruebas usan el verificador **real**; `internal/testutil/googletest` firma con un par RSA local y su cliente HTTP redirige la descarga de llaves a un servidor local. Porqué: así se prueban `idtoken` y las reglas propias (`iss`, `sub`, `email_verified`), no un doble.
 - Decisión: `usuarios.NewConsumer` arma la cuenta inicial para el registro (nv-05) y para Google; el registro ya lo usa.
 - A evitar: `idtoken` no pone plazo a la descarga de llaves ni revisa `iss`; el cliente lleva 5 s y `identityFromClaims` revisa `iss`. Su error de red llega como `*url.Error` (503); el resto es token malo (401). Una respuesta no 200 de Google la convierte en error `keysTransport`.
-- A evitar: en Docker con un worktree, `git` no funciona dentro del contenedor (la ruta del `.git` es de Windows); critic, `check_endpoints` y `check_sdd` corren igual, pero sin el diff.
+- A evitar: en Docker con un worktree, `git` no funciona dentro del contenedor (la ruta del `.git` es de Windows) y critic da un PASS falso (sin archivos que revisar). Correr `scripts/critic-guardrails.sh` en Git Bash. B2 marca cualquier identificador con «token» en un `errors.New` (p. ej. `ErrGoogleToken`): nómbralo sin esa palabra.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

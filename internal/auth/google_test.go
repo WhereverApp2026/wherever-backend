@@ -35,7 +35,7 @@ func TestGoogleVerifier_ValidTokenGivesIdentity(t *testing.T) {
 	assert.Equal(t, GoogleIdentity{Subject: "123", Email: "luz@wherever.test", Name: "Luz", Picture: "https://lh3.googleusercontent.com/a"}, id)
 }
 
-func TestGoogleVerifier_EveryBadTokenIsErrGoogleToken(t *testing.T) {
+func TestGoogleVerifier_EveryBadTokenIsErrGoogleInvalid(t *testing.T) {
 	e := googletest.Nuevo(t)
 	v := verifier(t, e)
 	base := googletest.Identidad{Sub: "123", Correo: "luz@wherever.test"}
@@ -51,7 +51,7 @@ func TestGoogleVerifier_EveryBadTokenIsErrGoogleToken(t *testing.T) {
 	}
 	for name, token := range cases {
 		_, err := v.Verify(context.Background(), token)
-		assert.ErrorIs(t, err, ErrGoogleToken, name)
+		assert.ErrorIs(t, err, ErrGoogleInvalid, name)
 	}
 }
 

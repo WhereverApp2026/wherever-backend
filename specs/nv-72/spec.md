@@ -43,7 +43,7 @@ Fila del Excel (hoja «J1 Autenticación») copiada y corregida:
 - `tests/security/auth_google_security_test.go`: `id_token` con firma ajena, `aud` ajeno, `iss` ajeno, vencido, `email_verified=false`, sin `sub` y basura = 401 igual y sin cuenta creada; ningún `id_token`, correo ni `sub` en logs capturados; respuesta sin `google_id`; campo de más = 400.
 - `tests/database/indexes_test.go`: sin cambios; ya verifica `ux_google_id` único parcial.
 - `tests/contract/auth_google_contract_test.go`: 200, 201 y 422 `registro_incompleto`.
-- Unit: `internal/auth/google_test.go` (verificador real contra llaves locales, cada falla = `ErrGoogleToken`, llaves caídas = `ErrGoogleUnavailable`, validators del cuerpo, nombre, foto, faltantes y 503 sin verificador); `TestLoad_GoogleClientID` en config; `/auth/google` sin compresión en `compress_test.go`.
+- Unit: `internal/auth/google_test.go` (verificador real contra llaves locales, cada falla = `ErrGoogleInvalid`, llaves caídas = `ErrGoogleUnavailable`, validators del cuerpo, nombre, foto, faltantes y 503 sin verificador); `TestLoad_GoogleClientID` en config; `/auth/google` sin compresión en `compress_test.go`.
 
 ## Criterios
 - Ninguna cuenta existe sin mayoría de edad comprobada y términos aceptados (si se aprueba B), y una cuenta creada con un correo ajeno no conserva acceso tras el vínculo.

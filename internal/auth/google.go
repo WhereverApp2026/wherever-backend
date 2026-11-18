@@ -15,8 +15,8 @@ import (
 
 // Errores del verificador; el service los traduce a 401 y 503 sin decir cuál falló.
 var (
-	// ErrGoogleToken: firma, `aud`, `iss`, `exp`, `email_verified` o `sub` no pasan.
-	ErrGoogleToken = errors.New("id_token de Google inválido")
+	// ErrGoogleInvalid: firma, `aud`, `iss`, `exp`, `email_verified` o `sub` no pasan.
+	ErrGoogleInvalid = errors.New("id_token de Google inválido")
 	// ErrGoogleUnavailable: no se pudieron bajar las llaves públicas de Google.
 	ErrGoogleUnavailable = errors.New("no se pudieron obtener las llaves de Google")
 )
@@ -76,7 +76,7 @@ func (v *idtokenVerifier) Verify(ctx context.Context, idToken string) (GoogleIde
 		if errors.As(err, &netErr) || errors.Is(err, ErrGoogleUnavailable) {
 			return GoogleIdentity{}, ErrGoogleUnavailable
 		}
-		return GoogleIdentity{}, ErrGoogleToken
+		return GoogleIdentity{}, ErrGoogleInvalid
 	}
 	return identityFromClaims(payload.Issuer, payload.Subject, payload.Claims)
 }
@@ -85,7 +85,7 @@ func (v *idtokenVerifier) Verify(ctx context.Context, idToken string) (GoogleIde
 func identityFromClaims(issuer, subject string, claims map[string]any) (GoogleIdentity, error) {
 	email, _ := claims["email"].(string)
 	if !googleIssuers[issuer] || subject == "" || email == "" || !emailVerified(claims["email_verified"]) {
-		return GoogleIdentity{}, ErrGoogleToken
+		return GoogleIdentity{}, ErrGoogleInvalid
 	}
 	name, _ := claims["name"].(string)
 	picture, _ := claims["picture"].(string)
