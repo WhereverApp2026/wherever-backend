@@ -23,6 +23,11 @@ output "imagenes_url" {
   value       = "https://${aws_cloudfront_distribution.imagenes.domain_name}"
 }
 
+output "respaldos_bucket" {
+  description = "Bucket privado de los respaldos semanales de MongoDB; la instancia solo escribe en respaldos/."
+  value       = aws_s3_bucket.respaldos.id
+}
+
 output "alb_dns" {
   description = "Balanceador; no responde directo desde internet."
   value       = aws_lb.api.dns_name

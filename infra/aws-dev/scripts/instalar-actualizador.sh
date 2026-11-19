@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Instala cosign, sube al servidor el actualizador de nv-08 y la sonda de nv-13, y activa sus timers. Corre en tu
+# Instala cosign, sube al servidor el actualizador de nv-08, la sonda de nv-13 y el respaldo semanal de
+# MongoDB, y activa sus timers (el del respaldo solo en el nodo a). Corre en tu
 # máquina y entra por Systems Manager, sin SSH; repítelo cada vez que cambien estos archivos, porque
 # el CD solo actualiza la imagen de la API. No reinicia la API: eso lo hace la siguiente imagen.
 # Si la instancia es nueva y no tiene .env, también hace el primer arranque (nv-14). Con --node, anota
@@ -85,10 +86,11 @@ echo "instalar-actualizador: instalando cosign $cosign_version"
 remote "VERSION=$cosign_version SUM_AMD64=$cosign_sha_amd64 SUM_ARM64=$cosign_sha_arm64
 $install_cosign"
 
-for file in server/compose.yml scripts/deploy-env.sh scripts/actualizar.sh; do
+for file in server/compose.yml scripts/deploy-env.sh scripts/actualizar.sh scripts/respaldo-mongo.sh; do
 	upload "$here/$file" "/opt/wherever/$(basename "$file")"
 done
-for file in wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer; do
+for file in wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer \
+	wherever-respaldo.service wherever-respaldo.timer; do
 	upload "$here/server/$file" "/etc/systemd/system/$file"
 done
 
@@ -100,15 +102,28 @@ if [ -f .env ]; then echo "instalar-actualizador: ya tiene .env; sin primer arra
 ./deploy-env.sh /wherever/dev/
 chown ec2-user:ec2-user .env'
 
+# shellcheck disable=SC2016 # se expande en la instancia, no aquí
 timers='set -e
 cd /opt/wherever
 chown ec2-user:ec2-user compose.yml deploy-env.sh actualizar.sh
 chmod +x deploy-env.sh actualizar.sh
+# Corre como root y lee .env: solo root lo cambia.
+chown root:root respaldo-mongo.sh
+chmod 700 respaldo-mongo.sh
+node=""
+[ -f nodo.env ] && node="$(sed -n "s/^NODE=//p" nodo.env)"
 cd /etc/systemd/system
-chown root:root wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer
-chmod 644 wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer
+units="wherever-actualizar.service wherever-actualizar.timer wherever-sonda.service wherever-sonda.timer wherever-respaldo.service wherever-respaldo.timer"
+chown root:root $units
+chmod 644 $units
 systemctl daemon-reload
 systemctl enable --now wherever-actualizar.timer wherever-sonda.timer
+# Respaldo de MongoDB solo en el nodo a: las dos instancias ven la misma base.
+if [ "$node" = a ]; then
+  systemctl enable --now wherever-respaldo.timer
+else
+  systemctl disable --now wherever-respaldo.timer
+fi
 systemctl list-timers "wherever-*" --no-pager'
 
 if [[ -n "$node" ]]; then

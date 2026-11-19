@@ -874,6 +874,17 @@
 - A evitar: instalar el actualizador nuevo y fusionar otra cosa antes de este PR: un `dev` sin firma quedaría en `failed_digest` (inofensivo, pero se pierde ese despliegue). Igual con `crear.sh` antes de fusionar: la instancia nueva no tendría imagen que instalar.
 - Pendiente: la constitución §6 (1.9.0, sin firmar) aún dice que Cosign es deuda diferida; decidir si se corrige al firmarla.
 
+## Respaldo semanal de MongoDB a S3 (PR F, 2026-11-19)
+- Estado: `respaldos.tf` (bucket `wherever-dev-respaldos-<cuenta>`: privado, sin ACL, SSE-S3, versionado, 28 días, solo TLS), `respaldo-mongo.sh` + `wherever-respaldo.{service,timer}` (viernes 21:00 México, solo nodo a), filtro `RespaldosOk` y alarma `wherever-dev-respaldos`, restauración en `infra/aws-dev/README.md`. Prueba `probar-respaldo.sh` en el job `iac-scan`. Sin aplicar en AWS: falta IAM en consola, `crear.sh` y un respaldo a mano.
+- Decisión: la instancia solo tiene `s3:PutObject` en `respaldos/*` (rol y boundary). Porqué: una instancia comprometida no puede leer ni borrar respaldos; el versionado cubre que sobrescriba uno.
+- Decisión: alarma de 7 días y no de 8. Porqué: CloudWatch no admite más de 604 800 s (periodo × periodos). Con la corrida de los viernes a las 21:00 avisa si esa semana no llegó antes de las 22:00. `treat_missing_data = breaching`: recién creada está en ALARM hasta el primer respaldo.
+- Decisión: la cadena de Atlas entra al contenedor por la entrada estándar y mongodump la lee con `--config`. Porqué: ni en la línea de comandos (visible en `ps`) ni en un archivo del host; sin montajes, la prueba corre igual en CI que en un contenedor.
+- Decisión: SSE-S3 y no KMS. Porqué: una llave propia cuesta US$1 al mes, más que el bucket, y sumaría permisos de KMS.
+- Decisión: el bucket lo crea el deployer con `wherever-dev-deployer-imagenes.json` (tres Sid nuevos, mismo patrón que el de imágenes). `wherever-dev-deployer-policy` ya no admite más caracteres.
+- A evitar: probar `respaldo-mongo.sh` desde Git Bash, que convierte las rutas de los argumentos de `docker`. En Windows se corre en un contenedor Linux con el socket: `MSYS_NO_PATHCONV=1 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(pwd -W):/repo:ro" docker:29-cli sh -c 'apk add -q bash coreutils shellcheck tzdata && bash /repo/infra/aws-dev/scripts/probar-respaldo.sh'`.
+- A evitar: una directiva `# shellcheck disable` de todo el archivo va antes del primer comando (`set -euo pipefail`); después solo cubre la línea siguiente.
+- Nota: `terraform fmt -check` de Terraform 1.14 marca la alineación de `metadata_options` en `main.tf`, que ya venía de `main`; no se tocó aquí.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

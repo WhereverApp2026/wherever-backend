@@ -1,0 +1,12 @@
+# Respaldo semanal de MongoDB Atlas a S3; solo en la instancia a (respaldo-mongo.sh lo revisa).
+[Unit]
+Description=Respaldo de MongoDB Atlas a S3
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/wherever/respaldo-mongo.sh
+# Por encima de los 40 minutos que se da mongodump; el apagado de las 22:00 lo corta antes.
+TimeoutStartSec=50min

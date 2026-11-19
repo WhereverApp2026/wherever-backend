@@ -91,7 +91,7 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw cloudfront_url)/ready"
 `/ready` da 503 si Atlas no acepta la IP elástica o falta un índice (`make indexes` contra Atlas).
 
 ## CI
-`ci-pr.yml` corre en todo PR (sin filtro de rutas) y construye la imagen con el `Dockerfile`, pero no revisa Terraform: `fmt`, `validate` y Trivy de `infra/` se corren a mano.
+`ci-pr.yml` construye la imagen con el `Dockerfile`; su job `iac-scan` corre `trivy config` sobre `infra/aws-dev` y `scripts/probar-respaldo.sh`. `fmt` y `validate` de Terraform se corren a mano.
 
 ## Servicios externos (spec nv-11)
 - **Neo4j en pausa.** Aura Free se pausa tras 72 horas sin uso y **borra la instancia tras 30 días en pausa**. En pausa, `/ready` da 503 y el actualizador no instala imágenes. Para reanudar: consola de Aura → instancia → Resume. Compruébalo antes de la entrega y de la evaluación.
@@ -127,6 +127,51 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 - **Variables para nv-45** en `/wherever/dev/`: `IMAGENES_BUCKET` (salida `imagenes_bucket`) e `IMAGENES_URL` (salida `imagenes_url`). Las define nv-45 como opcionales fuera de prod; esta spec no cambia la API.
 - **`destruir.sh`** vacía y borra el bucket (`force_destroy`): las imágenes se pierden y la URL de imágenes cambia al recrear.
 - **Costo:** dentro de la capa gratuita de CloudFront (1 TB y 10 millones de peticiones al mes); S3 unos centavos al mes para el piloto.
+
+## Respaldos de MongoDB
+Atlas M0 no tiene respaldos. Cada viernes a las 21:00 (`America/Mexico_City`) la instancia **a** corre `scripts/respaldo-mongo.sh` con `wherever-respaldo.timer`: `mongodump --archive --gzip` de la base de `MONGO_URI` en un contenedor `mongo` fijado por digest, sube `respaldos/AAAA-MM-DD.archive.gz` a S3, borra el archivo local y registra en CloudWatch el evento `respaldo` (`estado` ok o error, tamaño y paso; sin datos). Si ese viernes estuvo apagada, corre al encender (`Persistent=true`).
+
+- **Bucket** (`respaldos.tf`): `wherever-dev-respaldos-<cuenta>`, privado, con el acceso público bloqueado, sin ACL, SSE-S3, versionado y política que niega todo lo que no vaya por TLS. Los respaldos y sus versiones reemplazadas se borran a los 28 días: quedan cuatro.
+- **Permisos:** la instancia solo tiene `s3:PutObject` en `respaldos/*` (rol y boundary, `RespaldarMongo`): no puede leer, listar ni borrar. Si alguien sube basura con el nombre de un respaldo, el versionado guarda el anterior. Leer y restaurar se hace con el perfil `wherever-dev` (`BucketDeRespaldos` y `VaciarRespaldosAlDestruir` en `iam/wherever-dev-deployer-imagenes.json`).
+- **Secreto:** la cadena de Atlas sale de `.env` y entra al contenedor por la entrada estándar; nunca va en la línea de comandos ni en el log. Los errores de mongodump se imprimen sin credenciales.
+- **Alarma** `wherever-dev-respaldos`: sin un respaldo `ok` en 7 días (el máximo de CloudWatch para una alarma) llega el mismo correo que las demás. Aquí la falta de datos cuenta como falla. Recién creada queda en ALARM hasta el primer respaldo.
+- **Ver qué pasó:** `journalctl -u wherever-respaldo -n 50` en la instancia a, o el flujo `respaldos-<instancia>` del grupo de logs. Un fallo dice `respaldo: FALLÓ en el paso '<paso>'`.
+- **Respaldo a mano:** por Systems Manager en la instancia a, `systemctl start wherever-respaldo.service` (espera a que termine). En la b no hace nada.
+- **Prueba:** `infra/aws-dev/scripts/probar-respaldo.sh` (job `iac-scan`): shellcheck, respaldo en seco contra un MongoDB en Docker, restauración y conteo, y una cadena inalcanzable que debe terminar en error. En Windows córrelo dentro de un contenedor Linux con el socket de Docker (ver `Memoria.md`).
+- **Costo:** centavos. Un respaldo del piloto pesa pocos MB; cuatro en S3 Standard cuestan menos de un centavo de dólar al mes. Una métrica y una alarma más, dentro de las 10 gratuitas de cada una. Bajar la imagen `mongo` cada semana (el actualizador borra las imágenes sin usar) no cobra: el tráfico de entrada es gratis.
+- **`destruir.sh`** borra el bucket y sus respaldos (`force_destroy`): baja el último antes.
+- **Subir la versión de `mongo`:** cambia etiqueta y digest juntos en `respaldo-mongo.sh` (`docker buildx imagetools inspect mongo:8.0`) y corre `instalar-actualizador.sh` en la instancia a.
+
+### Restaurar
+Primero a un MongoDB local de prueba; a Atlas solo después de revisar que el respaldo está completo. En Git Bash antepón `MSYS_NO_PATHCONV=1` a los comandos de `docker` y `aws`.
+
+```bash
+cd infra/aws-dev
+bucket="$(terraform output -raw respaldos_bucket)"
+aws s3 ls "s3://$bucket/respaldos/" --profile wherever-dev                       # elige la fecha
+aws s3 cp "s3://$bucket/respaldos/2026-11-20.archive.gz" respaldo.archive.gz --profile wherever-dev
+# ¿Lo sobrescribió alguien? Versiones anteriores del mismo día:
+aws s3api list-object-versions --bucket "$bucket" --prefix respaldos/2026-11-20 --profile wherever-dev
+#   aws s3api get-object --bucket "$bucket" --key respaldos/2026-11-20.archive.gz --version-id <id> respaldo.archive.gz --profile wherever-dev
+
+# 1. Verificar en un MongoDB local desechable (misma imagen que el respaldo):
+imagen=mongo:8.0.38@sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361
+docker network create restauracion
+docker run -d --name mongo-restauracion --network restauracion "$imagen"
+sleep 5
+docker run -i --rm --network restauracion "$imagen" mongorestore --uri mongodb://mongo-restauracion:27017 --archive --gzip < respaldo.archive.gz
+docker exec mongo-restauracion mongosh wherever --quiet --eval 'db.getCollectionNames().sort().forEach(c => print(c, db[c].countDocuments()))'
+docker rm -f mongo-restauracion && docker network rm restauracion
+```
+
+2. **A Atlas**, solo si las colecciones y los conteos tienen sentido. Pon la API en mantenimiento ([Mantenimiento](#mantenimiento-spec-nv-16)) y usa tu usuario de Atlas (no el del servidor). La cadena va en un archivo fuera del repo, no en la línea de comandos: crea `~/restaurar.yaml` con una sola línea `uri: '<cadena con la base wherever>'`, y luego:
+
+```bash
+docker run -i --rm -v "$HOME/restaurar.yaml:/c.yaml:ro" "$imagen" mongorestore --config=/c.yaml   --archive --gzip --drop --nsInclude 'wherever.*' < respaldo.archive.gz
+rm ~/restaurar.yaml respaldo.archive.gz
+```
+
+`--drop` reemplaza cada colección del respaldo; lo escrito después del respaldo se pierde. Después corre `make indexes` contra Atlas y quita el mantenimiento. Los datos de Neo4j y Redis no están en este respaldo: el grafo se rehace con `scripts/reconstruir-grafo`.
 
 ## Correo saliente (SMTP)
 - **Puerto:** `egress_ports.smtp` abre el 587 (STARTTLS). Si el proveedor cambia a 465, cambia el puerto y `SMTP_TLS=tls`.
@@ -166,7 +211,7 @@ Pasos manuales tras recrear; `crear.sh` también los imprime:
 2. **SNS:** confirma el correo *Subscription Confirmation*; se pierde al destruir.
 3. **URL:** cambia al recrear, porque la distribución de CloudFront es otra. Actualiza `API_URL` con `gh variable set` y avisa al equipo móvil.
 
-**`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch y las imágenes del bucket.
+**`destruir.sh`** no toca Parameter Store, Atlas, Aura, Upstash, GHCR, el boundary ni las políticas. Se pierden los logs de CloudWatch, las imágenes del bucket y los respaldos de MongoDB.
 
 Antes de las 21:50 o después de las 08:00: fuera de horario, la instancia nueva se apaga o el actualizador no instala.
 La IP elástica se libera con el destroy; una suelta cobra. Los parámetros de `/wherever/dev/` no los crea Terraform: bórralos con `aws ssm delete-parameter` si ya no sirven.

@@ -24,6 +24,7 @@ Renombrar uno de estos campos en la API apaga su métrica en silencio.
 | `duracion_ms` | Línea de acceso | `LatenciaMs` |
 | `dependencia` | `/ready` al encontrar una base caída | `DependenciaCaida` |
 | `evento` | `actualizar.sh` | `Regresos` |
+| `evento` = `respaldo` y `estado` = `ok` | `respaldo-mongo.sh` (flujo `respaldos-<instancia>`) | `RespaldosOk` |
 
 ## Qué hacer con cada alarma
 Sin datos no hay alarma: las instancias se apagan a diario.
@@ -34,3 +35,4 @@ Sin datos no hay alarma: las instancias se apagan a diario.
 | `wherever-dev-respuestas` | 5 o más respuestas 5xx en 5 minutos | Consulta `errores-recientes`; un 503 suele ser Redis |
 | `wherever-dev-dependencia` | `/ready` encontró una base caída | Busca `dependencia` en el log; revisa la pausa de Aura y la cuota de Upstash |
 | `wherever-dev-regresos` | Una imagen nueva no quedó sana | Flujo `despliegues-*` y `/var/log/wherever/failed_digest` |
+| `wherever-dev-respaldos` | Sin respaldo `ok` de MongoDB en 7 días; aquí la falta de datos sí cuenta | Flujo `respaldos-*` y `journalctl -u wherever-respaldo` en la instancia a |
