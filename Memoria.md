@@ -827,7 +827,7 @@
 - Decisión: `wherever-dev-deployer-imagenes.json` suma `ssm:SendCommand` (solo instancias de `us-east-2` y `AWS-RunShellScript`), `ssm:GetCommandInvocation`/`ListCommandInvocations` y la lectura de la lista de prefijos de CloudFront. Porqué: esos permisos vivían solo en la consola y no en el JSON del repo; al pegar el JSON del repo encima se perdieron.
 - A evitar: nunca pegues un JSON de IAM del repo sobre una política viva sin compararlos antes; si se pierde algo, IAM → *Policy versions* → *Set as default* devuelve la versión anterior.
 
-## Correo por Gmail (2026-11-18)
+## Correo por Gmail (2026-11-18) — reemplazado por Brevo, ver «Fallas semanales»
 - Decisión: correo saliente por SMTP de Gmail con contraseña de aplicación (587, STARTTLS). Porqué: no hay dominio propio para SES y alcanza para el piloto (unos 500 al día). `egress_ports.smtp` abre el 587.
 - Estado: Stripe (entorno de prueba propio, Connect Express en México), Gemini, imágenes y `DATA_KEYS` cargados en Parameter Store y leídos por las dos instancias. Faltan Firebase y el correo.
 
@@ -842,11 +842,18 @@
 - A evitar: `idtoken` no pone plazo a la descarga de llaves ni revisa `iss`; el cliente lleva 5 s y `identityFromClaims` revisa `iss`. Su error de red llega como `*url.Error` (503); el resto es token malo (401). Una respuesta no 200 de Google la convierte en error `keysTransport`.
 - A evitar: en Docker con un worktree, `git` no funciona dentro del contenedor (la ruta del `.git` es de Windows) y critic da un PASS falso (sin archivos que revisar). Correr `scripts/critic-guardrails.sh` en Git Bash. B2 marca cualquier identificador con «token» en un `errors.New` (p. ej. `ErrGoogleToken`): nómbralo sin esa palabra.
 
+## Fallas semanales: fuzz y ZAP (2026-11-19)
+- Corrección: `parseRows` (ciudades) en JSON devolvía filas junto con el error: `json.Decoder` sigue tras un error de tipo y `[0 ]` dejaba una `ImportRow` vacía. Ahora con error no devuelve filas. Caso versionado en `internal/ciudades/testdata/fuzz/FuzzParseRows/`.
+- `FuzzNormalizePhone/9dfaa5d59ad6446b` ya estaba versionado desde nv-10 y pasa: el artefacto semanal lo trae porque `testdata/` viaja con el árbol, no porque fallara.
+- Decisión: ZAP 90022 (Application Error Disclosure) en `/api/v1/probe/error` es falso positivo y se filtra en `.zap/plan.yaml` (`alertFilter`). Porqué: la sonda da 500 a propósito, solo fuera de prod, y la evidencia es solo la línea de estado.
+- Correo: `infra/aws-dev/README.md` ya dice Brevo (`smtp-relay.brevo.com`, 587, STARTTLS). Porqué: Google bloqueaba el SMTP de Gmail desde AWS; con remitente gratuito puede ir a spam hasta tener dominio.
+- A evitar: antes de borrar un `testdata/` de prueba, revisa `git ls-files`: puede haber casos ya versionados.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
 - ~~D-1: cuenta nueva por Google sin `fecha_nacimiento`~~ — resuelta el 2026-11-18: camino B de `specs/nv-72` (falta el visto bueno del dueño de A1 en el PR).
-- Proveedor de correo (SMTP o servicio) y su remitente (`MAIL_FROM`).
+- ~~Proveedor de correo~~ — Brevo SMTP (2026-11-18); falta dominio propio para que no caiga en spam.
 - Firma de `nv-00…nv-03`: siguen en Borrador con evidencia. Desde nv-04 el revisor es Osmar Reséndiz (único integrante de backend; el Excel nombra a Jorge Alberto Rodríguez Enriquez para las hojas J y a Alexander Dominguez Zarate para las A como responsables del diseño).
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.
 

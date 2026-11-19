@@ -114,7 +114,10 @@ Con `MODO_MANTENIMIENTO=true`, `/api/v1/configuracion` anuncia `mantenimiento: t
 
 ## Correo saliente (SMTP)
 - **Puerto:** `egress_ports.smtp` abre el 587 (STARTTLS). Si el proveedor cambia a 465, cambia el puerto y `SMTP_TLS=tls`.
-- **Proveedor:** Gmail con contraseña de aplicación (`smtp.gmail.com`, 587, `SMTP_TLS=starttls`); unos 500 correos al día. `MAIL_FROM` debe ser la misma cuenta, porque Gmail reescribe el remitente, y va como correo simple (`cuenta@gmail.com`): con `Nombre <correo>` la API no arranca.
+- **Proveedor:** Brevo (`SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_TLS=starttls`); el plan gratuito da unos 300 correos al día.
+- **Credenciales:** `SMTP_USER` es el login SMTP que muestra Brevo (termina en `@smtp-brevo.com`, no es el correo de la cuenta) y `SMTP_PASSWORD` es la clave SMTP de Brevo (SecureString), no la contraseña de la cuenta.
+- **Remitente:** `MAIL_FROM` es el correo de un remitente verificado en Brevo, como correo simple (`remitente@dominio`): con `Nombre <correo>` la API no arranca.
+- **Por qué no Gmail:** al principio se usó el SMTP de Gmail con contraseña de aplicación, pero Google bloqueaba los envíos desde AWS (cuenta nueva sin verificar). Con un remitente de correo gratuito (Gmail, Outlook) Brevo lo marca como no conforme y los correos pueden llegar a spam; se resuelve al tener dominio propio con SPF y DKIM.
 - **Variables** en `/wherever/dev/`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD` (SecureString), `MAIL_FROM` y `APP_LINK_BASE`.
 - **Aplicar:** `crear.sh` (agrega una regla de salida al Security Group, sin recrear nada) y luego reiniciar la API para que relea Parameter Store.
 

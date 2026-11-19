@@ -9,6 +9,17 @@ env:
     failOnError: true
     progressToStdout: true
 jobs:
+  # Falsos positivos aceptados. Va antes del escaneo para que el filtro se aplique al levantarse la alerta.
+  - type: alertFilter
+    alertFilters:
+      # 90022 «Application Error Disclosure»: su evidencia es solo la línea `HTTP/1.1 500`. La sonda
+      # /api/v1/probe/error (internal/http/probe.go) da ese 500 a propósito para probar el error
+      # uniforme; solo existe fuera de prod (en prod da 404 y oculta `detalle`, lo prueba
+      # TestErrors_ProdHidesDetailAndProbes). El cuerpo no lleva trazas ni rutas de archivos.
+      - ruleId: 90022
+        newRisk: False Positive
+        url: http://localhost:8080/api/v1/probe/error
+        urlRegex: false
   - type: openapi
     parameters:
       apiFile: /zap/wrk/internal/http/openapi.json
