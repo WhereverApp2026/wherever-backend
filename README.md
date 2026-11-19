@@ -10,6 +10,7 @@ API REST en Go (Fiber) para Wherever, desarrollada con **Spec Driven Development
 - `AGENTS.md`: cómo se trabaja. `Memoria.md`: estado, decisiones y lecciones. `CHECKLIST_PR.md`: gates de PR.
 - `.claude/agents/` (5 sub-agentes) y `.claude/skills/` (skills de apoyo).
 - `docs/`: `endpoints.md`, `rate-limit-matrix.md`, `asvs-l2-checklist.md` (vivos).
+- Seguridad: estado, puntaje DevSecOps y brecha frente a banca y fintech en [`docs/seguridad.md`](docs/seguridad.md).
 
 ## Mapa de specs
 | Spec | Qué fija |
