@@ -885,6 +885,11 @@
 - A evitar: una directiva `# shellcheck disable` de todo el archivo va antes del primer comando (`set -euo pipefail`); después solo cubre la línea siguiente.
 - Nota: `terraform fmt -check` de Terraform 1.14 marca la alineación de `metadata_options` en `main.tf`, que ya venía de `main`; no se tocó aquí.
 
+## crear.sh deja de esconder errores (2026-11-19)
+- Lección: `crear.sh` filtraba `terraform plan` y `apply` con `grep … || true`. Un `AccessDenied` al crear el bucket de respaldos quedó oculto, el script siguió e imprimió «la infraestructura está lista» con 2 de 10 recursos creados.
+- Decisión: el plan va a un archivo y solo se muestra el resumen; si falla, se muestra completo y se sale. El apply muestra toda su salida; si falla, respalda el estado (`despues-de-fallo`) y sale antes de tocar las instancias. `probar-respaldo.sh` pasa `crear.sh` por shellcheck en el CI.
+- A evitar: un permiso IAM nuevo puede no quedar guardado en la consola. El error dice «no identity-based policy» (falta en la política del deployer) o «no permissions boundary» (falta en el boundary del rol de la instancia).
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).

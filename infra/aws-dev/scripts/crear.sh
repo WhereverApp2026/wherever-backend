@@ -35,7 +35,16 @@ trap 'rm -f "$plan"' EXIT
 tf init -input=false -no-color >/dev/null
 backup antes-de-crear
 echo "crear: calculando el plan"
-tf plan -input=false -no-color -out="$(basename "$plan")" | grep -E '^  # |^Plan:|^No changes' || true
+# La salida completa va a un archivo: en pantalla solo el resumen, pero si el plan falla se
+# muestra entera y el script se detiene (antes un `grep … || true` escondía el error).
+plan_log="$(mktemp)"
+trap 'rm -f "$plan" "$plan_log"' EXIT
+if ! tf plan -input=false -no-color -out="$(basename "$plan")" >"$plan_log" 2>&1; then
+	cat "$plan_log" >&2
+	echo "crear: el plan falló; no se cambió nada" >&2
+	exit 1
+fi
+grep -E '^  # |^Plan:|^No changes' "$plan_log" || true
 if [[ "$only_plan" == "true" ]]; then
 	echo "crear: solo plan; no se cambió nada"
 	exit 0
@@ -44,7 +53,14 @@ fi
 if tf show -no-color "$(basename "$plan")" | grep -q '^Plan:'; then
 	read -r -p "Escribe CREAR para aplicar este plan: " answer
 	[[ "$answer" == "CREAR" ]] || { echo "crear: cancelado; no se cambió nada"; exit 1; }
-	tf apply -input=false -no-color "$(basename "$plan")" | grep -E 'Apply complete|Error' || true
+	# Salida completa del apply: si falla, se ve el error entero y el script se detiene antes de
+	# instalar nada en las instancias o de decir que la infraestructura está lista.
+	if ! tf apply -input=false -no-color "$(basename "$plan")"; then
+		backup despues-de-fallo
+		echo "crear: el apply FALLÓ (error arriba). Lo que alcanzó a crearse quedó en el estado;" \
+			"corrige la causa y vuelve a correr este script." >&2
+		exit 1
+	fi
 	backup despues-de-crear
 fi
 
