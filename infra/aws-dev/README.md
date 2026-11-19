@@ -52,7 +52,7 @@ MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east
 La app la instalan `crear.sh` y el actualizador; ver [Crear y destruir](#crear-y-destruir-spec-nv-14).
 
 ## Actualización automática (spec nv-08)
-Cada `push` a `main` con CI en verde publica la imagen en GHCR (`cd-dev.yml`); el servidor la detecta y se instala sola, con regreso automático.
+Cada `push` a `main` con CI en verde publica la imagen en GHCR (`cd-dev.yml`); el servidor la detecta, verifica su firma y se instala sola, con regreso automático.
 
 Una sola vez:
 1. Crea un PAT clásico con solo `read:packages` y cárgalo tú, sin pegarlo en ningún chat:
@@ -63,9 +63,25 @@ MSYS_NO_PATHCONV=1 aws ssm put-parameter --profile wherever-dev --region us-east
 3. Activa el timer con `crear.sh`, que corre `instalar-actualizador.sh` en cada instancia. Repítelo si cambian esos archivos.
 
 - **Ver qué pasó:** `journalctl -u wherever-actualizar -n 50`.
+- **Firma rechazada:** el digest queda en `failed_digest` y CloudWatch registra el evento `firma_rechazada`. Si el log dice «no se pudo comprobar la firma» (red, Rekor o `GHCR_TOKEN`), no se marca: reintenta cada minuto sin instalar.
 - **Regresar:** en Actions, `cd-dev` → Run workflow con el SHA completo; el servidor la instala solo.
 - **Reintentar una versión fallida:** borra su línea de `/var/log/wherever/failed_digest`.
-- **Si el workflow termina en rojo con un SHA antiguo:** el servidor regresó, o venció `GHCR_TOKEN`.
+- **Si el workflow termina en rojo con un SHA antiguo:** el servidor regresó, rechazó la firma, o venció `GHCR_TOKEN`.
+
+### Firma, SBOM y provenance (PR D, 2026-11-19)
+- **Qué se publica:** `docker buildx build --provenance=mode=max --sbom=true`. La etiqueta del SHA apunta a un **índice OCI** con la imagen `linux/amd64` y su manifiesto de atestaciones (SBOM SPDX y provenance SLSA). `dev` apunta al **mismo** digest. Docker en la instancia elige la plataforma del índice; `RepoDigests` guarda el digest del índice, que es el que se firma y se verifica.
+- **Firma:** job `firmar`, con cosign `v3.1.4` sin llaves: el OIDC de GitHub (`id-token: write`, solo ahí) da un certificado de Fulcio con la identidad del workflow y la firma queda en Rekor. Siempre por digest. `dev` se mueve después de firmar, así un servidor nunca ve un `dev` sin firma.
+- **Verificación en el servidor:** antes de los índices y de salir del balanceador, `actualizar.sh` corre `cosign verify` con `--certificate-identity-regexp '^https://github\.com/WhereverApp2026/wherever-backend/\.github/workflows/cd-dev\.yml@refs/heads/main$'` y `--certificate-oidc-issuer https://token.actions.githubusercontent.com`. Usa las mismas credenciales de GHCR. cosign lo instala `instalar-actualizador.sh` (binario oficial, checksum fijado en el script, `/usr/local/bin/cosign`, caché de TUF en `/var/lib/wherever/sigstore`).
+- **Imágenes viejas sin firma (regreso):** solo se aceptan digests firmados por `cd-dev` desde `main`, sin excepción por fecha. Nada se firma a posteriori: un `Run workflow` con el SHA de una imagen anterior al cambio, o de una cuya firma quedó a medias, la **reconstruye** desde ese SHA (si es ancestro de `main`) con SBOM, provenance y firma nuevas; el digest cambia. Una imagen ya firmada no se reconstruye. El regreso automático de `actualizar.sh` a la versión que ya corría no se vuelve a verificar: ya estaba instalada.
+- **Retención:** cada despliegue deja de 4 a 5 versiones en GHCR (índice, imagen, atestación, firma y, si GHCR no tiene la API de referrers, su índice). Se guardan 40 (al menos 8 despliegues). Al más viejo puede faltarle una pieza; un regreso a ese SHA lo detecta y lo reconstruye.
+- **Comprobar a mano** (con un PAT de `read:packages`, en Docker; en Git Bash antepón `MSYS_NO_PATHCONV=1`):
+```bash
+digest="$(docker buildx imagetools inspect ghcr.io/whereverapp2026/wherever-backend:dev --format '{{json .Manifest}}' | jq -r .digest)"
+cosign verify --certificate-identity-regexp '^https://github\.com/WhereverApp2026/wherever-backend/\.github/workflows/cd-dev\.yml@refs/heads/main$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com "ghcr.io/whereverapp2026/wherever-backend@$digest"
+docker buildx imagetools inspect "ghcr.io/whereverapp2026/wherever-backend@$digest" --format '{{json .SBOM}}' | head -c 300
+```
+- **Subir cosign:** cambia juntas `cosign_version` y los dos checksums de `instalar-actualizador.sh` (de `cosign_checksums.txt` de esa versión) y `COSIGN_RELEASE` de `cd-dev.yml`; corre `instalar-actualizador.sh` en las dos instancias antes de fusionar.
 
 ## Verificar
 ```bash

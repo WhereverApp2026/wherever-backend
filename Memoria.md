@@ -864,6 +864,16 @@
 - A evitar: `--checks-bundle-repository` de Trivy acepta un solo valor (no una lista como `--db-repository`); se deja el de por defecto.
 - Pendiente del usuario: activar *Dependabot alerts* y *security updates* en *Settings → Code security* (el archivo solo activa las actualizaciones de versión). Las imágenes fijadas por digest en los workflows no las sube Dependabot.
 
+## CD: SBOM, provenance y firma con cosign (2026-11-19)
+- Estado: `cd-dev.yml` en tres jobs: `publicar` (buildx con `--provenance=mode=max --sbom=true`, driver docker-container), `firmar` (cosign v3.1.4 sin llaves; único job con `id-token: write`) y `desplegar` (verifica la firma, mueve `dev` al mismo digest y lo comprueba, retención, sonda del servidor). `actualizar.sh` corre `cosign verify` con la identidad `cd-dev.yml@refs/heads/main` antes de instalar. cosign se instala en la instancia desde `instalar-actualizador.sh` con checksum fijado.
+- Decisión: binario de cosign con checksum y no contenedor por digest. Porqué: un `curl` + `sha256sum -c` en AL2023; un contenedor necesitaría montar las credenciales de GHCR y la caché de TUF.
+- Decisión: firmar y verificar el digest del **índice** OCI. Porqué: con atestaciones la etiqueta es un índice; `docker pull` por etiqueta guarda ese digest en `RepoDigests` y es el que usa el actualizador. `imagetools create` con un solo índice lo copia tal cual: `dev` queda en el mismo digest, y el job lo comprueba.
+- Decisión: nada se firma a posteriori; un regreso a un SHA sin firma lo reconstruye. Porqué: la firma dice «esto lo construyó cd-dev desde main»; firmar lo que ya estaba en GHCR solo diría «esto estaba en GHCR».
+- Decisión: firma inválida → `failed_digest`; error de red o de GHCR → reintento sin marcar. Probado en Docker con AL2023: sin firma da `no signatures found`; otra identidad, `no matching attestations` y `certificate identity`; un 401 de GHCR no coincide con ningún patrón. Si cosign cambia sus mensajes, el actualizador se queda reintentando (falla cerrado).
+- Decisión: retención de 10 a 40 versiones. Porqué: cada despliegue deja de 4 a 5 (índice, imagen, atestación, firma) y `delete-package-versions` cuenta piezas sueltas; el motivo por el que nv-08 tenía `--provenance=false`.
+- A evitar: instalar el actualizador nuevo y fusionar otra cosa antes de este PR: un `dev` sin firma quedaría en `failed_digest` (inofensivo, pero se pierde ese despliegue). Igual con `crear.sh` antes de fusionar: la instancia nueva no tendría imagen que instalar.
+- Pendiente: la constitución §6 (1.9.0, sin firmar) aún dice que Cosign es deuda diferida; decidir si se corrige al firmarla.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
