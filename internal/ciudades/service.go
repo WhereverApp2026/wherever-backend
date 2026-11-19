@@ -102,8 +102,13 @@ func validateRow(row ImportRow) error {
 func parseRows(r io.Reader, format string) ([]ImportRow, error) {
 	switch format {
 	case "json":
+		// Con un error de tipo, Decode sigue y deja filas en cero (p. ej. `[0]` da una ImportRow vacía):
+		// ante cualquier error no se devuelve nada.
 		var rows []ImportRow
-		return rows, json.NewDecoder(r).Decode(&rows)
+		if err := json.NewDecoder(r).Decode(&rows); err != nil {
+			return nil, err
+		}
+		return rows, nil
 	case "csv":
 		return parseCSV(r)
 	default:
