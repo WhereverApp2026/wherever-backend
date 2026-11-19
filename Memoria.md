@@ -853,6 +853,7 @@
 - Estado: solo pruebas, sin cambio de API. `tests/security/rutas_faltantes_security_test.go` cubre 12 rutas que no tenían prueba propia; `tests/integration/negocios_enviar_revision_test.go` prueba `POST /negocios/{id}/enviar-revision` por HTTP (200 y 422 con lo que falta).
 - Decisión: qué se prueba sale de la columna Auth de `docs/endpoints.md`. Con JWT: 401 (sin token, vencido, sin firma, alg none), 403 con la cuenta en eliminación pendiente salvo `logout-todos` y `sync/cambios` (sin guardia ni 403 en la tabla), y aislamiento entre dos personas. Públicas (conteo, afluencia, clima) y de sesión opcional (semántica): 429 con `Retry-After`, parámetros malos 400/404/422, sin datos personales y sin coordenadas en logs. Porqué: no inventar un 401 donde la ruta no lo declara.
 - A evitar: para probar el 429 global no hagas 1000 peticiones: baja `cfg.RateLimitGlobal` y arma el entorno con `authtest.New`. Para un límite por sujeto, siembra `rate:{politica}:{sujeto}` en Redis.
+- A evitar: para alterar un cursor firmado no cambies el último carácter de la firma. En Base64 sin relleno sus 2 bits bajos no cuentan y la firma puede quedar igual: el CI dio 200 con `…xw`→`…xx`. Cambia el primero o reescribe el contenido.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

@@ -2,9 +2,12 @@ package security
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,8 +178,10 @@ func TestRutasFaltantesSecurity_SyncCursorAjenoOAlteradoEs422(t *testing.T) {
 
 	ajeno := send(t, app, rutaSync.method, rutaSync.path+"?"+url.Values{"desde": {siguiente}}.Encode(), nil, betoToken)
 	assert.Equal(t, http.StatusUnprocessableEntity, ajeno.status, ajeno.body)
-	alterado := send(t, app, rutaSync.method, rutaSync.path+"?"+url.Values{"desde": {siguiente[:len(siguiente)-2] + "xx"}}.Encode(), nil, anaToken)
-	assert.Equal(t, http.StatusUnprocessableEntity, alterado.status, alterado.body)
+	for name, malo := range cursoresAlterados(t, siguiente) {
+		alterado := send(t, app, rutaSync.method, rutaSync.path+"?"+url.Values{"desde": {malo}}.Encode(), nil, anaToken)
+		assert.Equal(t, http.StatusUnprocessableEntity, alterado.status, "%s: %s", name, alterado.body)
+	}
 
 	propia := send(t, app, rutaSync.method, rutaSync.path, nil, betoToken)
 	require.Equal(t, http.StatusOK, propia.status)
@@ -295,6 +300,32 @@ func TestRutasFaltantesSecurity_SemanticaCuentaPorSujeto(t *testing.T) {
 	assert.Equal(t, http.StatusOK, conSesion.status, conSesion.body)
 	assert.NotContains(t, conSesion.body, u.ID.Hex())
 	assert.NotContains(t, conSesion.body, u.Email)
+}
+
+// cursoresAlterados arma cursores con un cambio que sí altera bytes. Cambiar el último
+// carácter de la firma no sirve: en Base64 sin relleno sus 2 bits bajos no cuentan y la firma
+// decodificada puede quedar igual.
+func cursoresAlterados(t *testing.T, cursor string) map[string]string {
+	t.Helper()
+	payload, sig, ok := strings.Cut(cursor, ".")
+	require.True(t, ok, cursor)
+	otro := func(c byte) string {
+		if c == 'A' {
+			return "B"
+		}
+		return "A"
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(payload)
+	require.NoError(t, err)
+	var c map[string]any
+	require.NoError(t, json.Unmarshal(raw, &c))
+	c["orden"] = "0:0:" + strconv.FormatInt(time.Now().Unix(), 10)
+	forged, err := json.Marshal(c)
+	require.NoError(t, err)
+	return map[string]string{
+		"firma alterada":     payload + "." + otro(sig[0]) + sig[1:],
+		"contenido alterado": base64.RawURLEncoding.EncodeToString(forged) + "." + sig,
+	}
 }
 
 func keys(m map[string]any) []string {
