@@ -1,5 +1,6 @@
-# CD del entorno de desarrollo (spec nv-08). Publica la imagen en GHCR; el servidor la detecta y se
-# actualiza solo con wherever-actualizar.timer. GitHub no tiene ningún acceso a AWS.
+# CD del entorno de desarrollo (spec nv-08). Publica la imagen en GHCR con SBOM y provenance, la firma
+# con cosign sin llaves y mueve `dev`; el servidor la detecta, verifica la firma y se instala sola
+# (wherever-actualizar.timer). GitHub no tiene ningún acceso a AWS.
 name: cd-dev
 
 on:
@@ -14,9 +15,8 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-  packages: write
+# Cada job pide solo lo suyo; id-token (OIDC para cosign) solo lo tiene `firmar`.
+permissions: {}
 
 # Uno a la vez; el siguiente espera sin cancelar al que está en curso.
 concurrency:
@@ -25,10 +25,17 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/whereverapp2026/wherever-backend
+  COSIGN_RELEASE: v3.1.4
+  # Identidad que exige la firma, aquí y en actualizar.sh: este workflow, desde main.
+  FIRMA_IDENTIDAD: ^https://github\.com/WhereverApp2026/wherever-backend/\.github/workflows/cd-dev\.yml@refs/heads/main$
+  FIRMA_EMISOR: https://token.actions.githubusercontent.com
 
 jobs:
   publicar:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_run' &&
@@ -36,6 +43,9 @@ jobs:
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
+    outputs:
+      sha: ${{ steps.entrada.outputs.sha }}
+      digest: ${{ steps.imagen.outputs.digest }}
     steps:
       - name: validar sha
         id: entrada
@@ -56,50 +66,139 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # El driver docker-container admite atestaciones (SBOM y provenance); el de docker no siempre.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
+
       - name: entrar a GHCR
         env:
           TOKEN: ${{ github.token }}
         run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
-      # Volver a ejecutar el mismo SHA no reconstruye; un regreso a una imagen ya borrada sí,
-      # y solo si ese SHA pertenece a main. El checkout con fetch-depth 0 ya trae origin/main.
+      # Con SBOM y provenance la etiqueta apunta a un índice OCI (imagen + atestaciones); el digest
+      # que se firma y que instalan los servidores es el de ese índice. Volver a ejecutar un SHA ya
+      # firmado no reconstruye. Uno sin firma válida (anterior a la firma, o con la firma a medias) o
+      # incompleto se reconstruye, y solo si ese SHA pertenece a main: nunca se firma a posteriori lo
+      # que no se construyó en esta ejecución. El checkout con fetch-depth 0 ya trae origin/main.
       - name: publicar imagen del sha
+        id: imagen
         env:
           SHA: ${{ steps.entrada.outputs.sha }}
         run: |
-          if docker manifest inspect "$IMAGE:$SHA" >/dev/null 2>&1; then
-            echo "la imagen $SHA ya existe; no se reconstruye"
-            exit 0
+          digest="$(docker buildx imagetools inspect "$IMAGE:$SHA" --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty' || true)"
+          if [[ -n "$digest" ]] &&
+            docker buildx imagetools inspect "$IMAGE@$digest" --format '{{json .Image}}' >/dev/null 2>&1 &&
+            cosign verify --certificate-identity-regexp "$FIRMA_IDENTIDAD" \
+              --certificate-oidc-issuer "$FIRMA_EMISOR" "$IMAGE@$digest" >/dev/null 2>&1; then
+            echo "la imagen $SHA ya existe firmada ($digest); no se reconstruye"
+          else
+            if [[ -n "$digest" ]]; then
+              echo "::notice::la imagen $SHA existe sin firma válida o incompleta; se reconstruye"
+            fi
+            if ! git merge-base --is-ancestor "$SHA" origin/main; then
+              echo "::error::$SHA no es ancestro de main"
+              exit 1
+            fi
+            docker buildx build --provenance=mode=max --sbom=true --push \
+              --metadata-file build.json \
+              --build-arg VERSION="$SHA" \
+              --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              --label org.opencontainers.image.revision="$SHA" \
+              -t "$IMAGE:$SHA" .
+            digest="$(jq -r '."containerimage.digest" // empty' build.json)"
           fi
-          if ! git merge-base --is-ancestor "$SHA" origin/main; then
-            echo "::error::$SHA no es ancestro de main"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::no se pudo leer el digest de $IMAGE:$SHA"
             exit 1
           fi
-          docker buildx build --provenance=false --sbom=false --push \
-            --build-arg VERSION="$SHA" \
-            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label org.opencontainers.image.revision="$SHA" \
-            -t "$IMAGE:$SHA" .
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+  # Firma sin llaves: el certificado de Fulcio lleva la identidad de este workflow (OIDC de GitHub)
+  # y queda registrado en Rekor. Siempre por digest, nunca por etiqueta.
+  firmar:
+    needs: publicar
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      id-token: write
+    steps:
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
+
+      - name: entrar a GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: firmar el digest
+        env:
+          DIGEST: ${{ needs.publicar.outputs.digest }}
+        run: |
+          ref="$IMAGE@$DIGEST"
+          if cosign verify --certificate-identity-regexp "$FIRMA_IDENTIDAD" \
+            --certificate-oidc-issuer "$FIRMA_EMISOR" "$ref" >/dev/null 2>&1; then
+            echo "$ref ya está firmada; no se vuelve a firmar"
+            exit 0
+          fi
+          cosign sign --yes "$ref"
+
+  desplegar:
+    needs: [publicar, firmar]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
+
+      - name: entrar a GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # La misma comprobación que hará cada servidor; si falla aquí, `dev` no se mueve.
+      - name: comprobar la firma
+        env:
+          DIGEST: ${{ needs.publicar.outputs.digest }}
+        run: |
+          cosign verify --certificate-identity-regexp "$FIRMA_IDENTIDAD" \
+            --certificate-oidc-issuer "$FIRMA_EMISOR" "$IMAGE@$DIGEST" >/dev/null
+
+      # Con un solo índice de origen, imagetools lo copia tal cual: `dev` queda en el mismo digest
+      # firmado. Si no fuera así, los servidores rechazarían `dev`; por eso se comprueba.
       - name: mover la etiqueta dev
         env:
-          SHA: ${{ steps.entrada.outputs.sha }}
-        run: docker buildx imagetools create -t "$IMAGE:dev" "$IMAGE:$SHA"
+          DIGEST: ${{ needs.publicar.outputs.digest }}
+        run: |
+          docker buildx imagetools create -t "$IMAGE:dev" "$IMAGE@$DIGEST"
+          dev="$(docker buildx imagetools inspect "$IMAGE:dev" --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [[ "$dev" != "$DIGEST" ]]; then
+            echo "::error::dev quedó en $dev y no en el digest firmado $DIGEST"
+            exit 1
+          fi
 
-      # Cada publicación crea 2 versiones (la imagen y el índice de dev): 10 son unos 5 despliegues.
-      - name: conservar los últimos 5 despliegues
+      # Cada publicación crea de 4 a 5 versiones en GHCR: el índice, la imagen, la atestación y la
+      # firma (con su índice de referencias si GHCR no tiene la API de referrers). 40 son al menos 8
+      # despliegues. El corte cuenta versiones sueltas: al más viejo puede faltarle una pieza; un
+      # regreso a ese SHA lo detecta y lo reconstruye.
+      - name: conservar los últimos despliegues
         if: github.event_name == 'workflow_run'
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
           package-name: wherever-backend
           package-type: container
-          min-versions-to-keep: 10
+          min-versions-to-keep: 40
 
       # Tabla de spec nv-08 §Contratos. Con dos instancias (nv-12), A instala en unos 3 minutos y B al
       # menos 5 después. Varias lecturas seguidas con el SHA: el balanceador reparte entre las dos.
       - name: comprobar el servidor
         env:
-          SHA: ${{ steps.entrada.outputs.sha }}
+          SHA: ${{ needs.publicar.outputs.sha }}
           API_URL: ${{ vars.API_URL }}
         run: |
           if [[ -z "$API_URL" ]]; then
@@ -144,5 +243,5 @@ jobs:
             echo "::error::/health respondió $codigo tras 12 minutos"
             exit 1
           fi
-          echo "::error::el servidor sigue en $version y no en $SHA: revisa si regresó (failed_digest) o si venció GHCR_TOKEN"
+          echo "::error::el servidor sigue en $version y no en $SHA: revisa si regresó o rechazó la firma (failed_digest) o si venció GHCR_TOKEN"
           exit 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sube al servidor el actualizador de nv-08 y la sonda de nv-13, y activa sus timers. Corre en tu
+# Instala cosign, sube al servidor el actualizador de nv-08 y la sonda de nv-13, y activa sus timers. Corre en tu
 # máquina y entra por Systems Manager, sin SSH; repítelo cada vez que cambien estos archivos, porque
 # el CD solo actualiza la imagen de la API. No reinicia la API: eso lo hace la siguiente imagen.
 # Si la instancia es nueva y no tiene .env, también hace el primer arranque (nv-14). Con --node, anota
@@ -55,6 +55,35 @@ upload() {
 # Una instancia nueva crea /opt/wherever al final de su arranque (user_data).
 echo "instalar-actualizador: esperando el arranque de la instancia"
 remote 'cloud-init status --wait >/dev/null || true; test -d /opt/wherever'
+
+# cosign para que actualizar.sh verifique la firma de cada imagen. Binario oficial de la versión
+# fijada, comprobado contra el checksum de aquí (de cosign_checksums.txt de esa versión); sin
+# coincidencia no se instala. Antes de subir actualizar.sh: el nuevo no instala nada sin cosign.
+# Para subir de versión, cambia las tres variables juntas (y COSIGN_RELEASE de cd-dev.yml).
+cosign_version=v3.1.4
+cosign_sha_amd64=424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa
+cosign_sha_arm64=ade83b7aac62e131cacfe96d958948b2150cc9efec46a570a2649b8e27dedad2
+# shellcheck disable=SC2016 # se expande en la instancia, no aquí
+install_cosign='set -e
+case "$(uname -m)" in
+x86_64) arch=amd64 sum="$SUM_AMD64" ;;
+aarch64) arch=arm64 sum="$SUM_ARM64" ;;
+*) echo "instalar-actualizador: arquitectura sin cosign: $(uname -m)" >&2; exit 1 ;;
+esac
+bin=/usr/local/bin/cosign
+if [ -x "$bin" ] && echo "$sum  $bin" | sha256sum -c --quiet >/dev/null 2>&1; then
+  echo "instalar-actualizador: cosign $VERSION ya instalado"; exit 0
+fi
+tmp="$(mktemp)"
+trap "rm -f \"$tmp\"" EXIT
+curl -fsSL --retry 3 -o "$tmp" "https://github.com/sigstore/cosign/releases/download/$VERSION/cosign-linux-$arch"
+echo "$sum  $tmp" | sha256sum -c --quiet
+install -m 0755 -o root -g root "$tmp" "$bin"
+mkdir -p /var/lib/wherever/sigstore
+"$bin" version | grep -i gitversion'
+echo "instalar-actualizador: instalando cosign $cosign_version"
+remote "VERSION=$cosign_version SUM_AMD64=$cosign_sha_amd64 SUM_ARM64=$cosign_sha_arm64
+$install_cosign"
 
 for file in server/compose.yml scripts/deploy-env.sh scripts/actualizar.sh; do
 	upload "$here/$file" "/opt/wherever/$(basename "$file")"

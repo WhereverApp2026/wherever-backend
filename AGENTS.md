@@ -69,6 +69,7 @@
 - SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada semana (domingo, `nightly.yml`); Sonar informativo. `RESTler` diferido, documentado, no exigido.
 - Terraform: `iac-scan` corre `trivy config` sobre `infra/aws-dev` y bloquea con HIGH/CRITICAL. Un hallazgo se arregla; si arreglarlo cambia la infraestructura aplicada, `#trivy:ignore:AWS-xxxx` encima del recurso con la razón al lado.
 - Secretos: gitleaks en `guardrails` sobre los commits del PR (o del push), no solo el árbol final. Las excepciones de `.gitleaks.toml` son valores exactos (`^…$`), sin `paths`: en una lista global una ruta salta el archivo entero. Una llave falsa nueva en una prueba se parte (`"AIzaSy" + "…"`) en vez de agregarla ahí.
+- Imagen firmada: `cd-dev` publica con SBOM y provenance de buildx (la etiqueta es un índice OCI) y firma el digest del índice con cosign sin llaves; `id-token: write` solo en el job `firmar`. `actualizar.sh` exige `cosign verify` con la identidad `cd-dev.yml@refs/heads/main` y el emisor de GitHub: sin firma válida, el digest va a `failed_digest`; si cosign no pudo comprobar (red, GHCR), reintenta sin instalar. Nada se firma a posteriori: un regreso a un SHA sin firma lo reconstruye. cosign se fija por versión y checksum en `instalar-actualizador.sh` y por `COSIGN_RELEASE` en `cd-dev.yml`; se suben juntos.
 - Dependabot (`.github/dependabot.yml`): semanal (lunes) para `gomod`, `github-actions` y el `Dockerfile`; menores y parches en un PR agrupado por ecosistema. Las imágenes fijadas por digest en los workflows no las ve: se suben a mano. Las alertas de Dependabot se activan en *Settings → Code security* del repo.
 
 ## 7. Testing quirks
@@ -94,7 +95,7 @@
 - Bases de desarrollo con `make infra-up`; índices con `scripts/indexes`; esquema y demostración de Neo4j con `make siembra`.
 - Servidor de AWS: Redis en Upstash y Neo4j en Aura (nv-11). Antes de una demostración, comprueba que Aura no esté en pausa.
 - Imagen lista con `docker build`, no desplegada. Cuando haya hosting se añade runbook con variables y verificación post-subida.
-- Una sola instancia local para desarrollo. En AWS hay dos (nv-12): archivos del servidor con `instalar-actualizador.sh` en cada una; el chequeo del balanceador es `/health`.
+- Una sola instancia local para desarrollo. En AWS hay dos (nv-12): archivos del servidor y cosign con `instalar-actualizador.sh` en cada una; el chequeo del balanceador es `/health`. Si cambia `actualizar.sh`, un archivo de `server/` o la versión de cosign, se corre en las dos **antes** de fusionar.
 - Crear y eliminar la infraestructura: `infra/aws-dev/scripts/crear.sh` y `destruir.sh` (nv-14), en la máquina del operador. GitHub no tiene claves de AWS, por decisión de nv-08.
 
 ## 10. Lecciones

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Corre EN la instancia, como root, con wherever-actualizar.timer (spec nv-08). Si la etiqueta
-# `dev` de GHCR cambió de digest, instala esa versión; si no queda sana, regresa a la anterior.
+# `dev` de GHCR cambió de digest y la firma de cosign es de cd-dev, instala esa versión; si no queda
+# sana, regresa a la anterior (ya instalada, sin volver a verificarla).
 set -euo pipefail
 
 image="ghcr.io/whereverapp2026/wherever-backend"
@@ -15,6 +16,12 @@ ready_wait=120
 node_file="$app/nodo.env"
 seen_file="$app/digest-visto"
 b_delay=300
+# Firma de la imagen: solo se instala lo que firmó cd-dev.yml desde main (sin llaves, OIDC de
+# GitHub). cosign lo instala instalar-actualizador.sh; su caché de TUF vive en la instancia.
+cosign_bin=/usr/local/bin/cosign
+sign_identity='^https://github\.com/WhereverApp2026/wherever-backend/\.github/workflows/cd-dev\.yml@refs/heads/main$'
+sign_issuer=https://token.actions.githubusercontent.com
+export TUF_ROOT=/var/lib/wherever/sigstore HOME="${HOME:-/root}"
 NODE="" TARGET_GROUP_ARN="" PUBLIC_URL=""
 # shellcheck source=/dev/null
 [[ -f "$node_file" ]] && . "$node_file"
@@ -98,9 +105,9 @@ other_healthy() {
 }
 
 public_serves() {
-	local want="$1" try
+	local want="$1"
 	# El balanceador reparte: basta con que una lectura traiga el SHA, porque solo A puede servirlo.
-	for try in 1 2 3 4 5 6; do
+	for _ in 1 2 3 4 5 6; do
 		curl -s --max-time 10 "$PUBLIC_URL/health" | grep -q "\"version\":\"$want\"" && return 0
 		sleep 2
 	done
@@ -150,7 +157,31 @@ if [[ -n "$TARGET_GROUP_ARN" && -n "$current" ]]; then
 	fi
 fi
 
-echo "actualizar: instalando $digest"
+# Antes de tocar nada: la firma. Sin firma válida de cd-dev el digest queda registrado como
+# fallido, igual que un /ready fallido. Si cosign no pudo comprobar (red, Rekor, GHCR), no se marca:
+# se reintenta en la siguiente revisión, sin instalar.
+if [[ ! -x "$cosign_bin" ]]; then
+	echo "actualizar: falta $cosign_bin; corre instalar-actualizador.sh. No se instala $digest" >&2
+	exit 1
+fi
+set +e
+verify_out="$("$cosign_bin" verify --certificate-identity-regexp "$sign_identity" \
+	--certificate-oidc-issuer "$sign_issuer" "$digest" 2>&1 >/dev/null)"
+verify_status=$?
+set -e
+if ((verify_status != 0)); then
+	if grep -qiE 'no signatures found|no matching signatures|no matching attestations|none of the expected identities|certificate identity|invalid signature' <<<"$verify_out"; then
+		echo "actualizar: $digest no tiene una firma válida de cd-dev; se registra como fallida" >&2
+		echo "$digest" >>"$failed"
+		log_event firma_rechazada "$digest"
+	else
+		echo "actualizar: no se pudo comprobar la firma de $digest; se reintenta en la siguiente revisión" >&2
+	fi
+	printf '%s\n' "$verify_out" | tail -n 3 >&2
+	exit 1
+fi
+
+echo "actualizar: firma válida; instalando $digest"
 "$app/deploy-env.sh" /wherever/dev/
 # Corre como root; sin esto, `docker compose` manual como ec2-user ya no puede leer .env.
 chown ec2-user:ec2-user "$app/.env"
