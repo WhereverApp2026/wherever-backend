@@ -60,6 +60,7 @@
 - OpenAPI de un solo v1.
 
 ## 6. Seguridad DevSecOps
+- Estado, puntaje y brecha frente a fintech: `docs/seguridad.md`; actualízalo cuando cambie un control.
 - JWT HS256 real siempre (sin flag legacy), access 15 min; `jwt_revocado:{jti}` revisado en el middleware.
 - IP del cliente: entrada de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final (2 con CloudFront y balanceador); si no alcanza o no es IP, la conexión. Si cambia la cadena de proxies, cambia este valor.
 - Compresión (nv-12): según `Accept-Encoding`; `/auth` y `POST /usuarios` nunca, porque llevan tokens. Una ruta nueva que devuelva tokens se agrega a `carriesTokens`.

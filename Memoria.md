@@ -890,6 +890,12 @@
 - Decisión: el plan va a un archivo y solo se muestra el resumen; si falla, se muestra completo y se sale. El apply muestra toda su salida; si falla, respalda el estado (`despues-de-fallo`) y sale antes de tocar las instancias. `probar-respaldo.sh` pasa `crear.sh` por shellcheck en el CI.
 - A evitar: un permiso IAM nuevo puede no quedar guardado en la consola. El error dice «no identity-based policy» (falta en la política del deployer) o «no permissions boundary» (falta en el boundary del rol de la instancia).
 
+## Seguridad: estado y brecha fintech (Fase 3, 2026-11-19)
+- Estado: `docs/seguridad.md` (solo documentación): rúbrica de 20 controles DevSecOps con evidencia, controles por capa mapeados a ASVS L2 y Top 10 2021, brecha frente a banca con esfuerzo y costo estimado, hoja de ruta en 3 horizontes y riesgos aceptados. Puntaje: **15,5/20 = 77,5 %**; 82,5 % si el operador activa GitHub; 87,5 % con WAF.
+- Comprobado con `gh api` el 2026-11-19: `main` sin protección ni rulesets; alertas de Dependabot desactivadas; secret scanning no verificable sin `admin` (la cuenta del agente tiene `write`). Ninguno cuenta.
+- Decisión: la rúbrica se rehízo porque el desglose de la auditoría del 2026-11-18 (≈75 %) no quedó en el repo; marca parciales el TLS de origen, la rotación, las alertas de seguridad y el respaldo dentro de la misma cuenta.
+- A evitar: subir el puntaje sin evidencia; un ajuste de GitHub cuenta solo si `gh api` lo muestra activo.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
