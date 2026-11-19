@@ -120,9 +120,11 @@ if [[ -n "$dry_dir" ]]; then
 else
 	account="$(aws sts get-caller-identity --region "$region" --query Account --output text)"
 	bucket="wherever-dev-respaldos-$account"
-	# --expected-bucket-owner: si el bucket no es de esta cuenta, S3 rechaza la subida.
-	aws s3 cp "$archive" "s3://$bucket/$prefix$name" --region "$region" \
-		--expected-bucket-owner "$account" --only-show-errors --no-progress
+	# --expected-bucket-owner: si el bucket no es de esta cuenta, S3 rechaza la subida. `aws s3 cp`
+	# no la acepta (AWS CLI 2.38 de Amazon Linux 2023): por eso `s3api put-object`, que sube hasta
+	# 5 GB en una sola petición, de sobra para el piloto.
+	aws s3api put-object --bucket "$bucket" --key "$prefix$name" --body "$archive" --region "$region" \
+		--expected-bucket-owner "$account" >/dev/null
 	echo "respaldo: subido s3://$bucket/$prefix$name ($size bytes)"
 fi
 rm -f "$archive"
