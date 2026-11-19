@@ -78,6 +78,8 @@ resource "aws_lb_target_group_attachment" "api" {
 }
 
 # HTTP porque el tramo es CloudFront → balanceador, dentro de AWS; aceptado en desarrollo sin dominio.
+# Sin la cabecera secreta de CloudFront (waf.tf) responde 403: así nadie se salta el WAF entrando por
+# otra distribución. El chequeo de salud va directo a las instancias y no pasa por aquí.
 #trivy:ignore:AWS-0054
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.api.arn
@@ -85,6 +87,32 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      status_code  = "403"
+      content_type = "application/json"
+      message_body = local.waf_bodies.prohibido
+    }
+  }
+
+  # Primero CloudFront manda la cabecera y después el balanceador la exige; al revés habría 403 mientras
+  # CloudFront termina de desplegar. Entre este cambio y la regla quedan unos segundos de 403.
+  depends_on = [aws_cloudfront_distribution.api]
+}
+
+resource "aws_lb_listener_rule" "from_cloudfront" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 1
+
+  condition {
+    http_header {
+      http_header_name = local.origin_header
+      values           = [random_password.origen.result]
+    }
+  }
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
   }

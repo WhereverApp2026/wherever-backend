@@ -9,12 +9,12 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
-# Sin WAF ni registros de acceso: entorno de desarrollo, y cuestan; los logs de la API ya van a CloudWatch.
+# Con WAF (waf.tf). Sin registros de acceso: cuestan y los logs de la API ya van a CloudWatch.
 #trivy:ignore:AWS-0010
-#trivy:ignore:AWS-0011
 resource "aws_cloudfront_distribution" "api" {
   enabled         = true
   comment         = "${local.name}-api"
+  web_acl_id      = aws_wafv2_web_acl.api.arn
   price_class     = "PriceClass_100"
   is_ipv6_enabled = true
   http_version    = "http2"
@@ -22,6 +22,12 @@ resource "aws_cloudfront_distribution" "api" {
   origin {
     origin_id   = "balanceador"
     domain_name = aws_lb.api.dns_name
+
+    # El balanceador solo reenvía lo que trae esta cabecera (waf.tf, alb.tf).
+    custom_header {
+      name  = local.origin_header
+      value = random_password.origen.result
+    }
 
     custom_origin_config {
       http_port                = 80

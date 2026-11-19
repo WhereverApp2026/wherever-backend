@@ -191,6 +191,13 @@ rm ~/restaurar.yaml respaldo.archive.gz
 - **Actualización:** cada instancia sale del balanceador, instala y vuelve a entrar; nunca sale si es la única sana. B espera al menos 5 minutos y a que A sirva el SHA nuevo. Si A regresó, B no instala.
 - **Caída abrupta:** hasta unos 25 s de errores 502 intermitentes, hasta que el balanceador marca la instancia como no sana.
 
+## WAF y origen (plan de seguridad, PR E)
+- **Qué hace** (`waf.tf`): web ACL `wherever-dev-api` en `us-east-1` (CloudFront lo exige ahí) sobre la distribución de la API, con cuatro reglas en orden: reputación de IP de AWS, límite por IP (`waf_rate_limit`, 5000 en 5 minutos, responde 429 con el cuerpo uniforme), entradas maliciosas conocidas y OWASP general. OWASP no mira subidas `multipart/form-data` (falsos positivos con fotos y PDF) y `SizeRestrictions_BODY` solo cuenta (la API acepta hasta 10 MB). La distribución de imágenes no lleva WAF: solo sirve archivos.
+- **Origen:** CloudFront agrega la cabecera `X-Origen-Wherever` con un secreto (`random_password.origen`, en el estado, fuera de Git) y el balanceador solo reenvía si viene; sin ella responde 403. Así nadie se salta el WAF con otra distribución que apunte al balanceador. Rotar: `terraform apply -replace=random_password.origen` (unos segundos de 403).
+- **Costo:** ≈US$9–10 al mes (US$5 el web ACL, US$1 por regla, US$0.60 por millón de peticiones), también con las instancias apagadas.
+- **Aplicar:** un administrador crea la política `wherever-dev-deployer-waf` con `iam/wherever-dev-deployer-waf.json` y la adjunta a `wherever-deployer`; luego `crear.sh` (3 recursos nuevos y 2 cambios; nada se recrea). Al cambiar el balanceador quedan unos segundos de 403 mientras se crea la regla.
+- **Revisar:** consola de WAF (`us-east-1`) → *Web ACLs* → `wherever-dev-api` → *Traffic overview* y *Sampled requests* (últimas 3 h). Un 403 legítimo se ve ahí con el nombre de la regla; se corrige con `rule_action_override` a `count` en esa regla, no apagando el grupo. Sin registro completo de peticiones (cuesta por GB).
+
 ## Crear y destruir (spec nv-14)
 Son el paso configurado de la infraestructura. Corren en tu máquina, con `terraform.tfvars` y el perfil; GitHub no tiene claves de AWS. Muestran el plan y piden confirmar por escrito. El estado de Terraform es local y cada script lo respalda en `~/wherever-dev-terraform-respaldo`.
 

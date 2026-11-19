@@ -8,7 +8,7 @@
 
 Wherever es una API REST en Go (Fiber), monolito modular, con MongoDB Atlas, Neo4j Aura y Redis en Upstash, desplegada en AWS (`us-east-2`) con dos EC2 detrás de un balanceador y CloudFront. La seguridad se diseñó desde la constitución y se prueba en cada PR: autenticación robusta (Argon2id, JWT de 15 min con revocación), autorización por dueño del recurso, cifrado de campos sensibles, análisis estático y de dependencias bloqueantes, escaneo de imagen y de Terraform, imagen firmada y verificada antes de instalarse, y respaldos semanales con alarma. Hay unas 660 pruebas unitarias, 461 de integración, más de 105 de seguridad, 9 de base de datos y 21 de contrato, además de fuzzing, mutación y ZAP pasivo cada semana.
 
-Lo que falta para un nivel bancario no está en el código sino alrededor: el perímetro (WAF), el gobierno del repositorio en GitHub (protección de `main`, alertas), un entorno de staging separado, TLS completo hasta el balanceador (requiere dominio propio), pruebas de penetración externas y procesos formales (incidentes, rotación, auditoría inmutable).
+Lo que falta para un nivel bancario no está en el código sino alrededor: el gobierno del repositorio en GitHub (protección de `main`, alertas), un entorno de staging separado, TLS completo hasta el balanceador (requiere dominio propio), pruebas de penetración externas y procesos formales (incidentes, rotación, auditoría inmutable).
 
 ### Puntaje DevSecOps (rúbrica de 20 controles)
 
@@ -32,11 +32,11 @@ Lo que falta para un nivel bancario no está en el código sino alrededor: el pe
 | 14 | Gestión de secretos | 0,5 | SSM Parameter Store SecureString; la imagen no lleva secretos; Atlas con usuario propio del servidor. **Falta:** rotación periódica (hoy manual, `infra/aws-dev/README.md` «Rotar credenciales») |
 | 15 | Integridad de la cadena de suministro | 1 | `cd-dev.yml`: SBOM y provenance de buildx, firma cosign sin llaves del digest del índice; `actualizar.sh` exige `cosign verify` con la identidad `cd-dev.yml@refs/heads/main` antes de instalar (#122) |
 | 16 | Infraestructura con mínimo privilegio | 1 | Deployer IAM con MFA, boundary (`infra/aws-dev/iam/`), sin claves de AWS en GitHub; IMDSv2 obligatorio, SSH cerrado (Systems Manager), 8080 solo desde el balanceador y este solo desde CloudFront (`alb.tf`) |
-| 17 | Perímetro (WAF) | 0 | Sin WAF. Decisión pendiente por costo (sección 3.1) |
+| 17 | Perímetro (WAF) | 1 | `infra/aws-dev/waf.tf` (PR E): web ACL en CloudFront con reputación de IP, límite por IP (429 uniforme), entradas maliciosas y OWASP general; el balanceador solo reenvía con la cabecera secreta de CloudFront, así nadie se salta el WAF. Cuenta desde que el operador lo aplica con `crear.sh` |
 | 18 | Registro y monitoreo de seguridad | 0,5 | `slog` JSON con `request_id` y filtro de secretos y correos; CloudWatch con alarmas de errores, 5xx, dependencias y respaldos (`observabilidad.tf`). **Falta:** alertas de eventos de seguridad (picos de 401/423/429), CloudTrail y retención mayor a 14 días |
 | 19 | Respaldo y recuperación | 0,5 | Respaldo semanal de MongoDB a S3 versionado, 28 días, la instancia solo escribe, alarma de 7 días y restauración documentada (#123, #124); `crear.sh` ya no oculta fallos (#125). **Falta:** copia fuera de la cuenta y prueba de restauración periódica; `destruir.sh` borra los respaldos |
 | 20 | Gobierno del repositorio en GitHub | 0 | **Pendiente del operador** (ver abajo) |
-| | **Total** | **15,5 / 20 = 77,5 %** | |
+| | **Total** | **16,5 / 20 = 82,5 %** | |
 
 **Estado real de GitHub, consultado con `gh api` el 2026-11-19** (la cuenta del agente tiene permiso `write`, no `admin`):
 
@@ -46,10 +46,9 @@ Lo que falta para un nivel bancario no está en el código sino alrededor: el pe
 | Alertas de Dependabot | `dependabot/alerts` → *«Dependabot alerts are disabled for this repository»* (403). `dependabot.yml` solo activa las actualizaciones de versión | No |
 | Secret scanning y push protection | No verificable sin permiso de administrador (`secret-scanning/alerts` → 404, `security_and_analysis` → `null`). El operador reporta una alerta abierta, señal de que el escaneo existe; push protection sin confirmar | No (sin evidencia) |
 
-**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124) y los errores ocultos de `crear.sh` (#125). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso sube a 77,5 % y no más.
+**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124) los errores ocultos de `crear.sh` (#125) y el WAF (PR E). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso quedó en 77,5 % antes del WAF y en 82,5 % con él.
 
-- Si el operador activa el gobierno de GitHub (control 20): **16,5 / 20 = 82,5 %**, sin tocar código.
-- Con el WAF además (control 17): **17,5 / 20 = 87,5 %**.
+- Si el operador activa el gobierno de GitHub (control 20): **17,5 / 20 = 87,5 %**, sin tocar código.
 
 ## 2. Controles implementados por capa
 
@@ -127,7 +126,7 @@ Wherever no custodia dinero: los pagos van por Stripe (Connect Express) y el rep
 
 | # | Brecha | Por qué importa | Esfuerzo | Costo (estimación) |
 |---|---|---|---|---|
-| 3.1 | **WAF** en CloudFront (reglas administradas de AWS, límite por IP) | Filtra inyección, bots y abuso antes de llegar a la API; hoy cualquier distribución de CloudFront puede alcanzar el balanceador porque solo se filtra por la lista de prefijos | 1 día | US$8–10 al mes (web ACL + reglas + peticiones). **Decisión pendiente** |
+| 3.1 | **WAF** en CloudFront (reglas administradas de AWS, límite por IP) | Filtra inyección, bots y abuso antes de llegar a la API; con la cabecera secreta de origen, otra distribución de CloudFront ya no alcanza el balanceador | 1 día | ≈US$9–10 al mes (web ACL + 4 reglas + peticiones). **Hecho** (PR E, `waf.tf`) |
 | 3.2 | **MFA para usuarios** (TOTP y, para comerciantes y administradores, obligatorio) | En banca es obligatorio; una contraseña robada hoy basta para entrar | 4–6 días | US$0 (TOTP); SMS cobra por mensaje |
 | 3.3 | **Staging separado de producción** | Hoy un solo entorno sirve de prueba y de demostración; no hay dónde probar ataques ni migraciones sin riesgo | 2–3 días (Terraform ya está parametrizado) | US$15–40 al mes según tenga una o dos instancias |
 | 3.4 | **DAST activo** (ZAP *full scan* o equivalente) contra staging | El pasivo solo mira respuestas; el activo intenta inyección, XSS y control de acceso | 1–2 días, depende de 3.3 | US$0 en GitHub Actions |
@@ -150,7 +149,7 @@ Ordenada por riesgo dentro de cada horizonte.
 
 ### Antes de producción (bloqueante)
 1. Gobierno de GitHub (3.16): ruleset de `main` con `pr-gate` obligatorio y un revisor; alertas y actualizaciones de seguridad de Dependabot; confirmar secret scanning y push protection; cerrar la alerta abierta tras rotar la llave.
-2. WAF (3.1) o, como mínimo, cabecera secreta de origen entre CloudFront y el balanceador.
+2. ~~WAF (3.1) y cabecera secreta de origen~~: hechos (PR E). Falta revisar sus métricas tras la primera semana y pasar a bloqueo `SizeRestrictions_BODY` si no hay cuerpos JSON legítimos de más de 8 KB.
 3. Dominio propio, TLS hasta el balanceador y SPF/DKIM/DMARC (3.6, 3.7).
 4. Staging separado (3.3) y DAST activo contra él (3.4).
 5. Rotar todos los secretos que pasaron por el entorno de desarrollo y fijar calendario (3.10).

@@ -1,0 +1,91 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WebAclDelProyecto",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:CreateWebACL",
+        "wafv2:GetWebACL",
+        "wafv2:UpdateWebACL",
+        "wafv2:DeleteWebACL",
+        "wafv2:TagResource",
+        "wafv2:UntagResource",
+        "wafv2:ListTagsForResource",
+        "wafv2:GetLoggingConfiguration"
+      ],
+      "Resource": "arn:aws:wafv2:us-east-1:816101201001:global/webacl/wherever-dev-*/*"
+    },
+    {
+      "Sid": "ReglasAdministradasDeAws",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:CreateWebACL",
+        "wafv2:UpdateWebACL",
+        "wafv2:DescribeManagedRuleGroup"
+      ],
+      "Resource": "arn:aws:wafv2:us-east-1:*:global/managedruleset/*/*"
+    },
+    {
+      "Sid": "WafSinRecursoAcotable",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:ListWebACLs",
+        "wafv2:CheckCapacity",
+        "wafv2:ListAvailableManagedRuleGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PonerWafEnLaDistribucion",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:AssociateWebACL",
+        "wafv2:DisassociateWebACL",
+        "wafv2:GetWebACLForResource",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:GetDistribution"
+      ],
+      "Resource": [
+        "arn:aws:wafv2:us-east-1:816101201001:global/webacl/wherever-dev-*/*",
+        "arn:aws:cloudfront::816101201001:distribution/*"
+      ]
+    },
+    {
+      "Sid": "ReglaDeOrigenEnElBalanceador",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:ModifyListener",
+        "elasticloadbalancing:CreateRule",
+        "elasticloadbalancing:ModifyRule",
+        "elasticloadbalancing:DeleteRule",
+        "elasticloadbalancing:AddTags",
+        "elasticloadbalancing:RemoveTags"
+      ],
+      "Resource": [
+        "arn:aws:elasticloadbalancing:us-east-2:816101201001:listener/app/wherever-dev-*/*/*",
+        "arn:aws:elasticloadbalancing:us-east-2:816101201001:listener-rule/app/wherever-dev-*/*/*/*",
+        "arn:aws:elasticloadbalancing:us-east-2:816101201001:targetgroup/wherever-dev-*/*"
+      ]
+    },
+    {
+      "Sid": "LeerReglasDelBalanceador",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:DescribeRules",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeListenerAttributes",
+        "elasticloadbalancing:DescribeTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MetricasDelWaf",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:GetSampledRequests"
+      ],
+      "Resource": "arn:aws:wafv2:us-east-1:816101201001:global/webacl/wherever-dev-*/*"
+    }
+  ]
+}
