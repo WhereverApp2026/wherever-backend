@@ -1,5 +1,5 @@
 # CI de PR (constitución §8). Jobs en paralelo; pr-gate los reúne y escribe el reporte (nv-09):
-#   changes (filtro) → guardrails, semgrep · pipeline, go-security, image-scan (solo si hay código)
+#   changes (filtro) → guardrails, semgrep · pipeline, go-security, image-scan, iac-scan (solo si hay código)
 # pipeline: deps → build → unit → integration → security → database → contract → coverage
 #   → delta-check → mutation. delta-check y mutation son advisory (nv-03): no bloquean.
 # Un push a main corre todo, sin filtro: de ese resultado depende cd-dev.
@@ -14,6 +14,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # Fijada por digest: image-scan la corre con acceso al socket de Docker; iac-scan la reutiliza.
+  TRIVY: aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
 
 concurrency:
   group: ci-pr-${{ github.ref }}
@@ -48,8 +52,13 @@ jobs:
   guardrails:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      GITLEAKS: ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gitleaks recorre los commits del PR (o del push): necesita la historia.
+          fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -63,6 +72,25 @@ jobs:
 
       - name: sdd
         run: bash scripts/check_sdd.sh
+
+      # Secretos en los commits del PR, no solo en el árbol final: un secreto borrado en un
+      # commit posterior sigue en la historia. Excepciones exactas en .gitleaks.toml.
+      - name: gitleaks
+        if: ${{ !cancelled() }}
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ANTES: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENTO" == "pull_request" ]]; then
+            rango="$BASE_SHA..$HEAD_SHA"
+          elif [[ -n "$ANTES" && ! "$ANTES" =~ ^0+$ ]]; then
+            rango="$ANTES..$GITHUB_SHA"
+          else
+            rango="-1 $GITHUB_SHA"
+          fi
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo             -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo             "$GITLEAKS" git /repo --no-banner --redact --config /repo/.gitleaks.toml             --log-opts="$rango" --exit-code 1
 
   # Corre siempre: un secreto en un .md también cuenta. Sin cuenta ni token: --metrics=off.
   semgrep:
@@ -157,7 +185,6 @@ jobs:
       IMAGEN: wherever-api:ci
       # Fijadas por digest: corren con acceso al socket de Docker.
       DOCKLE: goodwithtech/dockle:v0.4.15@sha256:eade932f793742de0aa8755406c7677cd7696f8675b6180926f7eeffa7abe6b9
-      TRIVY: aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -211,6 +238,39 @@ jobs:
         with:
           name: trivy
           path: reporte/trivy.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Terraform de infra/aws-dev. Bloquea con HIGH y CRITICAL; respeta los #trivy:ignore:AWS-xxxx
+  # de los .tf (cada uno con su razón al lado). cambios.sh trata infra/ como código.
+  iac-scan:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      hallazgos: ${{ steps.conteo.outputs.hallazgos }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: trivy config
+        run: |
+          mkdir -p reporte
+          docker run --rm -v "$PWD/infra/aws-dev:/src:ro" -v "$PWD/reporte:/reporte"             "$TRIVY" config --quiet --severity HIGH,CRITICAL             --exit-code 1 --format json --output /reporte/trivy-iac.json /src
+
+      - name: contar
+        id: conteo
+        if: always()
+        run: |
+          total=0
+          [[ -s reporte/trivy-iac.json ]] && total="$(jq '[.Results[]?.Misconfigurations // [] | length] | add // 0' reporte/trivy-iac.json)"
+          echo "hallazgos=$total" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: trivy-iac
+          path: reporte/trivy-iac.json
           retention-days: 14
           if-no-files-found: ignore
 
@@ -298,7 +358,7 @@ jobs:
 
   # Reúne todo. Si changes falla, los jobs de código se omiten: por eso changes entra al gate.
   pr-gate:
-    needs: [changes, guardrails, semgrep, go-security, image-scan, pipeline]
+    needs: [changes, guardrails, semgrep, go-security, image-scan, iac-scan, pipeline]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -312,18 +372,21 @@ jobs:
           R_SEMGREP: ${{ needs.semgrep.result }}
           R_GO: ${{ needs.go-security.result }}
           R_IMAGE: ${{ needs.image-scan.result }}
+          R_IAC: ${{ needs.iac-scan.result }}
           R_PIPELINE: ${{ needs.pipeline.result }}
           H_SEMGREP: ${{ needs.semgrep.outputs.hallazgos }}
           H_GO: ${{ needs.go-security.outputs.hallazgos }}
           H_IMAGE: ${{ needs.image-scan.outputs.hallazgos }}
+          H_IAC: ${{ needs.iac-scan.outputs.hallazgos }}
         run: |
           # changes no se puede omitir: si no corrió, el filtro no decidió nada.
           if [[ "$R_CHANGES" == "skipped" ]]; then R_CHANGES=failure; fi
           bash scripts/ci/resumen-gate.sh <<FIN
           Filtro de rutas|$R_CHANGES|-
-          Guardarraíles (critic, endpoints, sdd)|$R_GUARDRAILS|-
+          Guardarraíles (critic, endpoints, sdd, gitleaks)|$R_GUARDRAILS|-
           Semgrep|$R_SEMGREP|$H_SEMGREP
           gosec, golangci-lint, govulncheck|$R_GO|$H_GO
           Imagen (Dockle, Trivy)|$R_IMAGE|$H_IMAGE
+          Terraform (Trivy config)|$R_IAC|$H_IAC
           Suites y cobertura|$R_PIPELINE|-
           FIN

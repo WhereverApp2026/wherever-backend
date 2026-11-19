@@ -11,7 +11,7 @@
 - [ ] Endpoints: `docs/endpoints.md` actualizado
 - [ ] Rate limits: `docs/rate-limit-matrix.md` verificado; si cambió `TestPresupuestoRedis_*`, estimación de comandos rehecha
 - [ ] ASVS: `docs/asvs-l2-checklist.md` verificado
-- [ ] Gate del PR en verde: Semgrep, `gosec`, `govulncheck`, Dockle y Trivy sin hallazgos nuevos; excepciones con motivo y fecha
+- [ ] Gate del PR en verde: Semgrep, `gosec`, `govulncheck`, gitleaks, Dockle, Trivy y `trivy config` sin hallazgos nuevos; excepciones con motivo y fecha
 - [ ] Cobertura ≥45% (`scripts/check_coverage.sh --min 45`)
 - [ ] Headers + `/ready` + `401` verificados manualmente
 - [ ] `make infra-up` y `docker build .` sin errores

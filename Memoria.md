@@ -855,6 +855,15 @@
 - A evitar: para probar el 429 global no hagas 1000 peticiones: baja `cfg.RateLimitGlobal` y arma el entorno con `authtest.New`. Para un límite por sujeto, siembra `rate:{politica}:{sujeto}` en Redis.
 - A evitar: para alterar un cursor firmado no cambies el último carácter de la firma. En Base64 sin relleno sus 2 bits bajos no cuentan y la firma puede quedar igual: el CI dio 200 con `…xw`→`…xx`. Cambia el primero o reescribe el contenido.
 
+## CI: Terraform, secretos y Dependabot (2026-11-19)
+- Estado: job `iac-scan` (`trivy config` de `infra/aws-dev`, HIGH/CRITICAL bloquean), gitleaks v8.30.0 en `guardrails` sobre los commits del PR y `.github/dependabot.yml` (semanal: `gomod`, `github-actions`, `docker`). Constitución 1.9.0 (§6 y §8), pendiente de firma.
+- Resultado local: `trivy config` da 0 HIGH/CRITICAL; sin los 12 `#trivy:ignore` saldrían 12 (AWS-0011 ×2, 0053, 0054, 0095, 0104 ×6, 0132). gitleaks sobre toda la historia (158 commits) dio 6 falsos positivos, todos datos de prueba o marcadores; con `.gitleaks.toml`, 0.
+- Decisión: Trivy en el `env` del workflow, una sola vez, para `image-scan` e `iac-scan`. Porqué: un solo digest que subir.
+- Decisión: excepciones de gitleaks por valor exacto (`^…$`) y sin `paths`. Porqué: en una lista global, `paths` salta el archivo entero aunque diga `condition = "AND"` (probado: una llave nueva en `tests/security/errores_security_test.go` no salía).
+- Decisión: menores y parches agrupados por ecosistema, mayores sueltas; tope de 5 PRs en Go y 3 en acciones y Docker. Porqué: no inundar de PRs; una mayor suele romper la API y conviene verla sola.
+- A evitar: `--checks-bundle-repository` de Trivy acepta un solo valor (no una lista como `--db-repository`); se deja el de por defecto.
+- Pendiente del usuario: activar *Dependabot alerts* y *security updates* en *Settings → Code security* (el archivo solo activa las actualizaciones de versión). Las imágenes fijadas por digest en los workflows no las sube Dependabot.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
