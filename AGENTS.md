@@ -7,7 +7,7 @@
 > Stack: ver `constitution.md §3`. Nada fuera sin excepción documentada.
 - Setup: `configs/.env.example → .env` (`APP_ENV=dev`); `MONGO_URI`, `REDIS_ADDR`, `NEO4J_URI` apuntan a las bases de `deployments/docker-compose.yml` (`make infra-up`, `make infra-down`); `go mod download`. Docker solo para infraestructura de desarrollo, tests y la imagen (`Dockerfile`).
 - Comandos: `go mod download`, `go build ./...`, `go test ./... -count=1` por suite (Unit, Integration, Security, Database, Contract), `go run ./cmd/api`, `go build -o bin/api ./cmd/api`.
-- CI `ci-pr.yml` (ubuntu-latest, Testcontainers exige Linux), jobs en paralelo: changes, guardrails (critic → endpoints → sdd), semgrep, go-security, image-scan, pipeline (deps → build → unit → integration → security → database → contract → coverage → delta-check → mutation) y pr-gate. Sin deploy. Un cambio solo de documentos omite go-security, image-scan y pipeline.
+- CI `ci-pr.yml` (ubuntu-latest, Testcontainers exige Linux), jobs en paralelo: changes, guardrails (critic → endpoints → sdd → gitleaks), semgrep, go-security, image-scan, iac-scan, pipeline (deps → build → unit → integration → security → database → contract → coverage → delta-check → mutation) y pr-gate. Sin deploy. Un cambio solo de documentos omite go-security, image-scan, iac-scan y pipeline.
 - PR = 1 slice (módulo); `CHECKLIST_PR.md` + 1 revisor + `Memoria.md` al día.
 - Naming: inglés en código; colecciones en español plural minúsculas; campos `snake_case`; JSON `snake_case`.
 - Sin secretos, sin TODO sin issue, sin imports muertos, sin código muerto.
@@ -66,12 +66,16 @@
 - Headers outermost + HSTS 365d no-dev + CORS 1 origen.
 - Rate 4 políticas + 429 uniforme + limitador antes de Auth.
 - Timeout 60s + body 10MB + `slog` con filtro de secretos.
-- SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada semana (domingo, `nightly.yml`); Sonar informativo; `Dependabot` activo. `RESTler` diferido, documentado, no exigido.
+- SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada semana (domingo, `nightly.yml`); Sonar informativo. `RESTler` diferido, documentado, no exigido.
+- Terraform: `iac-scan` corre `trivy config` sobre `infra/aws-dev` y bloquea con HIGH/CRITICAL. Un hallazgo se arregla; si arreglarlo cambia la infraestructura aplicada, `#trivy:ignore:AWS-xxxx` encima del recurso con la razón al lado.
+- Secretos: gitleaks en `guardrails` sobre los commits del PR (o del push), no solo el árbol final. Las excepciones de `.gitleaks.toml` son valores exactos (`^…$`), sin `paths`: en una lista global una ruta salta el archivo entero. Una llave falsa nueva en una prueba se parte (`"AIzaSy" + "…"`) en vez de agregarla ahí.
+- Dependabot (`.github/dependabot.yml`): semanal (lunes) para `gomod`, `github-actions` y el `Dockerfile`; menores y parches en un PR agrupado por ecosistema. Las imágenes fijadas por digest en los workflows no las ve: se suben a mano. Las alertas de Dependabot se activan en *Settings → Code security* del repo.
 
 ## 7. Testing quirks
 - `testing` + `testify`; mocks solo de interfaces externas; Integration y Security usan la app real en proceso.
 - `Security` reutiliza el helper `internal/testutil` (tokens válidos/vencidos/sin firma).
-- `scripts/ci/cambios.sh` decide qué jobs corren y `resumen-gate.sh` escribe el gate del PR. Dockle y Trivy se fijan por digest en `ci-pr.yml`; ZAP por versión en `nightly.yml`.
+- `scripts/ci/cambios.sh` decide qué jobs corren y `resumen-gate.sh` escribe el gate del PR. Dockle, Trivy y gitleaks se fijan por digest en `ci-pr.yml` (Trivy una vez, en el `env` del workflow, para `image-scan` e `iac-scan`); ZAP por versión en `nightly.yml`. `infra/` cuenta como código en `cambios.sh`, así que un cambio de Terraform corre `iac-scan`.
+- En local (Windows): `trivy config` y gitleaks en Docker con `MSYS_NO_PATHCONV=1`. gitleaks en modo `git` no funciona sobre un worktree montado (el `.git` apunta a una ruta de Windows): clona el `.git` del checkout principal dentro del contenedor o usa `gitleaks dir`.
 - Fuzz (nv-10): los objetivos `Fuzz*` corren como pruebas normales con sus semillas; `scripts/ci/fuzz.sh` hace el fuzz real cada semana. Un fallo deja un caso en `testdata/fuzz/`: se versiona y se corrige en el mismo PR. No usan repositorios simulados: `authtest.Build` con dependencias caídas.
 - Testcontainers con puerto fijo; suites con contenedor nunca en paralelo local (colisionan). Desde nv-04 Integration, Security, Database y Contract levantan contenedores: cada una con `-p 1` y una a la vez (`testutil.RunWithStack`). Desde nv-06 el stack incluye Mailpit (SMTP 1026, API 8026) y `testutil.Mailpit` lee los correos.
 - Correo (nv-06): las peticiones encolan con `mailer.Async` y nunca esperan al servidor; el trabajo nocturno envía directo con `mailer.Retrying`. Enlaces siempre con el token en el fragmento (`#token=`).

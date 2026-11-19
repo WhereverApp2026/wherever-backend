@@ -1,0 +1,25 @@
+# gitleaks (ci-pr.yml, job guardrails). Reglas por defecto más excepciones exactas.
+# Cada excepción es un valor de prueba claramente falso y exacto (^…$ sobre el secreto): sin
+# comodines por carpeta ni por regla, así que un secreto nuevo en esos archivos sigue saliendo.
+# Sin `paths`: en una lista global, una ruta salta el archivo entero aunque diga condition = AND.
+title = "wherever-backend"
+minVersion = "v8.30.0"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Marcador de configs/.env.example: hace fallar el arranque a propósito"
+regexes = ['''^PLACEHOLDER_MIN_32_BYTES$''']
+
+[[allowlists]]
+description = "JWT de ejemplo de jwt.io en la prueba del filtro de datos personales"
+regexes = ['''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c$''']
+
+[[allowlists]]
+description = "Llave de Google falsa (secuencia 1234…abc…) de la prueba de errores; hoy va partida"
+regexes = ['''^AIzaSyA1234567890abcdefghijklmnopqrstuv$''']
+
+[[allowlists]]
+description = "Campo de MongoDB (avisos_pendientes.0) que la regla genérica confunde con una llave"
+regexes = ['''^avisos_pendientes\.0$''']

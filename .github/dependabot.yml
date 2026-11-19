@@ -1,0 +1,46 @@
+# Dependabot (AGENTS.md §6). Revisión semanal; menores y parches van en un solo PR por
+# ecosistema para no recibir decenas. Las mayores llegan solas: suelen romper la API.
+# Las acciones están fijadas por SHA con la versión en comentario; Dependabot actualiza ambos.
+# Las imágenes fijadas por digest en los workflows (Trivy, Dockle, gitleaks, Semgrep, ZAP) no
+# las ve el ecosistema docker: se suben a mano.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      go-menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions-menores:
+        update-types: [minor, patch]
+
+  # Dockerfile de la raíz: imágenes base del builder y del runtime.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(docker)"
+    groups:
+      docker-menores:
+        update-types: [minor, patch]
