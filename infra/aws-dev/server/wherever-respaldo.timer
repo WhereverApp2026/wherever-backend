@@ -1,0 +1,12 @@
+# Viernes a las 21:00 de México: la instancia está prendida de 08:00 a 22:00 de lunes a viernes.
+# Persistent: si ese viernes estuvo apagada, corre al encender (el lunes a las 08:00).
+[Unit]
+Description=Respaldo semanal de MongoDB, viernes 21:00 (America/Mexico_City)
+
+[Timer]
+OnCalendar=Fri *-*-* 21:00:00 America/Mexico_City
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

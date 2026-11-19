@@ -97,6 +97,7 @@
 - Imagen lista con `docker build`, no desplegada. Cuando haya hosting se añade runbook con variables y verificación post-subida.
 - Una sola instancia local para desarrollo. En AWS hay dos (nv-12): archivos del servidor y cosign con `instalar-actualizador.sh` en cada una; el chequeo del balanceador es `/health`. Si cambia `actualizar.sh`, un archivo de `server/` o la versión de cosign, se corre en las dos **antes** de fusionar.
 - Crear y eliminar la infraestructura: `infra/aws-dev/scripts/crear.sh` y `destruir.sh` (nv-14), en la máquina del operador. GitHub no tiene claves de AWS, por decisión de nv-08.
+- Respaldo de MongoDB: la instancia **a** corre `respaldo-mongo.sh` cada viernes 21:00 (timer de `instalar-actualizador.sh`) y sube a `wherever-dev-respaldos-<cuenta>/respaldos/`; la instancia solo escribe (`s3:PutObject`), 28 días de retención y alarma sin respaldo `ok` en 7 días. Restaurar primero a un Mongo local (`infra/aws-dev/README.md`, «Respaldos de MongoDB»). Si cambia el script o la imagen `mongo`, `instalar-actualizador.sh` en la a.
 
 ## 10. Lecciones
 - Fuente: `Memoria.md`. Si se vuelve regla, mover a `AGENTS.md`.

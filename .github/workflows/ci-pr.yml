@@ -258,6 +258,11 @@ jobs:
           mkdir -p reporte
           docker run --rm -v "$PWD/infra/aws-dev:/src:ro" -v "$PWD/reporte:/reporte"             "$TRIVY" config --quiet --severity HIGH,CRITICAL             --exit-code 1 --format json --output /reporte/trivy-iac.json /src
 
+      # shellcheck, calendario del timer, respaldo en seco contra un MongoDB en Docker y su restauración.
+      - name: respaldo de MongoDB
+        if: success() || failure()
+        run: bash infra/aws-dev/scripts/probar-respaldo.sh
+
       - name: contar
         id: conteo
         if: always()

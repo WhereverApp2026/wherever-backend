@@ -115,6 +115,12 @@ if [[ -n "$imagenes" ]]; then
 	check "cuarentena fuera de CloudFront" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$imagenes/cuarentena/x.jpg" || true)" "403"
 fi
 
+# Respaldos de MongoDB: bucket privado, versionado, con ciclo de vida y sin escritura pública.
+respaldos="wherever-dev-respaldos-$account"
+check "bucket $respaldos con todo el acceso público bloqueado" "$(aws_q s3api get-public-access-block --bucket "$respaldos" --query 'PublicAccessBlockConfiguration.[BlockPublicAcls,IgnorePublicAcls,BlockPublicPolicy,RestrictPublicBuckets]' 2>/dev/null | tr -s '	' ' ')" "True True True True"
+check "respaldos con versionado" "$(aws_q s3api get-bucket-versioning --bucket "$respaldos" --query Status 2>/dev/null || echo FALTA)" "Enabled"
+check "respaldos expiran a los 28 días" "$(aws_q s3api get-bucket-lifecycle-configuration --bucket "$respaldos" --query "Rules[?ID=='cuatro-semanas'].Expiration.Days | [0]" 2>/dev/null || echo FALTA)" "28"
+
 if (( fails > 0 )); then
 	echo "verificar: FALLA ($fails)"
 	exit 1

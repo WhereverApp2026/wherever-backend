@@ -11,6 +11,7 @@ locals {
     latencia    = { metric = "LatenciaMs", pattern = "{ $.duracion_ms >= 0 }", value = "$.duracion_ms" }
     dependencia = { metric = "DependenciaCaida", pattern = "{ $.dependencia = * }", value = "1" }
     regresos    = { metric = "Regresos", pattern = "{ $.evento = \"regreso\" }", value = "1" }
+    respaldos   = { metric = "RespaldosOk", pattern = "{ $.evento = \"respaldo\" && $.estado = \"ok\" }", value = "1" }
   }
 
   # Con todo apagado no hay datos: "notBreaching" evita una alarma cada noche.
@@ -80,6 +81,29 @@ resource "aws_cloudwatch_metric_alarm" "api" {
   depends_on = [aws_cloudwatch_log_metric_filter.api]
 }
 
+# Respaldo semanal de MongoDB (respaldos.tf): avisa si en 7 días no hubo un respaldo `ok`. Siete
+# días es el máximo de una alarma (periodo por número de periodos, 604 800 s); con la corrida del
+# viernes a las 21:00, la alarma salta si el respaldo de esa semana no llegó antes de las 22:00.
+# Aquí la falta de datos sí cuenta como falla: justo eso es no haber respaldado. Recién creada, la
+# alarma queda en ALARM hasta el primer respaldo.
+resource "aws_cloudwatch_metric_alarm" "respaldos" {
+  alarm_name          = "${local.name}-respaldos"
+  alarm_description   = "Sin un respaldo ok de MongoDB en 7 días"
+  namespace           = local.metric_namespace
+  metric_name         = local.metric_filters.respaldos.metric
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 7
+  datapoints_to_alarm = 7
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  ok_actions          = [aws_sns_topic.alarms.arn]
+
+  depends_on = [aws_cloudwatch_log_metric_filter.api]
+}
+
 resource "aws_cloudwatch_query_definition" "api" {
   for_each        = local.saved_queries
   name            = "${local.name}/${each.key}"
@@ -114,7 +138,7 @@ resource "aws_cloudwatch_dashboard" "api" {
   })
 }
 
-# El daemon de Docker envía los logs con el rol de la instancia; actualizar.sh, sus eventos.
+# El daemon de Docker envía los logs con el rol de la instancia; actualizar.sh y respaldo-mongo.sh, sus eventos.
 data "aws_iam_policy_document" "send_logs" {
   statement {
     sid       = "EnviarLogsDeLaApi"
