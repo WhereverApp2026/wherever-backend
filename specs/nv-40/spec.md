@@ -45,8 +45,8 @@ Filas completas en `docs/endpoints.md`.
 - Sin push (nv-41) ni avisos programados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-40`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-40`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** token en el cuerpo; token guardado (hace falta para enviar) con búsqueda por hash; el sexto teléfono es 422 (no reemplaza al más viejo); los avisos viven 90 días.
 - **Detalle:** la evidencia irá en `specs/nv-40/checklists/gates.md` + `Memoria.md`.

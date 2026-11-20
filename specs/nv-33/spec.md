@@ -41,8 +41,8 @@ Si la IA falla o tarda, la persona siempre recibe opciones; también puede pedir
 - Sin memoria de conversación: cada petición es independiente; la app manda `excluir`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada en la rama `nv-33`; falta la medición con IA real y la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada en la rama `nv-33`; falta la medición con IA real y la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** respaldo secuencial en lugar de paralelo; `IA_LIMITE_HORA` 10; el límite del usuario ya no da 429 sino respaldo.
 - **Detalle:** evidencia en `specs/nv-33/checklists/gates.md` + `Memoria.md`.

@@ -55,8 +55,8 @@ Sin endpoints nuevos.
 - Bajar el umbral de cuarentena por debajo de 40 no ve etiquetas menores: `MinConfidence` es 40.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), implementada en la rama `nv-42`. Ola 6: imágenes y moderación.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), implementada en la rama `nv-42`. Ola 6: imágenes y moderación.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** confirmar la estimación de volumen (300 fotos al mes) y que el límite de subidas va en nv-45.
 - **Detalle:** evidencia en `specs/nv-42/checklists/gates.md` + `Memoria.md`.

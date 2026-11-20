@@ -43,8 +43,8 @@ Detalle de cuerpos en `docs/endpoints.md`. Límite: política `admin` (200 por m
 - Hasta 200 palabras bloqueadas de 1 a 60 caracteres; motivo de hasta 500; página de hasta 50.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), implementada en la rama `nv-43` (desde `nv-42`); ola 6
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), implementada en la rama `nv-43` (desde `nv-42`); ola 6
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Drift corregido (2026-11-13):** las reglas usan un solo documento (POST crea, PATCH ajusta con `If-Match`, GET da las por defecto si no hay); los permisos de S3 salen de esta spec (son de nv-44); se agregan 400/401/403/422 a los contratos y el umbral mínimo de 40.
 - **Detalle:** la evidencia irá en `specs/nv-43/checklists/gates.md` + `Memoria.md`.

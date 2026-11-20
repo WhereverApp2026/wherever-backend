@@ -63,9 +63,9 @@ Sin endpoints nuevos. `GET /health` sigue devolviendo el SHA de la instancia que
 - El chequeo en `/health` no consulta bases: si una sola instancia pierde MongoDB, sigue recibiendo tráfico y cerca de la mitad de las peticiones falla. Pasó al recrear, con una IP mal cargada en Atlas. Lo detecta la alarma `dependencia`, gracias a la sonda de NV-13; se acepta en desarrollo a cambio de que una pausa de Aura no saque a las dos instancias.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada y probada; falta `cd-dev` con todo apagado, el encendido de las 08:00, que la app compile con la URL final y la firma
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-05 (inicio de la ejecución)
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada y probada; falta `cd-dev` con todo apagado, el encendido de las 08:00, que la app compile con la URL final y la firma
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-05 (inicio de la ejecución); aprobada 2026-11-19
 - **Decisiones del revisor (2026-11-05):** aprobadas (a) CloudFront delante del balanceador, sin dominio; (b) costo de US$41 al mes, destrucción tras la evaluación y presupuesto de US$50; (c) puerto 22 cerrado e instalación por Systems Manager (cambió frente a la propuesta de abrirlo a la IP del operador); (d) ampliar boundary y política del deployer, con los JSON preparados por el revisor; (e) enmienda de la constitución. Si la prueba de ELB o CloudFront falla por verificación de cuenta o por la organización, no se insiste y se decide con el revisor.
 - **Cambios frente a la versión anterior:** dominio y certificado de ACM sustituidos por CloudFront; chequeo de salud en `/health`; corrección de la IP del cliente; salida y reingreso del balanceador al instalar con instalación escalonada condicionada a que A sirva el SHA nuevo; espera de `cd-dev` ampliada; prerrequisito de verificación de políticas de la organización. Revisión contra el código: permisos antes de la prueba de la organización; compresión por implementar; sonda para la petición larga; `cd-dev` en verde con 5xx sostenidos; B comprueba a A por CloudFront y por la salud del grupo de destino, con etiqueta de revisión en la imagen; salida del balanceador al 8080; `REQUEST_TIMEOUT` de 55 s.
 - **Detalle:** la evidencia irá en `specs/nv-12/checklists/gates.md` + `Memoria.md`.

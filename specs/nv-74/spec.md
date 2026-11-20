@@ -79,8 +79,8 @@ Filas copiadas del Excel (A5): `GET /api/v1/negocios/{id}/estadisticas` «Visita
 - Sin estadísticas en tiempo real (el panel de nv-56 ya cubre hoy).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/laughing-khorana-71fa8b`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/laughing-khorana-71fa8b`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** vistas contadas en vivo en `estadisticas_diarias` (no desde `historial_vistas`); resto por trabajo cada hora solo con MongoDB; días cerrados congelados y anónimos; avanzadas premium devuelven `null` con 200; categoría solo con ≥ 5 negocios; frase por reglas sin IA; PDF con escritor propio sin dependencia nueva (o `gopdf` con excepción). **Aplicadas tal como se proponen (2026-11-16)**: escritor de PDF propio y `go.mod` sin cambios.
 - **Detalle:** evidencia en `specs/nv-74/checklists/gates.md` + `Memoria.md` al ejecutar.

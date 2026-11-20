@@ -39,8 +39,8 @@ Sin endpoints nuevos.
 - Si Mongo falla al encolar, el cambio queda solo en el log hasta reconstruir.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-12); ruta prioritaria, ola 3: amistades, ML y grafo
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-12); ruta prioritaria, ola 3: amistades, ML y grafo
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** cola por usuario (estado, no eventos) con el trabajador dentro de la API; comando en `scripts/` en vez de `cmd/`.
 - **Detalle:** la evidencia irá en `specs/nv-52/checklists/gates.md` + `Memoria.md`.

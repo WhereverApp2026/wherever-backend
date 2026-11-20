@@ -83,8 +83,8 @@ Rutas de la hoja «A4 Planes» del Excel que ninguna spec cubría. **Origen**: p
 - **Pruebas:** Unit `internal/planes/extras_test.go`; Integration `tests/integration/planes_extras_test.go`; Security `tests/security/planes_extras_security_test.go`; Database `ix_populares`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-68`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-68`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** la vista compartida queda en el `POST` de NV-38 (código aleatorio con hash y revocable en lugar de token firmado); `visibilidad` solo `privado`/`publico`; `zona` = primera parada; punto redondeado a 2 decimales y caché HTTP pública de 5 min en vez de Redis; alternativas sin IA; versión en `If-Match`; paquete solo hoy o mañana.
 - **Detalle:** evidencia en `specs/nv-68/checklists/gates.md` + `Memoria.md` al ejecutar.

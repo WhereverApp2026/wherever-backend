@@ -31,8 +31,8 @@ La pantalla de Inicio se arma en una sola llamada con saludo, clima, chips por h
 - Las recomendaciones de `GET /recomendaciones` (nv-24) siguen sin clima; solo Inicio lo usa.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-12): implementada; local en verde (build, vet, Unit, lint, critic, SDD, endpoints). Integration, Security, Database y Contract en el CI del PR.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-12): implementada; local en verde (build, vet, Unit, lint, critic, SDD, endpoints). Integration, Security, Database y Contract en el CI del PR.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** caché en memoria en lugar de Redis; franjas, chips y umbrales de mal clima propuestos arriba.
 - **Detalle:** evidencia en `specs/nv-25/checklists/gates.md` + `Memoria.md`.

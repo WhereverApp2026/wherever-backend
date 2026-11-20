@@ -32,8 +32,8 @@ Sin endpoints nuevos.
 - La caché de Upstash tiene cuota mensual; si se agota, Redis da error y la caché se apaga sola antes de que falle la API.
 
 ## Aprobación y Control de Cambios
-- **Estado:** ✅ Ejecutada (2026-11-12) en la rama `claude/nice-almeida-3fcaaa`; local verde (build, vet, Unit, lint, critic, sdd, endpoints). Integration, Security, Database y Contract en el CI del PR. Ola 4.
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** 2026-11-12
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Ejecutada (2026-11-12) en la rama `claude/nice-almeida-3fcaaa`; local verde (build, vet, Unit, lint, critic, sdd, endpoints). Integration, Security, Database y Contract en el CI del PR. Ola 4.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-12; aprobada 2026-11-19
 - **Corrección de drift:** la spec original pedía cachear la configuración (ya en memoria) y no nombraba paquete ni llaves; ver Diseño.
 - **Detalle:** evidencia en `specs/nv-18/checklists/gates.md` + `Memoria.md`.

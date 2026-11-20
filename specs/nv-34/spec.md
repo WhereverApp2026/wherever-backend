@@ -29,8 +29,8 @@ Sin endpoints nuevos. Cambian los cuerpos de `PATCH /api/v1/usuarios/yo` (+`nomb
 - Sin límites propios más allá de los ya anotados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada (2026-11-11), Borrador con evidencia; ola 3: amistades, ML y grafo
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada (2026-11-11), Borrador con evidencia; ola 3: amistades, ML y grafo
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:** Confirmar el alcance y los valores propuestos en Diseño.
 - **Detalle:** la evidencia irá en `specs/nv-34/checklists/gates.md` + `Memoria.md`.

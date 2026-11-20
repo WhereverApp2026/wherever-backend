@@ -55,8 +55,8 @@ Filas completas en `docs/endpoints.md`.
 - Sin enlace de invitación (nv-38), votaciones (nv-39) ni notificaciones (nv-40/41).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-37`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-37`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** un grupo por plan; el organizador cuenta en los 12; quien declina libera cupo y sigue viendo el grupo; los integrantes no ven a quien declinó; 30 invitaciones por hora.
 - **Detalle:** la evidencia irá en `specs/nv-37/checklists/gates.md` + `Memoria.md`.

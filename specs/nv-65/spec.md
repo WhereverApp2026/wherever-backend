@@ -57,8 +57,8 @@ Filas copiadas del Excel (A2): `GET /eventos` «Eventos, ferias y tianguis cerca
 - **Pruebas:** `internal/eventos/service_test.go`, `tests/integration/eventos_test.go` (lista, permisos, edición, moderación, límite, ARCO y presupuesto de Redis en un solo archivo), `tests/security/eventos_security_test.go`, `tests/contract/eventos_contract_test.go`, `tests/database/indexes_test.go`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-65`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-65`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `creado_por` y `version` nuevos; `lat`/`lng` obligatorios; comerciante solo con negocio aprobado propio; el dueño del negocio también edita; cancelado no se reabre; borrado físico; `eventos_publicar` 10 por día; ARCO conserva los eventos del negocio sin `creado_por`; Inicio sin eventos por ahora.
 - **Detalle:** evidencia en `specs/nv-65/checklists/gates.md` + `Memoria.md` al ejecutar.

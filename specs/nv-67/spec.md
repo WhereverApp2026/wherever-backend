@@ -52,8 +52,8 @@ Filas copiadas del Excel (A2): `POST /lugares/{id}/reportes` «Reportar informac
 - **Pruebas:** `internal/reportesnegocio/service_test.go`, `tests/integration/reportes_negocio_test.go` (crear, cola, resolver, dueño, tope y ARCO en un solo archivo), `tests/security/reportes_negocio_security_test.go`, `tests/contract/reportes_negocio_contract_test.go`, `tests/database/indexes_test.go`; la exportación ARCO del contrato de usuarios gana `reportes_negocio`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-67`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-67`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `GET /admin/reportes-negocio` agregado; `PATCH` solo administrador; cualquier rol activo puede reportar salvo el dueño; un abierto por persona y negocio (409); 10 al día contados en MongoDB sin Redis; `PurgeAccount` borra también los resueltos; el `PATCH` no edita el negocio.
 - **Detalle:** evidencia en `specs/nv-67/checklists/gates.md` + `Memoria.md` al ejecutar.

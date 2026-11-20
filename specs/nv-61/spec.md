@@ -79,9 +79,9 @@ Filas de J6 §3; corregidas: `POST /cupones/validar` de J6 §4 queda bajo `/nego
 - Sin límites de cupones por plan del negocio (los fija A5 / nv-56).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 10; implementada, sin firma.
-- **Revisores:** Osmar Reséndiz (sin firma)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), ola 10; implementada, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones del revisor (Osmar Reséndiz, 2026-11-14):** se aceptan las propuestas tal como están: `monto` en centavos; reintento idempotente por documento (sin `idem:` en Redis); lecturas por fechas y trabajo cada 5 minutos sin candado; vistas solo en el detalle; `costo_puntos` fuera; nueva colección `cupones_metricas`.
 - **Cambios al implementar:** drift de nv-56, nv-18, nv-26 a nv-28 e `If-Match` (ver Contexto); orden de validar invertido (cartera y luego cupón); `usos_por_usuario` fijo en 1 (`ux_cartera`); `q` en una sola página.
 - **Detalle:** evidencia en `specs/nv-61/checklists/gates.md`.

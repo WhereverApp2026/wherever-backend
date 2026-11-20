@@ -56,8 +56,8 @@ Dos rutas pequeñas que faltan del Excel: (a) la app reporta errores agrupados q
 - Sin `GET /personas/yo/qr`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), implementada en la rama `nv-64`; ola 8
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), implementada en la rama `nv-64`; ola 8
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `origen` solo `app`; orden por `ultimo_en`; dos políticas nuevas de 30/h (cuota de Upstash); `/admin/errores` en la política `admin`; reporte sin `RequireActive`; propio código = 404; el QR ignora `buscable_por_usuario`.
 - **Detalle:** evidencia en `specs/nv-64/checklists/gates.md` + `Memoria.md` al ejecutar.

@@ -34,8 +34,8 @@ Sin endpoints nuevos.
 - La anonimización no reconoce nombres propios (nv-26); la app pide no escribirlos.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada en la rama `nv-28` (PR contra `nv-27`). Unit, lint, critic, SDD y endpoints en verde; Integration y Security en el CI del PR.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada en la rama `nv-28` (PR contra `nv-27`). Unit, lint, critic, SDD y endpoints en verde; Integration y Security en el CI del PR.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** límites integrados en `ia.Guardia`; generaciones sin usuario en una cubeta común; los máximos de configuración son los del proveedor.
 - **Detalle:** la evidencia irá en `specs/nv-28/checklists/gates.md` + `Memoria.md`.

@@ -38,8 +38,8 @@ Sin endpoints nuevos. Cambio de datos: `alergenos` acepta `ninguno` (solo) en la
 - La distancia es en línea recta.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-10): implementada en la rama `nv-23`; falta la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-10): implementada en la rama `nv-23`; falta la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** pesos propuestos; `["ninguno"]` contra lista vacía «sin dato»; los pesos se validan al llamar `Recomendar` (no al arrancar la API, porque aún no hay consumidor: nv-24 lo cablea al arrancar).
 - **Detalle:** la evidencia irá en `specs/nv-23/checklists/gates.md` + `Memoria.md`.

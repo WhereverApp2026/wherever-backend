@@ -36,8 +36,8 @@ Sin endpoints nuevos.
 - Sin versiones ni registros de acceso del bucket (costo); sin WAF.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), sin firma; ola 6.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), sin firma; ola 6.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Pendiente del operador:** IAM, `crear.sh` y `verificar.sh` (ver `infra/aws-dev/README.md` y `Memoria.md`).
 - **Detalle:** evidencia en `specs/nv-44/checklists/gates.md` + `Memoria.md`.

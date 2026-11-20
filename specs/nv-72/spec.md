@@ -54,8 +54,8 @@ Fila del Excel (hoja «J1 Autenticación») copiada y corregida:
 - Sin `perfil_completo` si se elige B.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (ejecutada 2026-11-18); se firma al fusionar con el CI verde
-- **Revisores:** Osmar Reséndiz
-- **Fecha:** 2026-11-18 (decisiones)
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (ejecutada 2026-11-18); se firma al fusionar con el CI verde
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-18 (decisiones); aprobada 2026-11-19
 - **Decisiones del revisor (2026-11-18):** D-1 camino B; excepción de stack `google.golang.org/api/idtoken` (Apache-2.0); vincular por correo y, si no estaba verificado, borrar contraseña y revocar sesiones; 409 `cuenta_vinculada` si el correo ya tiene otro `google_id`; política `auth_google` de 10 por minuto por IP; `GOOGLE_CLIENT_ID` opcional fuera de prod (503 sin ella) y fuera de las obligatorias de `deploy-env.sh`.
 - **Detalle:** evidencia en `specs/nv-72/checklists/gates.md` + `Memoria.md`.

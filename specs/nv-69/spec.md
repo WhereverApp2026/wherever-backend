@@ -85,8 +85,8 @@ Rutas de la hoja «J3 Grupos y chat» del Excel que ninguna spec cubría (NV-57 
 - **Pruebas:** `internal/grupos/extras_test.go`, `internal/planes/sorpresa_test.go`, `tests/integration/grupos_extras_test.go` (renombrar y disolver, punto, sugerido y traslados, sorpresa, me-apunto, ARCO y tareas, presupuesto de Redis), `tests/security/grupos_extras_security_test.go`, `tests/contract/grupos_extras_contract_test.go`. Los cuatro archivos de integración de la spec quedaron en uno.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-69`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-69`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `PATCH` solo cambia `nombre`; `version` e `If-Match` en grupos; disolver bloqueado por saldos de La Vaca; ubicación guardada a 3 decimales, 6 h y nunca devuelta; centro a cuadrícula de 1 km y sin centro en la respuesta (con 2 personas la fuga queda en ≈3 km); traslados ajenos solo por rango; sorpresa calculada al leer, sin trabajo programado; me-apunto exige plan `publico` y amistad, lleno = 409; unirse sigue en el `POST` de NV-38.
 - **Detalle:** evidencia en `specs/nv-69/checklists/gates.md` + `Memoria.md` al ejecutar.

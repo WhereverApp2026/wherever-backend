@@ -73,8 +73,8 @@ Filas del Excel (hoja «J2 Amigos») copiadas y corregidas:
 - **Pruebas:** `internal/personas/perfil_test.go`, `tests/integration/personas_perfil_test.go` (perfil, Neo4j caído, límite, silencio, contactos y presupuesto de Redis en un solo archivo), `tests/security/personas_privacidad_test.go`, `tests/contract/personas_perfil_contract_test.go`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-70`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-70`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** teléfonos en claro por TLS y HMAC en el servidor (no `hashes[]` del Excel); `indice` en vez de devolver el número; contactos 10 por día y perfil 120 por hora; bloqueo = 404 (no 403); perfil completo solo para amigos y sin insignias ni momentos; silencio sin `If-Match`.
 - **Detalle:** evidencia en `specs/nv-70/checklists/gates.md` + `Memoria.md` al ejecutar.

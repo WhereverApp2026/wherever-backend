@@ -66,8 +66,8 @@ Fila copiada del Excel (J5): `POST /api/v1/negocios/{id}/reservas/{rid}/mensajes
 - Sin recordatorios configurables (solo 2 h) ni por correo.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/nv-73-87ba71`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/nv-73-87ba71`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** mensajes guardados en `mensajes_reserva` (90 días) y leídos en `GET /reservas/{id}`; solo de ida (negocio → cliente); 5 por reserva en 24 h contados en MongoDB; sin moderación con IA; recordatorio dentro del barrido de nv-59 con `UpdateOne` condicional, sin Redis; cambio de hora reinicia el recordatorio. **Aplicadas tal como se proponen (2026-11-16)**; las reservas hechas con menos de 2 h sí reciben el aviso (no se aplicó la excepción de 15 min).
 - **Detalle:** evidencia en `specs/nv-73/checklists/gates.md` + `Memoria.md` al ejecutar.

@@ -38,8 +38,8 @@ Detalle vivo en `docs/endpoints.md`.
 - Sin límites propios más allá de los ya anotados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada en la rama `nv-24` sobre `nv-23`; falta la firma y el CI del PR
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada en la rama `nv-24` sobre `nv-23`; falta la firma y el CI del PR
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** confirmar la regla de privacidad, el efecto de la compañía y el 404 del DELETE sin descarte (Diseño).
 - **Detalle:** la evidencia irá en `specs/nv-24/checklists/gates.md` + `Memoria.md`.

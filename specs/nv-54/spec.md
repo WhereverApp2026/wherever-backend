@@ -52,8 +52,8 @@ Guardar con el corazón los negocios y planes que le gustan a la persona, verlos
 - Sin sincronización sin conexión (nv-47 la excluye).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), ola 8; rama `nv-54`, PR contra `main`
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), ola 8; rama `nv-54`, PR contra `main`
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** solo rol `consumidor` (Excel); plan solo propio; tope 500 por tipo con 409; PUT responde 200 siempre; negocio pausado se oculta sin borrar y objetivo inexistente se limpia al listar.
 - **Detalle:** evidencia en `specs/nv-54/checklists/gates.md` + `Memoria.md` al ejecutar.

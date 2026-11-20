@@ -40,8 +40,8 @@ La IA convierte una frase libre en parámetros y la API elige los candidatos rea
 - Sin política de rate limit propia: los límites de IA por usuario y globales viven en `ia.Guardia` (nv-28) y se conectan con nv-33. **No fusionar a `main` sin nv-33** o sin un límite equivalente en la ruta.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada (2026-11-11) en la rama `nv-31` sobre `nv-29`; falta la firma y el CI del PR. Ruta prioritaria, ola 2: planes con IA (hallazgo C1)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada (2026-11-11) en la rama `nv-31` sobre `nv-29`; falta la firma y el CI del PR. Ruta prioritaria, ola 2: planes con IA (hallazgo C1)
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** armado por reglas en nv-31 (el itinerario con IA pasa a nv-32); IA apagada = 503 hasta nv-33; estancias por giro; `presupuesto` del plan = por persona × personas.
 - **Detalle:** evidencia en `specs/nv-31/checklists/gates.md` + `Memoria.md`.

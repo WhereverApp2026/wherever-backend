@@ -150,9 +150,9 @@ Decisión del revisor. **Aplicada sin firma (2026-11-14): la app dibuja.**
 - Tag tras aprobar.
 
 ## Aprobación
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 10. Implementada con las seis decisiones como se proponen, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), ola 10. Implementada con las seis decisiones como se proponen, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:**
   1. La app dibuja la postal y la tarjeta, o el servidor (§4).
   2. Quitar `POST /postales/subida` y usar nv-45.

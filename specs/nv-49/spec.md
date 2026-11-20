@@ -39,8 +39,8 @@ Sin endpoints nuevos. Campo nuevo `usuarios.mayor_de_edad`.
 - La llave protege contra el robo de la base, no contra quien tenga acceso a la instancia (nv-48).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; implementada en la rama `nv-49`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; implementada en la rama `nv-49`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** fallo cerrado con 503; sin llave fuera de prod se guarda en claro; la migración no sube `version`.
 - **Detalle:** la evidencia irá en `specs/nv-49/checklists/gates.md` + `Memoria.md`.

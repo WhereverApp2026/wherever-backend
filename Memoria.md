@@ -910,7 +910,7 @@
 - Proveedor del modelo de lenguaje (API o modelo local).
 - ~~D-1: cuenta nueva por Google sin `fecha_nacimiento`~~ — resuelta el 2026-11-18: camino B de `specs/nv-72` (falta el visto bueno del dueño de A1 en el PR).
 - ~~Proveedor de correo~~ — Brevo SMTP (2026-11-18); falta dominio propio para que no caiga en spam.
-- Firma de `nv-00…nv-03`: siguen en Borrador con evidencia. Desde nv-04 el revisor es Osmar Reséndiz (único integrante de backend; el Excel nombra a Jorge Alberto Rodríguez Enriquez para las hojas J y a Alexander Dominguez Zarate para las A como responsables del diseño).
+- ~~Firmas~~ — resuelto el 2026-11-19: Osmar Reséndiz aprobó la constitución 1.9.0 y las 67 specs que seguían en Borrador (nv-00…nv-75); cada una conserva su «Estado al firmar» con los pendientes que tenía.
 - Zona horaria por ciudad (documento de backend) contra `America/Mexico_City` fija (Excel): la constitución toma la zona de la ciudad con ese valor por defecto.
 
 ## Mapa de fases

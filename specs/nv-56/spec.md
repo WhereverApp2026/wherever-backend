@@ -65,8 +65,8 @@ Lo que el comerciante ve y edita de su negocio ya aprobado: el resumen del día 
 - Sin plan premium ni límites por plan.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), implementada; sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), implementada; sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones aplicadas (propuestas, sin firma):** E1 `cambios_pendientes` sin despublicar (la cola es `GET /admin/negocios?estado=cambios_pendientes` y la decisión el mismo `PATCH /admin/negocios/{id}/revision`); E2 regla del Sello como se proponía y solo el admin la otorga; E3 **sin PNG**: la API da el contenido y la app dibuja el QR (sin excepción de stack); E4 la pausa no cancela reservas y reanudar no reactiva cupones; E5 pausa ≤ 90 días; E6 anticipo > 0 exige `cobros.estado=activo`; E7 tope de 200 platillos; E8 confirmación con el nombre exacto; E9 diferidos como en «Límites».
 - **Detalle:** evidencia en `specs/nv-56/checklists/gates.md` + `Memoria.md`.

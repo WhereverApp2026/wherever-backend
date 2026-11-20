@@ -66,8 +66,8 @@ Registra lo que cada integrante pagó durante la salida y calcula quién le debe
 - Sin notificaciones hasta nv-40 y nv-41.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), ola 8; implementado en el PR de nv-58 contra `main`
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), ola 8; implementado en el PR de nv-58 contra `main`
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones tomadas al ejecutar (pendientes de firma):** `confirmar: true` para editar con deudas pagadas; candado `lock:vaca:{grupo}` en Redis (2 comandos por escritura) frente a un contador en Mongo; residuo al primero por id si quien pagó no participa; la Vaca se conserva al borrar la cuenta (nombre «Cuenta eliminada»); tope de 500 gastos por grupo.
 - **Detalle:** la evidencia irá en `specs/nv-58/checklists/gates.md` + `Memoria.md`.

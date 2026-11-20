@@ -32,8 +32,8 @@ Sin endpoints nuevos. `POST /api/v1/planes/generar` (nv-31) conserva su forma; s
 - Sin límites propios más allá de los ya anotados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11); implementada en la rama `nv-32`, PR contra `nv-31`. Falta la firma y el CI del PR (Integration, Security, Database, Contract).
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11); implementada en la rama `nv-32`, PR contra `nv-31`. Falta la firma y el CI del PR (Integration, Security, Database, Contract).
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** espera máxima de 60 min entre paradas; reemplazo al final del plan (no en la posición de la descartada); nombres de negocios hacia el modelo (dato público).
 - **Detalle:** evidencia en `specs/nv-32/checklists/gates.md` + `Memoria.md`.

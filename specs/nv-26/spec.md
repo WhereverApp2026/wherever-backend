@@ -38,8 +38,8 @@ Sin endpoints nuevos.
 - El costo es cero en la capa gratuita; si se activa la facturación, el tope de nv-27 manda.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada y probada en vivo (20 de 20 válidas, sin 429, p95 1,2 s); falta la firma
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-09
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada y probada en vivo (20 de 20 válidas, sin 429, p95 1,2 s); falta la firma
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-09; aprobada 2026-11-19
 - **Decisiones del revisor (2026-11-09):** Gemini en lugar de Bedrock por la cuota cero; misma interfaz; 429 al motor de reglas; límites propios por debajo de la capa gratuita; embeddings de nv-50 en Gemini; sin datos personales al proveedor; el aviso de privacidad nombra al proveedor externo.
 - **Detalle:** la evidencia va en `specs/nv-26/checklists/gates.md` + `Memoria.md`.

@@ -33,8 +33,8 @@ Sin endpoints nuevos.
 - El tope es mensual de toda la aplicación, no por usuario.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada (2026-11-11), Unit verde; Integration en el CI del PR; falta la firma
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-11
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada (2026-11-11), Unit verde; Integration en el CI del PR; falta la firma
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-11; aprobada 2026-11-19
 - **Decisiones para el revisor:** colección `usos_ia` (no `ia_uso`, por la regla de nombres en plural); llaves `cuota:ia_gasto:{mes}` y `cache:ia:{huella}`; mes en UTC; tope máximo configurable de 50 USD (el presupuesto de la cuenta); ARCO desliga en lugar de borrar para no bajar el gasto del mes.
 - **Detalle:** la evidencia irá en `specs/nv-27/checklists/gates.md` + `Memoria.md`.

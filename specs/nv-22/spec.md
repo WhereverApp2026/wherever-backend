@@ -34,8 +34,8 @@ Quien ya sabe a dónde ir debe encontrar el negocio escribiendo pocas letras, au
 - Sin límites propios más allá de los ya anotados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-12): implementada en la rama `nv-22`; local en verde (build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`); Integration, Security, Database y Contract las corre el CI del PR.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-12): implementada en la rama `nv-22`; local en verde (build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`); Integration, Security, Database y Contract las corre el CI del PR.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** confirmar la tolerancia en Go con tope de 1000 negocios, guardar recientes sin pedir `aprendizaje_personalizado` (es historial visible y borrable) y la vida de 90 días.
 - **Detalle:** la evidencia irá en `specs/nv-22/checklists/gates.md` + `Memoria.md`.
