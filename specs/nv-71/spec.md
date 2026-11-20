@@ -66,8 +66,8 @@ Filas del Excel copiadas y corregidas:
 - **Pruebas:** `internal/moderacion/umbrales_test.go`, `internal/notificaciones/dto_test.go`, `tests/integration/dispositivos_id_test.go`, `tests/integration/moderacion_reglas_filtro_test.go`, `tests/security/dispositivos_reglas_security_test.go`, `tests/contract/dispositivos_reglas_contract_test.go`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-71`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), ola 11; implementada en la rama `nv-71`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `{id}` del dispositivo es el `_id`, nunca el token (se mantiene nv-40); el id llega por `Location` sin cambiar el 204; `PUT /dispositivos/{id}` sin `If-Match`; reglas por filtro dentro del documento único de nv-43 (`{id}` = nombre del filtro, sin colección `reglas_moderacion`); `DELETE` desactiva y no borra; `datos_personales` no se puede desactivar.
 - **Detalle:** evidencia en `specs/nv-71/checklists/gates.md` + `Memoria.md` al ejecutar.

@@ -43,8 +43,8 @@ Filas completas en `docs/endpoints.md`.
 - Hasta 100 votaciones por grupo en la lista.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-39`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-39`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** votan invitados y confirmados; hora límite de 5 minutos a 7 días; sin votos gana la primera; cierre por vencimiento sin Redis; una ganadora que no cabe deja el plan igual con motivo.
 - **Detalle:** la evidencia irá en `specs/nv-39/checklists/gates.md` + `Memoria.md`.

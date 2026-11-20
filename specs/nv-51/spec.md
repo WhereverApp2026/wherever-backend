@@ -42,8 +42,8 @@ Encontrar lugares por significado y medir si mejora frente a solo reglas. **Orig
 - Plantilla solo en español.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada; falta la medición con IA real y la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada; falta la medición con IA real y la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** pesos con `afinidad_semantica` 0,20 (los demás × 0,8); respaldo sin filtros duros; límite de 30 por minuto.
 - **Detalle:** evidencia en `specs/nv-51/checklists/gates.md` + `Memoria.md`.

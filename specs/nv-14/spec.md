@@ -44,8 +44,8 @@ Sin endpoints nuevos ni recursos nuevos de Terraform. Enmienda de la constituci�
 - Solo desarrollo.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada y con el ciclo real hecho; sin firmar
-- **Revisores:** Osmar Reséndiz (pendiente de firmar)
-- **Fecha:** 2026-11-06 (ejecución)
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada y con el ciclo real hecho; sin firmar
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-06 (ejecución); aprobada 2026-11-19
 - **Decisiones:** (a) respuesta del docente: bastan scripts versionados, según Osmar Reséndiz, 2026-11-06. Con eso salen el workflow `infra-dev.yml`, el usuario `wherever-dev-pipeline` y sus claves en GitHub. (b) El estado sigue local: el bucket de S3 solo hacía falta para correr en GitHub. Si se quiere remoto, es un cambio aparte.
 - **Detalle:** la evidencia va en `specs/nv-14/checklists/gates.md` + `Memoria.md`.

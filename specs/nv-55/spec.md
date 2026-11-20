@@ -91,8 +91,8 @@ La persona da de alta su negocio en pasos con guardado automático (datos del ne
 - **Pendientes:** conectar `alta.Imagenes` y `expediente.Almacen` con nv-45 en `cmd/api` (y la cola `en_revision` de las fotos de nv-42/43); el aviso con estos datos y `AVISO_VERSION` nueva (rama `aviso-privacidad-integral`) antes de desplegar; avisar a nv-60 de D3.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), ola 9; implementada con D1–D11 como se proponen. Fotos y subida de documentos responden 503 hasta conectar nv-45 (ver «Implementación»). nv-44 ya está: CloudFront solo sirve `i/*`, así que `privado/` queda fuera.
-- **Revisores:** Osmar Reséndiz (pendiente de firmar D1–D11)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), ola 9; implementada con D1–D11 como se proponen. Fotos y subida de documentos responden 503 hasta conectar nv-45 (ver «Implementación»). nv-44 ya está: CloudFront solo sirve `i/*`, así que `privado/` queda fuera.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:** D1 documentos subidos a la API y cifrados con `DATA_KEYS` (no URL firmada); D2 colección aparte `negocios_documentos` en lugar de `negocios.documentos`; D3 `PUT /cuenta-deposito` en nv-55 con CLABE cifrada hasta que nv-60 la mande a Stripe (nv-60 la reclama hoy); D4 fiscales y CLABE no frenan la revisión; D5 el comprobante se borra a los 90 días como la INE; D6 el rol `comerciante` se agrega sin quitar `consumidor` y con `requiere_refresh`; D7 tope de 3 altas abiertas; D8 `motivo` obligatorio en cada lectura del admin y bitácora de 5 años; D9 sin `DATA_KEYS` = 503 (no guardar en claro); D10 política nueva «Expediente del negocio» de 10 por hora; D11 avisar a nv-60 del cambio de D3 si se aprueba.
 - **Detalle:** evidencia en `specs/nv-55/checklists/gates.md` + `Memoria.md` al ejecutar.

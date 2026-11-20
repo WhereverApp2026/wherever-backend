@@ -36,9 +36,9 @@ La app debe registrar qué versión de términos y de aviso aceptó cada persona
 - El registro (`POST /usuarios`) guarda `version_terminos` pero no la del aviso: la cuenta nueva nace con `consentimiento_vigente` falso hasta llamar a la ruta nueva.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada (2026-11-12), pendiente de la firma del revisor. Local verde: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints`; Integration, Security, Database y Contract en el CI del PR.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada (2026-11-12), pendiente de la firma del revisor. Local verde: build, vet, Unit, lint, critic, `check_sdd` y `check_endpoints`; Integration, Security, Database y Contract en el CI del PR.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:**
   1. Reutilizar la privacidad de nv-05 y agregar solo `version_aviso`; el historial va aparte en `consentimientos`.
   2. Solo se aceptan las versiones vigentes (422 si no).

@@ -34,8 +34,8 @@ Sin endpoints nuevos. Variable nueva: `DATA_KEYS` (obligatoria en prod).
 - Sin KMS propio: el costo es cero.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12); implementada en la rama `nv-48`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12); implementada en la rama `nv-48`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** formato de `DATA_KEYS` (la primera cifra); en staging puede faltar; el ánimo no se cifra porque no se guarda.
 - **Detalle:** la evidencia irá en `specs/nv-48/checklists/gates.md` + `Memoria.md`.

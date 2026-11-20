@@ -52,7 +52,7 @@ Casa vacía pero con luz. Base ejecutable una sola vez, ya en forma de producci�
 Sin colecciones de negocio, sin roles usados, sin Stripe/FCM/OTel/`/metrics` completo. JWT configurado pero sin emisión: la emisión llega con el módulo auth (`nv-04+`). Sin hosting: `go build` y `docker build` listos, no desplegados.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (ejecutada, sin firma)
-- **Revisores:** (pendiente de nombre)
-- **Fecha:** 2026-11-02 (ejecución)
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (ejecutada, sin firma)
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-02 (ejecución); aprobada 2026-11-19
 - **Detalle:** T1 ejecutada. Evidencia en `specs/nv-01/checklists/gates.md` + `Memoria.md`. Unit 30 + Integration 14 + Security 8 verdes. Desvíos documentados: etapa `request_timeout` entre `request_id` y `proxy_headers`; limitador de escrituras por IP hasta que exista auth; puertos del compose configurables.

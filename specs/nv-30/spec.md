@@ -48,8 +48,8 @@ Todas con JWT (sin token = 401). Un plan ajeno, borrado o con id mal formado res
 - Sin alternativas por parada ni compartir en esta spec. Planes grupales e integrantes llegan con nv-37.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada en la rama `nv-30` sobre `nv-29`; falta el CI del PR y la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada en la rama `nv-30` sobre `nv-29`; falta el CI del PR y la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** 409/400 en lugar de 412/428 (como nv-05); plan ajeno = 404 (no 403); reordenar reparte las horas de llegada; `guardados` = todos los activos hasta que exista una marca de guardado.
 - **Detalle:** evidencia en `specs/nv-30/checklists/gates.md` + `Memoria.md`.

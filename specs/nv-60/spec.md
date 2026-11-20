@@ -83,9 +83,9 @@ Cobra el anticipo de una reserva con Stripe, confirma la reserva cuando Stripe a
 - Sin claves de Stripe en GitHub: el CI usa solo el doble.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), implementada en la rama de nv-60; sin firma.
-- **Revisores:** Osmar Reséndiz (decisiones tomadas el 2026-11-14; firma pendiente)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), implementada en la rama de nv-60; sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones del revisor (2026-11-14):**
   1. Se aprueba la enmienda de la constitución §3, versión 1.8.0, con la fila de Stripe (`stripe-go`); aplicada en `.specify/memory/constitution.md` (el espejo `constitution.md` solo enlaza).
   2. Stripe Connect Express con transferencia semanal: Wherever cobra el anticipo y cada lunes transfiere a cada negocio lo suyo menos la comisión. Confirmar con Stripe México que la cuenta real lo permite queda pendiente del operador; en modo de prueba está completo.

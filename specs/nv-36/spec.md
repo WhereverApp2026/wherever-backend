@@ -48,8 +48,8 @@ Enviar, aceptar, rechazar, eliminar y bloquear amistades, con la lista ordenada 
 - El bloqueo no oculta planes ya compartidos.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11); ruta prioritaria, ola 3: amistades, ML y grafo
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11); ruta prioritaria, ola 3: amistades, ML y grafo
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** orden por `actualizada_en` (no hay campo de actividad del usuario); bloqueo en ambos sentidos en la búsqueda; rechazar borra; quien envió recibe 404 al intentar aceptar.
 - **Detalle:** evidencia en `specs/nv-36/checklists/gates.md` + `Memoria.md`.

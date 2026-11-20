@@ -42,8 +42,8 @@ La persona sube una foto directo a S3; la API la valida, la modera y la publica 
 - Un original en revisión vence a 1 día: si el administrador decide después, la foto queda en revisión sin publicarse y la persona la sube de nuevo.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13): implementada; local verde (build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`); Integration, Security, Database y Contract en el CI del PR. Falta la firma y la prueba en vivo.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13): implementada; local verde (build, vet, Unit, lint, critic, `check_sdd`, `check_endpoints`); Integration, Security, Database y Contract en el CI del PR. Falta la firma y la prueba en vivo.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones tomadas:** 6000 px y 64 MB decodificada en lugar de 4000 px (fotos de teléfono actuales); tope diario de 50 para acotar Rekognition; `AVISO_VERSION` sin subir por indicación del revisor.
 - **Detalle:** evidencia en `specs/nv-45/checklists/gates.md` + `Memoria.md`.

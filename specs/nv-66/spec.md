@@ -76,8 +76,8 @@ Filas copiadas del Excel (A2): `GET /lugares/conteo` «Cuenta cuántos resultado
 - **Pruebas:** `internal/negocios/afluencia_test.go`, `internal/vistas/service_test.go`, `tests/integration/lugares_actividad_test.go` (conteo, tope, afluencia, vistas, tope por hora, ARCO y presupuesto de Redis en un solo archivo), `tests/security/vistas_security_test.go`, `tests/contract/lugares_actividad_contract_test.go`, `tests/database/indexes_test.go`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-66`, sin firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-15), ola 11; implementada en la rama `nv-66`, sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** `historial_vistas` solo con vistas (búsquedas y descartes ya viven aparte); vistas para cualquier rol activo; límite de vistas contado en MongoDB sin Redis (60/h) y sin escritura antes de 10 min; conteo sin caché ni política propia con tope 1000; `dia` 0 = domingo; estadísticas del negocio fuera y solo anónimas.
 - **Detalle:** evidencia en `specs/nv-66/checklists/gates.md` + `Memoria.md` al ejecutar.

@@ -38,8 +38,8 @@ Fila completa en `docs/endpoints.md`.
 - El conflicto de ajustes compara la versión antes de aplicar (no en la misma operación): dos dispositivos que editan a la vez pueden pisarse, como ya pasa en `PATCH /preferencias`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-47`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-47`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** reclamar antes de aplicar; 503 sueltando la acción que falló; 101 = 422; 30 lotes por minuto.
 - **Detalle:** la evidencia irá en `specs/nv-47/checklists/gates.md` + `Memoria.md`.

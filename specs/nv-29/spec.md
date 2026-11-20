@@ -35,8 +35,8 @@ Sin endpoints nuevos.
 - Máximo 6 paradas por plan.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada (2026-11-11) en la rama `nv-29`; falta la firma. Ruta prioritaria, ola 2: planes con IA (hallazgo C1)
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada (2026-11-11) en la rama `nv-29`; falta la firma. Ruta prioritaria, ola 2: planes con IA (hallazgo C1)
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** confirmar `precio` por persona, velocidades en código (sin variable de entorno) y que «Borrar mi historial» no borre planes.
 - **Detalle:** la evidencia irá en `specs/nv-29/checklists/gates.md` + `Memoria.md`.

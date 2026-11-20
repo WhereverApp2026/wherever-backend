@@ -124,9 +124,9 @@ Comunes a B y C:
 - `curl` con 401 sin token y 404 a un ajeno; tag tras aprobar.
 
 ## Aprobación
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13), ola 8. Implementado REST + push sin canal en vivo (diferido, §7 opción «sin decisión»); límite de chat en MongoDB; `antes_de` reemplazado por `cursor` firmado; GET sin guardia de cuenta activa (igual que grupos). Evidencia en `Memoria.md` (NV-57).
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13), ola 8. Implementado REST + push sin canal en vivo (diferido, §7 opción «sin decisión»); límite de chat en MongoDB; `antes_de` reemplazado por `cursor` firmado; GET sin guardia de cuenta activa (igual que grupos). Evidencia en `Memoria.md` (NV-57).
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:**
   1. Tiempo real: opción A, B o C de §7 (recomendada C).
   2. Quien entra después ve el historial completo.

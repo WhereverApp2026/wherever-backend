@@ -36,8 +36,8 @@ Fila completa en `docs/endpoints.md`.
 - Dos ediciones del mismo usuario en el mismo milisegundo pueden guardarse en orden distinto al de su número; quien sincroniza justo en medio puede saltarse la primera hasta su siguiente edición o la siguiente descarga completa. Es una ventana de milisegundos y se acepta.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-46`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-46`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** ajustes por versión del perfil; solo planes propios; 410 con `campos`.
 - **Detalle:** la evidencia irá en `specs/nv-46/checklists/gates.md` + `Memoria.md`.

@@ -35,8 +35,8 @@ Buscar por nombre de usuario o teléfono sin revelar quién existe ni exponer da
 - El tiempo de respuesta no es constante: el teléfono siempre hace una consulta por índice, exista o no, y el límite por hora frena la enumeración.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11); implementada en la rama `nv-35`, ola 3: amistades, ML y grafo
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11); implementada en la rama `nv-35`, ola 3: amistades, ML y grafo
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:** Confirmar el alcance y los valores propuestos en Diseño.
 - **Detalle:** la evidencia irá en `specs/nv-35/checklists/gates.md` + `Memoria.md`.

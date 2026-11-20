@@ -79,9 +79,9 @@ Sin negocios en la base no hay nada que recomendar ni filtrar: esta spec crea el
 - No hay `ciudad_id` en `negocios`: la ubicación es GeoJSON y `direccion.municipio/estado`; el filtro geográfico de NV-21 usa coordenadas.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada y probada (2026-11-10), cinco suites verdes; falta la firma y cargar el CSV real del piloto. Ruta prioritaria, ola 1: catálogo y recomendaciones
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-10
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada y probada (2026-11-10), cinco suites verdes; falta la firma y cargar el CSV real del piloto. Ruta prioritaria, ola 1: catálogo y recomendaciones
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-10; aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:**
   1. Confirmar que `GET /categorias` devuelve los 6 giros de A2 con etiquetas/servicios y filtros, y que **no** se inventa el catálogo de 15 gustos del stub.
   2. Confirmar los nombres del Excel (`categoria`, `nivel_precio`, `nombre_normalizado`, estados `borrador/en_revision/aprobado/rechazado/pausado`) frente a los del stub.

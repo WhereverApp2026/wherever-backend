@@ -33,8 +33,8 @@ Formas en `docs/endpoints.md`.
 - Sin algoritmos de grafos avanzados (comunidades, centralidad).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-12); implementada, falta el CI del PR
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-12); implementada, falta el CI del PR
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** sin caché de 10 minutos y degradado también en la señal social (ver Diseño).
 - **Detalle:** la evidencia irá en `specs/nv-53/checklists/gates.md` + `Memoria.md`.

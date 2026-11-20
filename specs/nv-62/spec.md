@@ -92,9 +92,9 @@ Filas de J7 §3, sin los métodos de reserva. Se copian a `docs/endpoints.md` al
 - Sin aspectos por giro ni avance al Sello.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-14), implementada en `internal/resenas` (ola 10). Sin firma.
-- **Revisores:** Osmar Reséndiz (decisiones aceptadas el 2026-11-14; firma pendiente)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-14), implementada en `internal/resenas` (ola 10). Sin firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones del revisor (Osmar Reséndiz, 2026-11-14), aceptadas tal como las proponía la spec:** un check-in válido por negocio y día; una reseña por negocio cada 30 días, consultada con `ix_mis_resenas`; no se guarda la ubicación del usuario; campo nuevo `calificacion_suma` en `negocios`, inicializado desde la semilla; 5 aspectos fijos; 3 reportes ocultan una reseña; al eliminar la cuenta las reseñas se anonimizan, no se borran; reservas y puntos quedan fuera.
 - **Drift corregido:** ver «Drift corregido contra el código (2026-11-14)» (moderación de nv-42 y cola de nv-43, fotos de nv-45, P-50 de nv-56, caché de nv-18, `qr_checkin` de nv-20, If-Match 400/409, sin `rate:resenas_ia`, estado `rechazada`, `ix_resenas_recientes`).
 - **Pruebas:** `tests/integration/resenas_test.go`, `tests/security/resenas_security_test.go`, `tests/database/indexes_test.go`, contrato `usuarios/exportacion_descargar_200` (`checkins` y `resenas`) y Unit `internal/resenas/reglas_test.go`.

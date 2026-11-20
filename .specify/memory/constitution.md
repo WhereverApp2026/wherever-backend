@@ -2,7 +2,7 @@
 version: 1.9.0
 ratified: 2026-10-28
 last_amended: 2026-11-19
-status: borrador (pendiente de firma del revisor)
+status: vigente (1.9.0 aprobada por Osmar Reséndiz el 2026-11-19)
 source_of_truth: .specify/memory/constitution.md
 mirror: ./constitution.md
 methodology: SDD
@@ -85,7 +85,10 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 - Llaves de Redis (todas con TTL): `jwt_revocado:{jti}`, `login_fallos:{correo}`, `rate:{politica}:{sujeto}`, `idem:{llave}`, `lock:{recurso}`, `cuota:{usuario}:{fecha}`, `cache:{entidad}:{id}` (esta última desde su spec de módulo).
 - La contraseña nunca va a caché, logs ni respuestas.
 - Logs sin secretos (filtro en `slog`); `request_id` por petición.
-- Imágenes y dependencias: Dockle y Trivy en cada PR, ZAP pasivo cada noche (nv-09); Terraform con `trivy config`, secretos de los commits con gitleaks y Dependabot semanal. RESTler y Cosign se documentan como deuda diferida, no exigidas en esta etapa.
+- Imágenes y dependencias: Dockle y Trivy en cada PR, ZAP pasivo cada semana (nv-09); Terraform con `trivy config`, secretos de los commits con gitleaks y Dependabot semanal.
+- Cadena de suministro: la imagen se publica con SBOM y provenance y se firma con cosign sin llaves; el servidor solo instala un digest con firma válida de `cd-dev` en `main`. RESTler se documenta como deuda diferida, no exigida en esta etapa.
+- Perímetro del servidor de desarrollo: WAF en CloudFront (reglas administradas de AWS y límite por IP) y el balanceador solo atiende peticiones con la cabecera secreta de origen de CloudFront.
+- Respaldo semanal de MongoDB a un bucket privado donde la instancia solo escribe, con retención y alarma si falta; gobierno de `main` en GitHub: PR y `pr-gate` obligatorios, sin force-push.
 - `docs/endpoints.md`, `docs/rate-limit-matrix.md` y `docs/asvs-l2-checklist.md` están vivos; las specs solo los enlazan.
 
 ## 7. Testing y QA
@@ -129,4 +132,4 @@ No se agregan librerías sin evaluar licencia, mantenimiento y seguridad. Regla 
 | 1.6.0 | 2026-11-06 | Dos instancias detrás de balanceador y CloudFront en desarrollo, con HTTPS del certificado de CloudFront (nv-12) |
 | 1.7.0 | 2026-11-12 | Etapa `version` entre los límites y JWT, solo sobre `/api/v1/`; códigos `426` y `304` (ETag débil); lista del pipeline igual al código, con `request_timeout` (nv-16) |
 | 1.8.0 | 2026-11-14 | Stripe entra al stack para el anticipo de reservas y los depósitos a negocios (nv-60); aprobada por Osmar Reséndiz |
-| 1.9.0 | 2026-11-19 | CI: gitleaks en `guardrails`, job `iac-scan` con `trivy config` (HIGH/CRITICAL bloquean) y Dependabot semanal; pendiente de firma |
+| 1.9.0 | 2026-11-19 | CI: gitleaks en `guardrails`, job `iac-scan` con `trivy config` (HIGH/CRITICAL bloquean) y Dependabot semanal; ZAP semanal; imagen firmada con cosign, SBOM y provenance (Cosign sale de la deuda diferida); WAF y cabecera de origen; respaldo de MongoDB; `main` protegido; aprobada por Osmar Reséndiz |

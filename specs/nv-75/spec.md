@@ -77,8 +77,8 @@ Filas copiadas del Excel (A5): `GET /api/v1/negocios/{id}/consejo` «Consejo de 
 - Sin traducción ni varias propuestas de descripción.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/nv-75-a587c9`. Falta la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-16), ola 12; implementada en la rama `claude/nv-75-a587c9`. Falta la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor (tomadas como las propone la spec, 2026-11-16):** reglas eligen el hecho y la IA solo lo redacta; consejo al pedirlo (no nocturno), uno por día en MongoDB con candado por índice único, sin Redis; variable nueva `IA_CONSEJO_DIA=60`; el consejo nunca da 429 ni 503 por IA; la descripción no se guarda, da 429 en el límite del usuario y plantilla en lo demás; respuestas con `fuente`.
 - **Detalle:** evidencia en `specs/nv-75/checklists/gates.md` + `Memoria.md` al ejecutar.

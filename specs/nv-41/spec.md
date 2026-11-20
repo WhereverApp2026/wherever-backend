@@ -47,8 +47,8 @@ Sin endpoints nuevos. Variables nuevas: `FCM_PROJECT_ID`, `FCM_CREDENCIALES_B64`
 - La entrega no está garantizada: FCM es de mejor esfuerzo. Al apagar la API, los push en cola se pierden (el aviso sigue en el centro).
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; implementada en la rama `nv-41`; falta la prueba en vivo con las credenciales del equipo.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; implementada en la rama `nv-41`; falta la prueba en vivo con las credenciales del equipo.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** amistad sin interruptor propio; credenciales en base64; 3 intentos; los push en cola se pierden al apagar.
 - **Detalle:** la evidencia irá en `specs/nv-41/checklists/gates.md` + `Memoria.md`.

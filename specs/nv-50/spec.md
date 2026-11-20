@@ -35,8 +35,8 @@ Sin endpoints nuevos.
 - El modelo es de un tercero gestionado; no se entrena uno propio.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-11): implementada; Unit, lint y gates locales en verde, el resto en el CI del PR. Falta la prueba en vivo y la firma.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-11): implementada; Unit, lint y gates locales en verde, el resto en el CI del PR. Falta la prueba en vivo y la firma.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** colección aparte en lugar de campo, límites propios en lugar de los de nv-28 y los valores 80/800 (a confirmar en AI Studio).
 - **Detalle:** la evidencia está en `specs/nv-50/checklists/gates.md` + `Memoria.md`.

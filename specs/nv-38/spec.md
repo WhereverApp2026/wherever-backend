@@ -43,8 +43,8 @@ Filas completas en `docs/endpoints.md`.
 - Los Android App Links los configura la app. Ojo: la URL de CloudFront cambia al recrear la infraestructura (nv-14), y con ella `APP_LINK_BASE`.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-38`.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador revisado (2026-11-12) con la corrección de drift; en ejecución en la rama `nv-38`.
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor:** el código va en el cuerpo y en el fragmento (no en la ruta); un enlace por grupo, que se reemplaza al crear otro; unirse no pide amistad; vencido = 404 en la vista y 410 al unirse.
 - **Detalle:** la evidencia irá en `specs/nv-38/checklists/gates.md` + `Memoria.md`.

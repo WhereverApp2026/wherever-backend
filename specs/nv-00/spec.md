@@ -40,7 +40,7 @@ N/A — verificación manual de estructura + `ConfigTest` (3): `.env.example vá
 Sin `p95, gate de mutación, ZAP/RESTler bloqueantes, Trivy de imagen, /metrics completo, Pact real` — van como deuda documentada, no verde falso. Sin módulos de negocio, sin hosting.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (ejecutada, sin firma)
-- **Revisores:** (pendiente de nombre)
-- **Fecha:** 2026-11-02 (ejecución)
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (ejecutada, sin firma)
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-02 (ejecución); aprobada 2026-11-19
 - **Detalle:** T1 ejecutada. Evidencia en `specs/nv-00/checklists/gates.md` + `Memoria.md`. Test real: `internal/platform/config/config_example_test.go` (`TestEnvExample_IsValid`, `TestEnvExample_HasNoSensitivePatterns`, `TestEnvExample_HasNoFutureKeys`). `scripts/check_coverage.sh` llega en `nv-03`; hasta entonces el NFR de cobertura queda documentado sin medir.

@@ -38,8 +38,8 @@ La app necesita explorar negocios cercanos con filtros, ver su ficha y verlos en
 - La distancia es en línea recta, sin rutas.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Implementada y probada (2026-11-10), cinco suites verdes; falta la firma y Semgrep en CI. Ruta prioritaria, ola 1: catálogo y recomendaciones
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** 2026-11-10
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Implementada y probada (2026-11-10), cinco suites verdes; falta la firma y Semgrep en CI. Ruta prioritaria, ola 1: catálogo y recomendaciones
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** 2026-11-10; aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:** Confirmar el alcance y los valores propuestos en Diseño.
 - **Detalle:** la evidencia irá en `specs/nv-21/checklists/gates.md` + `Memoria.md`.

@@ -83,8 +83,8 @@ La persona elige día, hora y personas; el servidor aparta el cupo sin que dos p
 - El QR lo dibuja la app.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador con evidencia (2026-11-13): implementada en la ola 10 desde `main` (nv-55 y nv-56 ya fusionadas); decisiones aplicadas como se proponían, sin firma
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
+- **Estado:** ✅ Aprobada (2026-11-19, Osmar Reséndiz): implementada y fusionada en `main` con el CI verde. Estado al firmar: Borrador con evidencia (2026-11-13): implementada en la ola 10 desde `main` (nv-55 y nv-56 ya fusionadas); decisiones aplicadas como se proponían, sin firma
+- **Revisores:** Osmar Reséndiz (único integrante de backend)
+- **Fecha:** aprobada 2026-11-19
 - **Decisiones para el revisor antes de ejecutar:** estados `bloqueada` y `pendiente` en lugar de `pendiente_pago`; `confirmacion` y `permite_cambios` en `reservas_config` (a cargo de nv-55); barrido cada 5 min solo con Mongo; código de 32 símbolos; tope de 3 apartados y 10 reservas por hora; reservas pasadas conservadas al borrar la cuenta; anticipo 422 hasta nv-60.
 - **Detalle:** la evidencia irá en `specs/nv-59/checklists/gates.md` + `Memoria.md`.
