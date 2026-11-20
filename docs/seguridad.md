@@ -35,20 +35,20 @@ Lo que falta para un nivel bancario no está en el código sino alrededor: el go
 | 17 | Perímetro (WAF) | 1 | `infra/aws-dev/waf.tf` (PR E): web ACL en CloudFront con reputación de IP, límite por IP (429 uniforme), entradas maliciosas y OWASP general; el balanceador solo reenvía con la cabecera secreta de CloudFront, así nadie se salta el WAF. Cuenta desde que el operador lo aplica con `crear.sh` |
 | 18 | Registro y monitoreo de seguridad | 0,5 | `slog` JSON con `request_id` y filtro de secretos y correos; CloudWatch con alarmas de errores, 5xx, dependencias y respaldos (`observabilidad.tf`). **Falta:** alertas de eventos de seguridad (picos de 401/423/429), CloudTrail y retención mayor a 14 días |
 | 19 | Respaldo y recuperación | 0,5 | Respaldo semanal de MongoDB a S3 versionado, 28 días, la instancia solo escribe, alarma de 7 días y restauración documentada (#123, #124); `crear.sh` ya no oculta fallos (#125). **Falta:** copia fuera de la cuenta y prueba de restauración periódica; `destruir.sh` borra los respaldos |
-| 20 | Gobierno del repositorio en GitHub | 0 | **Pendiente del operador** (ver abajo) |
-| | **Total** | **16,5 / 20 = 82,5 %** | |
+| 20 | Gobierno del repositorio en GitHub | 1 | Ruleset «Protect main» activo: PR obligatorio, `pr-gate` obligatorio, sin force-push ni borrado, sin excepciones. Alertas de Dependabot activas. Secret scanning y push protection activados por el operador (ver abajo) |
+| | **Total** | **17,5 / 20 = 87,5 %** | |
 
-**Estado real de GitHub, consultado con `gh api` el 2026-11-19** (la cuenta del agente tiene permiso `write`, no `admin`):
+**Estado real de GitHub, consultado con `gh api` el 2026-11-19 después de que el operador lo activó** (la cuenta del agente tiene permiso `write`, no `admin`):
 
 | Ajuste | Resultado | Cuenta |
 |---|---|---|
-| Protección de `main` | `branches/main` → `protected: false`; `rules/branches/main` y `rulesets` → `[]`. `pr-gate` existe pero no es obligatorio: se puede fusionar con el CI en rojo o sin CI | No |
-| Alertas de Dependabot | `dependabot/alerts` → *«Dependabot alerts are disabled for this repository»* (403). `dependabot.yml` solo activa las actualizaciones de versión | No |
-| Secret scanning y push protection | No verificable sin permiso de administrador (`secret-scanning/alerts` → 404, `security_and_analysis` → `null`). El operador reporta una alerta abierta, señal de que el escaneo existe; push protection sin confirmar | No (sin evidencia) |
+| Protección de `main` | `rulesets` → «Protect main», `active`, sobre `refs/heads/main`, sin `bypass_actors`. `rules/branches/main` → `pull_request` (0 aprobaciones: un solo integrante de backend), `required_status_checks` = `pr-gate` (GitHub Actions), `non_fast_forward` y `deletion`. `branches/main` → `protected: true` | Sí |
+| Alertas de Dependabot | `dependabot/alerts` → 200 con 0 alertas abiertas (antes 403 *«disabled»*). Actualizaciones de seguridad activadas por el operador; su endpoint solo lo lee un administrador | Sí |
+| Secret scanning y push protection | Activados por el operador y la alerta de la llave de prueba cerrada como «Used in tests». No verificable con permiso `write` (`secret-scanning/alerts` → 404, `security_and_analysis` → `null`); el repositorio es público, donde ambos son gratuitos | Sí (reporte del operador) |
 
-**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124) los errores ocultos de `crear.sh` (#125) y el WAF (PR E). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso quedó en 77,5 % antes del WAF y en 82,5 % con él.
+**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124), los errores ocultos de `crear.sh` (#125) y el WAF (PR E). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso quedó en 77,5 % antes del WAF, 82,5 % con él y 87,5 % con el gobierno de GitHub.
 
-- Si el operador activa el gobierno de GitHub (control 20): **17,5 / 20 = 87,5 %**, sin tocar código.
+- Lo que sigue a medias (DAST, protección de datos, rotación, registros, respaldos) y el TLS de origen dependen de staging, dominio propio y procesos (sección 3).
 
 ## 2. Controles implementados por capa
 
@@ -141,14 +141,14 @@ Wherever no custodia dinero: los pagos van por Stripe (Connect Express) y el rep
 | 3.13 | **PCI DSS** | Stripe reduce el alcance: el backend nunca ve, guarda ni transmite tarjetas. Con los componentes de Stripe en la app el alcance suele ser el cuestionario SAQ A (confirmarlo con Stripe). No aplica la certificación completa | 1 día para el cuestionario | US$0 |
 | 3.14 | **LFPDPPP** (ley vigente desde marzo de 2025) | Ya hay aviso de privacidad (`docs/aviso-privacidad.md`), consentimiento versionado, derechos ARCO y borrado. Falta: responsable de datos designado, contratos de encargado con los proveedores (Google, Stripe, Brevo, Firebase, AWS), registro de transferencias y procedimiento de vulneraciones (3.8) | 3–5 días con apoyo legal | Asesoría legal: variable |
 | 3.15 | **SOC 2 / ISO 27001** como referencia | No se busca certificar; sirven como lista para ordenar políticas (accesos, cambios, proveedores, continuidad). Una certificación real cuesta decenas de miles de dólares al año | Referencia | US$20 000–60 000 al año si se certificara |
-| 3.16 | **Gobierno del repositorio** (control 20) | Sin protección de `main`, un PR puede fusionarse con el CI en rojo; sin alertas, una vulnerabilidad nueva en una dependencia ya fusionada no avisa | 15 minutos del operador | US$0 |
+| 3.16 | **Gobierno del repositorio** (control 20) | Sin protección de `main`, un PR puede fusionarse con el CI en rojo; sin alertas, una vulnerabilidad nueva en una dependencia ya fusionada no avisa | 15 minutos del operador | US$0. **Hecho** (2026-11-19); falta exigir 1 aprobación cuando haya un segundo revisor |
 
 ## 4. Hoja de ruta
 
 Ordenada por riesgo dentro de cada horizonte.
 
 ### Antes de producción (bloqueante)
-1. Gobierno de GitHub (3.16): ruleset de `main` con `pr-gate` obligatorio y un revisor; alertas y actualizaciones de seguridad de Dependabot; confirmar secret scanning y push protection; cerrar la alerta abierta tras rotar la llave.
+1. ~~Gobierno de GitHub (3.16)~~: hecho el 2026-11-19. Falta subir el ruleset a 1 aprobación cuando haya un segundo revisor.
 2. ~~WAF (3.1) y cabecera secreta de origen~~: hechos (PR E). Falta revisar sus métricas tras la primera semana y pasar a bloqueo `SizeRestrictions_BODY` si no hay cuerpos JSON legítimos de más de 8 KB.
 3. Dominio propio, TLS hasta el balanceador y SPF/DKIM/DMARC (3.6, 3.7).
 4. Staging separado (3.3) y DAST activo contra él (3.4).

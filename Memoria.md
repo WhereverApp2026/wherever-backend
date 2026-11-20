@@ -901,6 +901,10 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### Gobierno de GitHub activo y Neo4j nuevo (2026-11-19)
+- Estado: ruleset «Protect main» (PR + `pr-gate` obligatorios, sin force-push ni borrado, 0 aprobaciones), alertas de Dependabot y secret scanning activados por el operador; verificado con `gh api` salvo secret scanning (requiere `admin`). Puntaje **17,5/20 = 87,5 %**. Neo4j pasó a otra instancia Aura (`1f1f1070`): `make siembra` + `make reconstruir-grafo` y reinicio de la API.
+- A evitar: reiniciar la API a mano sin `--env-file imagen.env` (intenta bajar `wherever-api:dev` y falla). Una URI de Aura copiada a mano trajo un espacio y una contraseña incompleta: cargarla desde el `.txt` que descarga Aura.
+
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.
 - Proveedor del modelo de lenguaje (API o modelo local).
