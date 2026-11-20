@@ -891,10 +891,15 @@
 - A evitar: un permiso IAM nuevo puede no quedar guardado en la consola. El error dice «no identity-based policy» (falta en la política del deployer) o «no permissions boundary» (falta en el boundary del rol de la instancia).
 
 ## Seguridad: estado y brecha fintech (Fase 3, 2026-11-19)
-- Estado: `docs/seguridad.md` (solo documentación): rúbrica de 20 controles DevSecOps con evidencia, controles por capa mapeados a ASVS L2 y Top 10 2021, brecha frente a banca con esfuerzo y costo estimado, hoja de ruta en 3 horizontes y riesgos aceptados. Puntaje: **15,5/20 = 77,5 %**; 82,5 % si el operador activa GitHub; 87,5 % con WAF.
+- Estado: `docs/seguridad.md` (solo documentación): rúbrica de 20 controles DevSecOps con evidencia, controles por capa mapeados a ASVS L2 y Top 10 2021, brecha frente a banca con esfuerzo y costo estimado, hoja de ruta en 3 horizontes y riesgos aceptados. Puntaje: **15,5/20 = 77,5 %** al cerrar la Fase 3; 82,5 % con el WAF (PR E) y 87,5 % si además el operador activa GitHub.
 - Comprobado con `gh api` el 2026-11-19: `main` sin protección ni rulesets; alertas de Dependabot desactivadas; secret scanning no verificable sin `admin` (la cuenta del agente tiene `write`). Ninguno cuenta.
 - Decisión: la rúbrica se rehízo porque el desglose de la auditoría del 2026-11-18 (≈75 %) no quedó en el repo; marca parciales el TLS de origen, la rotación, las alertas de seguridad y el respaldo dentro de la misma cuenta.
 - A evitar: subir el puntaje sin evidencia; un ajuste de GitHub cuenta solo si `gh api` lo muestra activo.
+
+### WAF en CloudFront y cabecera de origen (PR E, 2026-11-19)
+- Estado: `infra/aws-dev/waf.tf`: web ACL en `us-east-1` (provider `aws.global`) con reputación de IP, límite por IP (5000/5 min → 429 uniforme), entradas maliciosas y OWASP general sin multipart y con `SizeRestrictions_BODY` en `count`. El balanceador responde 403 sin la cabecera `X-Origen-Wherever` (secreto `random_password`, provider `random` nuevo). Política nueva `iam/wherever-dev-deployer-waf.json`. Plan: 3 nuevos, 2 cambios, 0 destruidos. Puntaje 82,5 % (87,5 % con GitHub).
+- Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
+- A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
 ## Pendientes de decidir
 - Proveedor del catálogo de lugares (Google Places, Foursquare u OSM): licencias.

@@ -107,6 +107,17 @@ variable "log_retention_days" {
   default     = 14
 }
 
+variable "waf_rate_limit" {
+  description = "Peticiones por IP en 5 minutos antes de que el WAF responda 429 en el borde."
+  type        = number
+  default     = 5000
+
+  validation {
+    condition     = var.waf_rate_limit >= 100
+    error_message = "waf_rate_limit debe ser al menos 100: menos bloquea a una red que comparte IP."
+  }
+}
+
 variable "budget_usd" {
   description = "Tope mensual de gasto para la alerta."
   type        = number

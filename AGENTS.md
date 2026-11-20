@@ -65,6 +65,7 @@
 - IP del cliente: entrada de `X-Forwarded-For` a `TRUSTED_PROXY_HOPS` del final (2 con CloudFront y balanceador); si no alcanza o no es IP, la conexión. Si cambia la cadena de proxies, cambia este valor.
 - Compresión (nv-12): según `Accept-Encoding`; `/auth` y `POST /usuarios` nunca, porque llevan tokens. Una ruta nueva que devuelva tokens se agrega a `carriesTokens`.
 - Headers outermost + HSTS 365d no-dev + CORS 1 origen.
+- WAF de CloudFront (`waf.tf`): el balanceador solo atiende con la cabecera secreta `X-Origen-Wherever`; si una ruta legítima da 403 del WAF, pon esa regla en `count`, no apagues el grupo.
 - Rate 4 políticas + 429 uniforme + limitador antes de Auth.
 - Timeout 60s + body 10MB + `slog` con filtro de secretos.
 - SAST Semgrep, gosec y govulncheck bloqueantes; imagen con Dockle y Trivy bloqueantes (nv-09); ZAP pasivo cada semana (domingo, `nightly.yml`); Sonar informativo. `RESTler` diferido, documentado, no exigido.
