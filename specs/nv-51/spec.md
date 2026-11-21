@@ -30,7 +30,7 @@ Encontrar lugares por significado y medir si mejora frente a solo reglas. **Orig
 - `Unit/Semantica` (`internal/semantica/semantica_test.go`): producto punto, mín–máx, orden y empates, palabras, reglas, híbrido, huella, codificación de la caché y causas del log.
 - `Unit/Recomendador` (`puntaje_test.go`): pesos con siete factores, factor neutro sin semántica y orden conservado.
 - `Integration/Semántica 8` (`tests/integration/semantica_test.go`) con MongoDB y Redis reales y el servidor local `iatest.ServidorVectores`: frase → esperado primero y solo aprobados; límite; caché de 24 h sin la frase en la llave; proveedor con 500 o 429 → reglas; sin cupo → reglas sin llamar al proveedor; sin vectores → reglas; 422; 429 a la petición 31.
-- Medición: `scripts/evaluar-semantica` (30 frases sobre 30 negocios ficticios) da el top-5 de reglas, semántica y reglas + afinidad; se guarda en `docs/ml-evaluacion.md`.
+- Medición: `scripts/evaluar-semantica` (30 frases sobre 30 negocios ficticios) da el top-5 de reglas, semántica y reglas + afinidad; se guarda en `docs/ml-evaluacion.md`. Corrida real del 2026-11-20 con `gemini-embedding-2`: top-1 reglas 10/30, semántica 30/30, reglas + afinidad 30/30; top-5 reglas 14/30, las otras dos 30/30.
 
 ## Criterios
 - La búsqueda semántica mejora el top-5 frente a solo reglas, con evidencia medida.

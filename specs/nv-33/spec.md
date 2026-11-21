@@ -29,7 +29,7 @@ Si la IA falla o tarda, la persona siempre recibe opciones; también puede pedir
 - Unit `internal/asistente/respaldo_test.go`: cada falla de la IA (tiempo, 429, límite del proveedor, falla, bloqueada, inválida, IA apagada) termina en reglas con 3 paradas sin el alérgeno; tope, límite del usuario y global con una `ia.Guardia` de precio positivo no llaman al proveedor ni suman gasto; la IA lenta cae a reglas en menos de 1 s; la cancelación corta la IA sin respaldo; otra idea no repite y sin lugares da 422; validación de `excluir`; motivo por error.
 - `Integration/Asistente` (`tests/integration/asistente_test.go`) con MongoDB y Redis reales y el doble de `ia.Modelo` detrás de la guardia real: plan correcto, la IA inventa un lugar, la IA tarda más del plazo, 429, falla, inválida, itinerario vacío, límite del usuario, tope agotado (sin sumar gasto), sin candidatos, frase de 301; `OtraIdea`: no repite, nunca trae un negocio no aprobado, sin más lugares 422.
 - `Security/Asistente`: 401 sin sesión, token vencido o usuario inexistente y 403 con eliminación pendiente, en las dos rutas. La inyección de instrucciones la cubre `Security/IA` (nv-28).
-- Medición con IA real (pendiente, necesita la llave de SSM): 20 frases en español, tasa de descartes, latencia p50 y p95, tasa de 429 y tokens por plan.
+- Medición con IA real (2026-11-20, `docs/ml-evaluacion.md` § Planes con IA real): 20 frases en el servidor con los 40 negocios de Tula; 18 planes por IA, 0 descartes a reglas, 0 respuestas 429, 2 sin lugares compatibles (niños y mascota, faltan etiquetas en los datos), p50 2,60 s y p95 3,13 s, ≈1 593 + 199 tokens por plan.
 
 ## Criterios
 - Con la IA caída, el usuario siempre recibe 3 opciones (si hay 3 lugares compatibles).

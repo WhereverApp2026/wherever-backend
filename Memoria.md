@@ -901,6 +901,11 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### Medición con IA real: nv-33 y nv-51 (2026-11-20)
+- Estado: `docs/ml-evaluacion.md`. Semántica (nv-51, `gemini-embedding-2`, 30 frases ficticias): top-1 reglas 10/30, semántica 30/30, reglas + afinidad 30/30. Planes (nv-33, servidor con los 40 negocios de Tula): 18/20 por IA, 0 descartes, 0 × 429, p50 2,60 s, p95 3,13 s, ≈1 593 + 199 tokens por plan.
+- Decisión: 4 cuentas `yahiresendiz34+medicion-ia-N@gmail.com` (alias del operador, para que Brevo no rebote) por el límite de 5 planes por hora; quedaron en `eliminacion_pendiente` (purga 2026-12-21).
+- A evitar: «con niños» y «con mi perro» dan 422 porque los negocios del DENUE no traen esas etiquetas; etiquetarlos en el panel. Borrar el archivo de contraseñas de prueba solo después de confirmar el 202 de cada cuenta (el límite de login 5/5 min por IP hizo fallar la cuarta).
+
 ### Aviso de privacidad integral (2026-11-20)
 - Estado: `docs/aviso-privacidad.md` con aviso integral y simplificado (LFPDPPP 2025). Encargados completos: AWS (servidores, S3, CloudFront, Rekognition), Atlas, Aura, Upstash, Gemini, Firebase Cloud Messaging, inicio con Google, Open-Meteo y Brevo; Stripe como transferencia. Fecha 20/11/2026, versión `2026-11`.
 - Decisión: no se sube `AVISO_VERSION` (solo hay usuarios de prueba); se sube al publicar a usuarios reales, tras la revisión jurídica, que sigue pendiente.
