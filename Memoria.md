@@ -901,6 +901,11 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-77 — Descripción del perfil (2026-11-21)
+- Estado: `usuarios.descripcion` (≤ 160, una línea) en `PATCH/GET /usuarios/yo`, exportación ARCO y `GET /personas/{id}`. Moderada con las reglas de nv-71 (`account.WithModeracion`): rechazada = 422 sin guardar; dudosa se guarda. Sin rutas nuevas.
+- Decisión: visible para quien ve el perfil, no en búsquedas ni sugerencias; se quitan controles y marcas de dirección (suplantación de texto).
+- A evitar: escribir marcas de dirección reales en el código de pruebas; gosec (G116) y staticcheck (ST1018) las marcan: usar escapes `‮`.
+
 ### CI: límite de tiempo de las suites (2026-11-21)
 - Error: la suite de Integration tardaba ~625 s y `go test` corta a los 10 min de pruebas (sin contar el arranque de contenedores): con las pruebas de nv-76 se pasó y el CI dio `panic: test timed out`, sin ninguna prueba rota.
 - Decisión: `-timeout 20m` en las cuatro suites con contenedor y el job `pipeline` de 30 a 45 min (hoy ~19 min). Si Integration se acerca a 20 min, partirla en dos jobs en vez de subir más el límite.

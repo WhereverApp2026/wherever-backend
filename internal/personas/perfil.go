@@ -73,7 +73,9 @@ type FriendExtras struct {
 // extras.
 type ProfileResponse struct {
 	Person
-	Relation string `json:"relacion"`
+	// Description es la presentación de la persona (nv-77); la ve quien puede ver su perfil.
+	Description string `json:"descripcion"`
+	Relation    string `json:"relacion"`
 	*FriendExtras
 }
 
@@ -96,7 +98,7 @@ func (s *Service) Profile(ctx context.Context, subject, rawID string) (ProfileRe
 	if err != nil {
 		return ProfileResponse{}, err
 	}
-	out := ProfileResponse{Person: newPerson(u), Relation: rel}
+	out := ProfileResponse{Person: newPerson(u), Description: u.Description, Relation: rel}
 	if rel == RelationFriend {
 		if out.FriendExtras, err = s.friendExtras(ctx, me, u); err != nil {
 			return ProfileResponse{}, err

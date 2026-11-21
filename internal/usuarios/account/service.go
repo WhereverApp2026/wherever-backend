@@ -47,6 +47,7 @@ type Service struct {
 	consents  *usuarios.ConsentRepository
 	versions  Versions
 	retiro    RetiroDatosNegocio
+	moderador Moderador
 }
 
 // NewService arma el servicio; falla solo si no puede preparar el hasher.
@@ -131,7 +132,8 @@ func (s *Service) PatchProfile(ctx context.Context, claims *middleware.Claims, v
 	return s.profileOf(user), nil
 }
 
-func (s *Service) profileChanges(ctx context.Context, req PatchProfileRequest) (bson.D, error) {
+// textChanges arma nombre, nombre de usuario, foto y descripción (moderada, nv-77).
+func (s *Service) textChanges(ctx context.Context, req PatchProfileRequest) (bson.D, error) {
 	var set bson.D
 	if req.Name != nil {
 		set = append(set, bson.E{Key: "nombre", Value: strings.TrimSpace(*req.Name)}, bson.E{Key: "nombre_normalizado", Value: text.Normalize(*req.Name)})
@@ -141,6 +143,21 @@ func (s *Service) profileChanges(ctx context.Context, req PatchProfileRequest) (
 	}
 	if req.PhotoURL != nil {
 		set = append(set, bson.E{Key: "foto_url", Value: *req.PhotoURL})
+	}
+	if req.Description != nil {
+		desc, err := s.descripcion(ctx, *req.Description)
+		if err != nil {
+			return nil, err
+		}
+		set = append(set, bson.E{Key: "descripcion", Value: desc})
+	}
+	return set, nil
+}
+
+func (s *Service) profileChanges(ctx context.Context, req PatchProfileRequest) (bson.D, error) {
+	set, err := s.textChanges(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 	if req.CityID != nil {
 		id, err := bson.ObjectIDFromHex(*req.CityID)
