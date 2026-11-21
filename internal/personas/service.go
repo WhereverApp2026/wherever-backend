@@ -117,6 +117,8 @@ type Service struct {
 	log      *slog.Logger
 	// profile es el perfil de persona y los contactos (nv-70).
 	profile profileDeps
+	// insignias son las ganadas que se ven en el perfil (nv-78).
+	insignias Insignias
 }
 
 // NewService recibe los repositorios y la llave HMAC del teléfono (la misma de nv-05).

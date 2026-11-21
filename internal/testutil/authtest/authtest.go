@@ -37,6 +37,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
+	"github.com/WhereverApp2026/wherever-backend/internal/insignias"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
@@ -116,6 +117,7 @@ type Env struct {
 	Votaciones        *votaciones.Service
 	Chat              *chat.Service
 	Moderacion        *moderacion.Service // cola y reglas (nv-43)
+	Insignias         *insignias.Service  // insignias de las personas (nv-78)
 	Recomendaciones   *recomendaciones.Service
 	Clima             *clima.Servicio     // contra OpenMeteo, el doble de Open-Meteo (nv-25)
 	OpenMeteo         *climatest.Servidor // la prueba cambia su respuesta, demora o falla
@@ -318,6 +320,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	mods.WithDestino(eventos.TipoCola, events.Destino())
 	registry.RegisterPurger(eventos.NewPrivacy(eventRepo))
 	registry.RegisterExporter(eventos.NewPrivacy(eventRepo))
+	insigniasRepo := insignias.NewRepository(client.DB())
+	badges := insignias.NewService(insigniasRepo, log)
+	registry.RegisterPurger(insignias.NewPrivacy(insigniasRepo))
+	registry.RegisterExporter(insignias.NewPrivacy(insigniasRepo))
 	// testutil.Config no fija IA_CONSEJO_DIA: se usa el valor por defecto de producción.
 	tips := consejos.NewService(consejos.NewRepository(client.DB()), businessRepo, log).WithIA(guardia, consejos.CupoPorOmision)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
@@ -333,7 +339,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	friends.WithGraph(graph).WithNotifier(notifier)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
-	people.WithProfile(users, friendRepo, groupRepo, nil) // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
+	people.WithProfile(users, friendRepo, groupRepo, nil).WithInsignias(badges) // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph
 	suggestions, err := sugerencias.NewService(friendRepo, users, businessRepo, log)
 	require.NoError(t, err)
 	appErrors, err := errores.NewService(errores.NewRepository(client.DB()), cursor)
@@ -345,9 +351,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Google: google, Log: log, Logs: logs,
-		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images,
+		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images, Insignias: badges,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),
+			insignias.NewHandler(badges, usuarios.RequireActive(users)),
 			account.NewHandler(acc, v).WithActiveGuard(usuarios.RequireActive(users)),
 			ciudades.NewHandler(cities, v),
 			configuracion.NewHandler(configuracion.NewService(cfg.VersionApp)),

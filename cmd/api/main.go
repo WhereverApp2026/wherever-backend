@@ -40,6 +40,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
 	"github.com/WhereverApp2026/wherever-backend/internal/inicio"
+	"github.com/WhereverApp2026/wherever-backend/internal/insignias"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
@@ -220,6 +221,11 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
+	// Insignias de las personas (nv-78): se calculan al pedirlas; ARCO exporta y borra las ganadas.
+	insigniasRepo := insignias.NewRepository(db)
+	insigniasSvc := insignias.NewService(insigniasRepo, log)
+	registry.RegisterPurger(insignias.NewPrivacy(insigniasRepo))
+	registry.RegisterExporter(insignias.NewPrivacy(insigniasRepo))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
@@ -277,7 +283,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	accountSvc.WithRetiroDatosNegocio(business.privacy)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active}, db, cursor, log)
+	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active, insignias: insigniasSvc}, db, cursor, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,6 +295,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	chatSvc := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
+		insignias.NewHandler(insigniasSvc, active),
 		// Aceptación de términos y aviso (nv-19) con las versiones que publica /configuracion.
 		account.NewHandler(accountSvc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}), validator).WithActiveGuard(active),
 		ciudades.NewHandler(citySvc, validator),
@@ -535,6 +542,7 @@ type socialDeps struct {
 	phoneKey  []byte
 	validator *validation.Validator
 	active    fiber.Handler
+	insignias *insignias.Service
 }
 
 // buildExtras arma los módulos sociales y los errores de la app (nv-64: agrupados por huella,
@@ -564,7 +572,7 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	people.WithProfile(d.users, d.friends, d.groups, nil)
+	people.WithProfile(d.users, d.friends, d.groups, nil).WithInsignias(d.insignias)
 	if d.graph.driver != nil {
 		people.WithGraph(d.graph.driver)
 	}

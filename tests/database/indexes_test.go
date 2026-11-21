@@ -24,6 +24,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/grafo"
 	"github.com/WhereverApp2026/wherever-backend/internal/grupos"
 	"github.com/WhereverApp2026/wherever-backend/internal/indexes"
+	"github.com/WhereverApp2026/wherever-backend/internal/insignias"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
@@ -95,6 +96,7 @@ var expected = map[string][]string{
 	postales.RecuerdosCollection:        {"_id_", "ux_recuerdo", "ix_recuerdos_fecha"},
 	postales.MomentosCollection:         {"_id_", "ix_feed", "ix_etiquetados", "ix_momentos_negocio", "ux_momento_postal"},
 	consejos.Collection:                 {"_id_", "ux_consejo_dia", "ttl_consejos"},
+	insignias.Collection:                {"_id_", "ux_insignia_usuario"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -175,6 +177,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		postales.RecuerdosCollection:     {"ux_recuerdo"},
 		postales.MomentosCollection:      {"ux_momento_postal"},
 		consejos.Collection:              {"ux_consejo_dia"},
+		insignias.Collection:             {"ux_insignia_usuario"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
