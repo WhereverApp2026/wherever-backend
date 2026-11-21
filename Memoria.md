@@ -901,6 +901,10 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### Aviso de privacidad integral (2026-11-20)
+- Estado: `docs/aviso-privacidad.md` con aviso integral y simplificado (LFPDPPP 2025). Encargados completos: AWS (servidores, S3, CloudFront, Rekognition), Atlas, Aura, Upstash, Gemini, Firebase Cloud Messaging, inicio con Google, Open-Meteo y Brevo; Stripe como transferencia. Fecha 20/11/2026, versión `2026-11`.
+- Decisión: no se sube `AVISO_VERSION` (solo hay usuarios de prueba); se sube al publicar a usuarios reales, tras la revisión jurídica, que sigue pendiente.
+
 ### Gobierno de GitHub activo y Neo4j nuevo (2026-11-19)
 - Estado: ruleset «Protect main» (PR + `pr-gate` obligatorios, sin force-push ni borrado, 0 aprobaciones), alertas de Dependabot y secret scanning activados por el operador; verificado con `gh api` salvo secret scanning (requiere `admin`). Puntaje **17,5/20 = 87,5 %**. Neo4j pasó a otra instancia Aura (`1f1f1070`): `make siembra` + `make reconstruir-grafo` y reinicio de la API.
 - A evitar: reiniciar la API a mano sin `--env-file imagen.env` (intenta bajar `wherever-api:dev` y falla). Una URI de Aura copiada a mano trajo un espacio y una contraseña incompleta: cargarla desde el `.txt` que descarga Aura.
