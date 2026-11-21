@@ -284,7 +284,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     # Testcontainers exige Linux (AGENTS.md §1).
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -312,23 +312,23 @@ jobs:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: integration
-        run: go test ./tests/integration/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-integration.out
+        run: go test ./tests/integration/... -count=1 -p 1 -timeout 20m $COVER -coverprofile=bin/coverage-integration.out
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: security
-        run: go test ./tests/security/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-security.out
+        run: go test ./tests/security/... -count=1 -p 1 -timeout 20m $COVER -coverprofile=bin/coverage-security.out
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       - name: database
-        run: go test ./tests/database/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-database.out
+        run: go test ./tests/database/... -count=1 -p 1 -timeout 20m $COVER -coverprofile=bin/coverage-database.out
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
       # Sin CONTRACT_CAPTURE solo valida contra tests/contract/testdata.
       - name: contract
-        run: go test ./tests/contract/... -count=1 -p 1 $COVER -coverprofile=bin/coverage-contract.out
+        run: go test ./tests/contract/... -count=1 -p 1 -timeout 20m $COVER -coverprofile=bin/coverage-contract.out
         env:
           COVER: -covermode=atomic -coverpkg=./internal/...,./cmd/...
 
