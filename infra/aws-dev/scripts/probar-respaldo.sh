@@ -33,7 +33,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "probar-respaldo: shellcheck"
-scripts=(respaldo-mongo.sh probar-respaldo.sh instalar-actualizador.sh crear.sh)
+scripts=(respaldo-mongo.sh probar-respaldo.sh instalar-actualizador.sh crear.sh rotar-secretos.sh)
 if command -v shellcheck >/dev/null; then
 	(cd "$here" && shellcheck "${scripts[@]}") && ok "shellcheck" || bad "shellcheck"
 else
