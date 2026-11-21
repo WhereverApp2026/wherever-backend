@@ -5,7 +5,8 @@
 ## Dónde está cada cosa
 | Qué | Dónde |
 |---|---|
-| Logs de la API | CloudWatch, grupo `/wherever/dev/api`, flujo `api-<instancia>`, 14 días |
+| Logs de la API | CloudWatch, grupo `/wherever/dev/api`, flujo `api-<instancia>`, 90 días |
+| Auditoría de la cuenta | CloudTrail `wherever-dev-auditoria`: S3 `wherever-dev-auditoria-<cuenta>` (365 días, con validación de archivos) y CloudWatch `/wherever/dev/cloudtrail` (90 días) |
 | Eventos de despliegue | Mismo grupo, flujo `despliegues-<instancia>` |
 | Panel | CloudWatch → Paneles → `wherever-dev-api` |
 | Consultas | Logs Insights → Consultas guardadas → `wherever-dev/*` |
@@ -20,7 +21,7 @@ Renombrar uno de estos campos en la API apaga su métrica en silencio.
 | Campo | Lo escribe | Métrica |
 |---|---|---|
 | `level` | `slog` (`ERROR`, en mayúsculas) | `Errores` |
-| `estado` | Línea de acceso | `Respuestas5xx`, `Peticiones` |
+| `estado` | Línea de acceso | `Respuestas5xx`, `Peticiones`, `Respuestas401`, `Respuestas423`, `Respuestas429` |
 | `duracion_ms` | Línea de acceso | `LatenciaMs` |
 | `dependencia` | `/ready` al encontrar una base caída | `DependenciaCaida` |
 | `evento` | `actualizar.sh` | `Regresos` |
@@ -36,3 +37,8 @@ Sin datos no hay alarma: las instancias se apagan a diario.
 | `wherever-dev-dependencia` | `/ready` encontró una base caída | Busca `dependencia` en el log; revisa la pausa de Aura y la cuota de Upstash |
 | `wherever-dev-regresos` | Una imagen nueva no quedó sana | Flujo `despliegues-*` y `/var/log/wherever/failed_digest` |
 | `wherever-dev-respaldos` | Sin respaldo `ok` de MongoDB en 7 días; aquí la falta de datos sí cuenta | Flujo `respaldos-*` y `journalctl -u wherever-respaldo` en la instancia a |
+| `wherever-dev-no-autorizados` | 50 o más 401 en 5 minutos | Logs Insights: `filter estado = 401 \| stats count(*) by ruta, ip`; si viene de pocas IP, bloquéalas en el WAF |
+| `wherever-dev-bloqueos` | 3 o más cuentas bloqueadas por intentos (423) en 5 minutos | Consulta `login-fallido`; ataque de contraseñas: revisa IP y avisa a las cuentas afectadas |
+| `wherever-dev-limites` | 100 o más 429 en 5 minutos | `filter estado = 429 \| stats count(*) by ruta, ip`; abuso o una app con un ciclo de reintentos |
+| `wherever-dev-cambios-iam` | Alguien cambió usuarios, roles o políticas de IAM | Grupo `/wherever/dev/cloudtrail`: `eventName`, `userIdentity.arn` y `sourceIPAddress`; si nadie del equipo lo hizo, trátalo como incidente |
+| `wherever-dev-uso-root` | Se usó la cuenta root | Mismo grupo; root solo para tareas que lo exigen. Si no fue el dueño: cambiar contraseña de root, revisar MFA y llaves |

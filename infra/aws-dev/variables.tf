@@ -102,9 +102,15 @@ variable "start_enabled" {
 }
 
 variable "log_retention_days" {
-  description = "Días que CloudWatch conserva los logs de la API."
+  description = "Días que CloudWatch conserva los logs de la API y de CloudTrail (control 18: 90 para investigar un incidente)."
   type        = number
-  default     = 14
+  default     = 90
+}
+
+variable "auditoria_dias" {
+  description = "Días que S3 conserva los eventos de CloudTrail."
+  type        = number
+  default     = 365
 }
 
 variable "waf_rate_limit" {

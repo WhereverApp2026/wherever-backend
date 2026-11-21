@@ -12,6 +12,10 @@ locals {
     dependencia = { metric = "DependenciaCaida", pattern = "{ $.dependencia = * }", value = "1" }
     regresos    = { metric = "Regresos", pattern = "{ $.evento = \"regreso\" }", value = "1" }
     respaldos   = { metric = "RespaldosOk", pattern = "{ $.evento = \"respaldo\" && $.estado = \"ok\" }", value = "1" }
+    # Señales de ataque (control 18): tokens malos, cuentas bloqueadas por intentos y abuso.
+    no-autorizados = { metric = "Respuestas401", pattern = "{ $.estado = 401 }", value = "1" }
+    bloqueos       = { metric = "Respuestas423", pattern = "{ $.estado = 423 }", value = "1" }
+    limites        = { metric = "Respuestas429", pattern = "{ $.estado = 429 }", value = "1" }
   }
 
   # Con todo apagado no hay datos: "notBreaching" evita una alarma cada noche.
@@ -20,6 +24,10 @@ locals {
     respuestas  = { metric = "Respuestas5xx", threshold = 5, description = "5 o más respuestas 5xx en 5 minutos" }
     dependencia = { metric = "DependenciaCaida", threshold = 1, description = "/ready encontró una base caída: MongoDB, Redis o Neo4j" }
     regresos    = { metric = "Regresos", threshold = 1, description = "Una imagen nueva no quedó sana y el servidor regresó a la anterior" }
+    # Umbrales para el tráfico del piloto; un uso normal no llega a ellos en 5 minutos.
+    no-autorizados = { metric = "Respuestas401", threshold = 50, description = "50 o más 401 en 5 minutos: tokens robados o vencidos en masa" }
+    bloqueos       = { metric = "Respuestas423", threshold = 3, description = "3 o más cuentas bloqueadas por intentos en 5 minutos: posible ataque de contraseñas" }
+    limites        = { metric = "Respuestas429", threshold = 100, description = "100 o más 429 en 5 minutos: alguien está abusando de la API" }
   }
 
   # Las líneas de acceso y los eventos de despliegue son JSON; Insights lee sus campos directo.
