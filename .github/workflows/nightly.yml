@@ -49,7 +49,7 @@ jobs:
   dast-zap:
     if: ${{ !inputs.solo || inputs.solo == 'todo' || inputs.solo == 'dast' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       ZAP: ghcr.io/zaproxy/zaproxy:2.17.0
       MONGO_URI: mongodb://localhost:27017/wherever
@@ -75,8 +75,11 @@ jobs:
           export JWT_KEY PHONE_HMAC_KEY CURSOR_HMAC_KEY
           # REQUEST_TIMEOUT=10s: la sonda /probe/lenta (nv-12) espera 45 s y ZAP la toma del
           # OpenAPI; con 10 s responde su 408 antes de que ZAP corte la lectura y falle el plan.
+          # Límites altos solo en esta API desechable: el escaneo activo manda miles de peticiones
+          # desde una IP y con el límite real casi todo sería 429. El servidor de AWS conserva los suyos.
           docker run -d --name api --network host \
             -e APP_ENV=staging -e PORT=8080 -e REQUEST_TIMEOUT=10s -e MONGO_URI -e REDIS_ADDR=localhost:6379 \
+            -e RATE_LIMIT_GLOBAL=100000 -e RATE_LIMIT_WRITES=100000 \
             -e NEO4J_URI=neo4j://localhost:7687 -e JWT_ISSUER=wherever-api -e JWT_AUDIENCE=wherever-app \
             -e JWT_KEY -e PHONE_HMAC_KEY -e CURSOR_HMAC_KEY \
             wherever-api:dast
@@ -104,6 +107,45 @@ jobs:
             echo "Alertas altas: **$altas** de $total, en $urls URL distintas. Reporte en los artefactos."
           } >> "$GITHUB_STEP_SUMMARY"
           [[ "$altas" == "0" ]]
+
+      # Activo y autenticado (control 6): una cuenta nueva, su token y .zap/plan-activo.yaml. Va
+      # después del pasivo, que así no ve el tráfico del ataque. Falla con alertas altas.
+      - name: ZAP activo
+        if: success() || failure()
+        run: |
+          cuerpo="$(jq -n --arg correo "dast-$GITHUB_RUN_ID@wherever.test" --arg clave "$(openssl rand -hex 16)a1" \
+            '{nombre: "DAST", fecha_nacimiento: "1990-01-01", correo: $correo, password: $clave,
+              acepta_terminos: true, version_terminos: "2026-10", promociones_correo: false}')"
+          TOKEN="$(curl -sf -X POST http://localhost:8080/api/v1/usuarios -H 'Content-Type: application/json' -d "$cuerpo" | jq -r .access_token)"
+          [[ -n "$TOKEN" && "$TOKEN" != "null" ]] || { echo "no se pudo crear la cuenta del escaneo" >&2; exit 1; }
+          echo "::add-mask::$TOKEN"
+          export TOKEN
+          # Todas las GET registradas (no solo las 38 del OpenAPI), con un id de ejemplo en cada
+          # parámetro y coordenadas de Tula; las sondas y docs quedan fuera por el contexto.
+          go run ./scripts/routes | tr -d '\r' | awk '$1 == "GET" { print $2 }' \
+            | sed -E 's#:[A-Za-z_]+#6b00e7bf3f506b397b1991d3#g' \
+            | awk '{ printf "      - url: http://localhost:8080%s?lat=20.0536&lng=-99.3417\n", $0 }' > rutas-get.txt
+          sed -i '/# RUTAS-GET/r rutas-get.txt' .zap/plan-activo.yaml
+          echo "ZAP activo: $(wc -l < rutas-get.txt) rutas GET sembradas"
+          mkdir -p zap-activo
+          chmod 777 zap-activo
+          docker run --rm --network host -e TOKEN -v "$PWD:/zap/wrk:rw" "$ZAP" zap.sh -cmd -port 8091 -autorun /zap/wrk/.zap/plan-activo.yaml
+          altas="$(jq '[.site[]?.alerts[]? | select(.riskcode == "3")] | length' zap-activo/zap-activo.json)"
+          total="$(jq '[.site[]?.alerts[]?] | length' zap-activo/zap-activo.json)"
+          {
+            echo "## ZAP (activo, autenticado)"
+            echo "Alertas altas: **$altas** de $total. Reporte en los artefactos."
+            jq -r '.site[]?.alerts[]? | select(.riskcode == "3" or .riskcode == "2") | "- \(.riskdesc): \(.alert) (\(.count) casos)"' zap-activo/zap-activo.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          [[ "$altas" == "0" ]]
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: zap-activo
+          path: zap-activo
+          retention-days: 14
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
