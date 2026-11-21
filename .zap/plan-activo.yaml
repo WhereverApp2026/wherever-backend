@@ -1,0 +1,53 @@
+# Análisis ACTIVO de ZAP (plan de seguridad, control 6 de docs/seguridad.md). Corre en
+# nightly.yml contra la API desechable del mismo runner (APP_ENV=staging, bases vacías y llaves
+# de un solo uso), nunca contra el servidor de AWS. Ataca de verdad: inyección, XSS, rutas,
+# cabeceras. Va autenticado con el token de una cuenta recién creada (variable TOKEN).
+env:
+  contexts:
+    - name: wherever-api
+      urls:
+        - http://localhost:8080
+      excludePaths:
+        # Las sondas existen para dar errores a propósito, y /probe/lenta espera 45 s.
+        - "http://localhost:8080/api/v1/probe/.*"
+        # Cerrar sesión o borrar la cuenta dejaría al resto del escaneo con 401 y 403.
+        - "http://localhost:8080/api/v1/auth/logout.*"
+        - "http://localhost:8080/api/v1/auth/sesiones.*"
+        - "http://localhost:8080/api/v1/usuarios/yo"
+  parameters:
+    failOnError: true
+    progressToStdout: true
+jobs:
+  - type: replacer
+    parameters:
+      deleteAllRules: true
+    rules:
+      - description: token de la cuenta de prueba
+        matchType: req_header
+        matchString: Authorization
+        replacementString: "Bearer ${TOKEN}"
+  - type: openapi
+    parameters:
+      apiFile: /zap/wrk/internal/http/openapi.json
+      targetUrl: http://localhost:8080
+      context: wherever-api
+  # El token dura 15 minutos (máximo de la constitución): el escaneo termina antes.
+  - type: activeScan
+    parameters:
+      context: wherever-api
+      maxScanDurationInMins: 12
+      maxRuleDurationInMins: 2
+      threadPerHost: 4
+    policyDefinition:
+      defaultStrength: low
+      defaultThreshold: medium
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/zap-activo
+      reportFile: zap-activo.json
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/zap-activo
+      reportFile: zap-activo.html
