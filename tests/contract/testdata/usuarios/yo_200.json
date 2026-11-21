@@ -15,6 +15,7 @@
     "id": "string",
     "modo_actual": "string",
     "nivel": "string",
+    "nivel_numero": "number",
     "nombre": "string",
     "nombre_usuario": "null",
     "preferencias": {

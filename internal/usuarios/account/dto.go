@@ -253,6 +253,7 @@ type ProfileResponse struct {
 	PhoneRegistered bool                `json:"telefono_registrado"`
 	Points          int                 `json:"puntos"`
 	Level           string              `json:"nivel"`
+	LevelNumber     int                 `json:"nivel_numero"`
 	StreakWeeks     int                 `json:"racha_semanas"`
 	Status          string              `json:"estado"`
 	DeleteAt        *time.Time          `json:"eliminar_en"`
@@ -321,7 +322,7 @@ func profileResponse(u usuarios.User) ProfileResponse {
 		ID: u.ID.Hex(), Name: u.Name, Email: u.Email, EmailVerified: u.EmailVerified, PhotoURL: u.PhotoURL, Description: u.Description,
 		FriendCode: u.FriendCode, Roles: roles, Mode: u.Mode, Tastes: tastesResponse(u.Tastes),
 		Preferences: preferencesResponse(u.Preferences), Privacy: privacyResponse(u.Privacy),
-		PhoneRegistered: u.PhoneHash != "", Points: u.Points, Level: u.Level, StreakWeeks: u.StreakWeeks,
+		PhoneRegistered: u.PhoneHash != "", Points: u.Points, Level: u.Level, LevelNumber: max(u.LevelNumber, 1), StreakWeeks: u.StreakWeeks,
 		Status: u.Status, DeleteAt: u.DeleteAt, Version: u.Version, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 	}
 	if u.Username != "" {

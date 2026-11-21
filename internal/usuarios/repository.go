@@ -39,6 +39,8 @@ const (
 const (
 	WelcomePoints = 50
 	InitialLevel  = "Explorador"
+	// InitialLevelNumber es el nivel 1 de la tabla de nv-79.
+	InitialLevelNumber = 1
 )
 
 // friendCodeAlphabet evita caracteres que se confunden (0/O, 1/I/L); hoja A1: 8 caracteres.
@@ -160,12 +162,14 @@ type User struct {
 	Privacy     Privacy         `bson:"privacidad"`
 	Points      int             `bson:"puntos"`
 	Level       string          `bson:"nivel"`
-	StreakWeeks int             `bson:"racha_semanas"`
-	Status      string          `bson:"estado"`
-	DeleteAt    *time.Time      `bson:"eliminar_en,omitempty"`
-	Version     int             `bson:"version"`
-	CreatedAt   time.Time       `bson:"creado_en"`
-	UpdatedAt   time.Time       `bson:"actualizado_en"`
+	// LevelNumber es el número de nivel (nv-79); `nivel` guarda su nombre.
+	LevelNumber int        `bson:"nivel_numero"`
+	StreakWeeks int        `bson:"racha_semanas"`
+	Status      string     `bson:"estado"`
+	DeleteAt    *time.Time `bson:"eliminar_en,omitempty"`
+	Version     int        `bson:"version"`
+	CreatedAt   time.Time  `bson:"creado_en"`
+	UpdatedAt   time.Time  `bson:"actualizado_en"`
 }
 
 // SearchableByUsername dice si la persona aparece al buscarla por nombre de usuario.

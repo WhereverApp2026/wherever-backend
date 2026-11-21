@@ -48,6 +48,18 @@ type Service struct {
 	versions  Versions
 	retiro    RetiroDatosNegocio
 	moderador Moderador
+	conciliar Conciliador
+}
+
+// Conciliador pone al día puntos, nivel y racha antes de leer el perfil (insignias, nv-79).
+type Conciliador interface {
+	ConciliarPerfil(ctx context.Context, userID bson.ObjectID) error
+}
+
+// WithConciliador agrega la conciliación de puntos a GET /usuarios/yo.
+func (s *Service) WithConciliador(c Conciliador) *Service {
+	s.conciliar = c
+	return s
 }
 
 // NewService arma el servicio; falla solo si no puede preparar el hasher.
@@ -107,7 +119,15 @@ func (s *Service) EmailAvailable(ctx context.Context, email string) (bool, error
 }
 
 // Profile devuelve el perfil propio.
+// Antes concilia puntos, nivel y racha; si falla, el perfil sale con lo último guardado.
 func (s *Service) Profile(ctx context.Context, claims *middleware.Claims) (ProfileResponse, error) {
+	if s.conciliar != nil {
+		if userID, err := userIDOf(claims); err == nil {
+			if err := s.conciliar.ConciliarPerfil(ctx, userID); err != nil {
+				s.log.WarnContext(ctx, "no se concilió el nivel", "evento", "puntos", "error", err)
+			}
+		}
+	}
 	user, err := s.current(ctx, claims)
 	if err != nil {
 		return ProfileResponse{}, err

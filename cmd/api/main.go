@@ -221,11 +221,14 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		registry.RegisterPurger(p)
 	}
 	registry.RegisterExporter(account.NewPrivacy(users))
-	// Insignias de las personas (nv-78): se calculan al pedirlas; ARCO exporta y borra las ganadas.
+	// Insignias, puntos y nivel (nv-78, nv-79): se concilian al pedirlos y cada noche; ARCO
+	// exporta y borra las ganadas y la bitácora de puntos.
 	insigniasRepo := insignias.NewRepository(db)
 	insigniasSvc := insignias.NewService(insigniasRepo, log)
 	registry.RegisterPurger(insignias.NewPrivacy(insigniasRepo))
 	registry.RegisterExporter(insignias.NewPrivacy(insigniasRepo))
+	registry.RegisterPurger(insignias.NewPrivacyPuntos(insigniasRepo))
+	registry.RegisterExporter(insignias.NewPrivacyPuntos(insigniasRepo))
 	registry.RegisterExporter(auth.NewPrivacy(authRepo))
 	registry.RegisterExporter(planPrivacy)
 	registry.RegisterExporter(iaUses)
@@ -280,7 +283,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("usuarios: %w", err)
 	}
-	accountSvc.WithRetiroDatosNegocio(business.privacy).WithModeracion(moderacion.New(nil, nil, modSvc, log))
+	accountSvc.WithRetiroDatosNegocio(business.privacy).WithModeracion(moderacion.New(nil, nil, modSvc, log)).WithConciliador(insigniasSvc)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
 	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active, insignias: insigniasSvc}, db, cursor, log)
@@ -340,7 +343,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 			WithPending(sincronizacion.NewPending(syncActions, planSvc, accountSvc, users, validator), active),
 	}
 	modules = append(modules, social...)
-	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, estadisticas.NewTarea(stats), pagos.NewTarea(bookings.pagos), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), nil
+	return modules, privacidad.NewJob(redisClient, users, exports, registry, authSvc, log).WithTareas(business.retencion, merchant.tarea, estadisticas.NewTarea(stats), pagos.NewTarea(bookings.pagos), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo), insignias.NewTarea(insigniasSvc)), nil
 }
 
 // buildRecomendaciones valida los pesos del recomendador: con un JSON inválido la API no

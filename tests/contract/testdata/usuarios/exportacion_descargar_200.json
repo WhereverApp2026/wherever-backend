@@ -31,6 +31,14 @@
     "pagos": [],
     "planes": [],
     "postales": [],
+    "puntos_movimientos": [
+      {
+        "creado_en": "string",
+        "motivo": "string",
+        "puntos": "number",
+        "ref_id": "string"
+      }
+    ],
     "recuerdos": [],
     "reportes_negocio": [],
     "resenas": [],
@@ -74,6 +82,7 @@
       "id": "string",
       "modo_actual": "string",
       "nivel": "string",
+      "nivel_numero": "number",
       "nombre": "string",
       "nombre_usuario": "string",
       "preferencias": {
