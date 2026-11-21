@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "ganadas": "number",
+    "insignias": [
+      {
+        "descripcion": "string",
+        "ganada": "bool",
+        "ganada_en": "string",
+        "id": "string",
+        "nombre": "string",
+        "progreso": {
+          "actual": "number",
+          "meta": "number"
+        }
+      }
+    ],
+    "total": "number"
+  }
+}

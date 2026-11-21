@@ -64,15 +64,15 @@ func TestDTOs_AccionesInvalidasSon422(t *testing.T) {
 	v := newValidator(t)
 	id := bson.NewObjectID().Hex()
 	cases := map[string]PendingRequest{
-		"lote vacío":                {},
-		"id_cliente corto":          {Actions: []Action{{ClientID: "corto", Type: ActionPlanCreate}}},
-		"tipo desconocido":          {Actions: []Action{{ClientID: "cliente-0001", Type: "plan.copiar"}}},
-		"editar sin plan_id":        {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanEdit}}},
-		"plan_id que no es id":      {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanDelete, PlanID: "no-es-id"}}},
-		"editar parada sin su id":   {Actions: []Action{{ClientID: "cliente-0001", Type: ActionStopEdit, PlanID: id}}},
-		"quitar parada sin su id":   {Actions: []Action{{ClientID: "cliente-0001", Type: ActionStopRemove, PlanID: id}}},
-		"versión negativa":          {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanEdit, PlanID: id, Version: -1}}},
-		"más de 100 acciones":       {Actions: make([]Action, MaxActions+1)},
+		"lote vacío":              {},
+		"id_cliente corto":        {Actions: []Action{{ClientID: "corto", Type: ActionPlanCreate}}},
+		"tipo desconocido":        {Actions: []Action{{ClientID: "cliente-0001", Type: "plan.copiar"}}},
+		"editar sin plan_id":      {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanEdit}}},
+		"plan_id que no es id":    {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanDelete, PlanID: "no-es-id"}}},
+		"editar parada sin su id": {Actions: []Action{{ClientID: "cliente-0001", Type: ActionStopEdit, PlanID: id}}},
+		"quitar parada sin su id": {Actions: []Action{{ClientID: "cliente-0001", Type: ActionStopRemove, PlanID: id}}},
+		"versión negativa":        {Actions: []Action{{ClientID: "cliente-0001", Type: ActionPlanEdit, PlanID: id, Version: -1}}},
+		"más de 100 acciones":     {Actions: make([]Action, MaxActions+1)},
 	}
 	for name, req := range cases {
 		assert.Equal(t, apperr.KindValidation, appErrOf(t, v.Struct(req)).Kind, name)

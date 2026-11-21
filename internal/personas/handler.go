@@ -72,6 +72,17 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/personas/codigo/:codigo", limited(codePolicy, codeLimit, codeWindow, h.byCode)...)
 	v1.Post("/personas/contactos", limited(contactsPolicy, contactsLimit, contactsWindow, h.contacts)...)
 	v1.Get("/personas/:id", limited(profilePolicy, profileLimit, profileWindow, h.profile)...)
+	// Insignias (nv-78): cuentan en la misma política que el perfil.
+	v1.Get("/personas/:id/insignias", limited(profilePolicy, profileLimit, profileWindow, h.insignias)...)
+}
+
+func (h *Handler) insignias(c *fiber.Ctx) error {
+	out, err := h.svc.InsigniasDe(c.UserContext(), subject(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.JSON(out)
 }
 
 func (h *Handler) profile(c *fiber.Ctx) error {

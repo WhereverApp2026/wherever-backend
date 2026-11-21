@@ -901,6 +901,11 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-78 — Insignias de las personas (2026-11-21)
+- Estado: `internal/insignias` con 8 insignias calculadas al pedirlas (planes activos, reseñas publicadas, lugares distintos con check-in válido, amigos, postales listas); la fecha de la primera vez va en `insignias_usuarios` (`ux_insignia_usuario`). `GET /usuarios/yo/insignias` (ganadas y bloqueadas con avance) y `GET /personas/{id}/insignias` (solo ganadas, reglas de nv-70). ARCO exporta y borra.
+- Decisión: sin eventos en cada módulo ni puntos o niveles; una insignia ganada no se pierde. `insignias` no importa módulos de negocio (ciclo personas, insignias, postales/amistades): constantes propias y `TestInsignias_ColeccionesIgualesALosModulos`.
+- A evitar: un módulo nuevo va también en `scripts/routes/main.go` (su lista de módulos es propia) o `check_endpoints` no ve sus rutas.
+
 ### NV-77 — Descripción del perfil (2026-11-21)
 - Estado: `usuarios.descripcion` (≤ 160, una línea) en `PATCH/GET /usuarios/yo`, exportación ARCO y `GET /personas/{id}`. Moderada con las reglas de nv-71 (`account.WithModeracion`): rechazada = 422 sin guardar; dudosa se guarda. Sin rutas nuevas.
 - Decisión: visible para quien ve el perfil, no en búsquedas ni sugerencias; se quitan controles y marcas de dirección (suplantación de texto).

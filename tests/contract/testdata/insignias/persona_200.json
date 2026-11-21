@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "body": {
+    "insignias": [
+      {
+        "ganada_en": "string",
+        "id": "string",
+        "nombre": "string"
+      }
+    ]
+  }
+}
