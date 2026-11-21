@@ -33,6 +33,8 @@ type PatchProfileRequest struct {
 	Username *string `json:"nombre_usuario" validate:"omitempty,username"`
 	PhotoURL *string `json:"foto_url" validate:"omitempty,url,startswith=https://,max=500"`
 	CityID   *string `json:"ciudad_id" validate:"omitempty,objectid"`
+	// Description es la presentación del perfil (nv-77): hasta 160 caracteres; "" la borra.
+	Description *string `json:"descripcion" validate:"omitempty,max=160"`
 }
 
 // ChangeEmailRequest es el cuerpo de PUT /usuarios/yo/correo.
@@ -211,6 +213,7 @@ type ProfileResponse struct {
 	Email           string              `json:"correo"`
 	EmailVerified   bool                `json:"correo_verificado"`
 	PhotoURL        string              `json:"foto_url"`
+	Description     string              `json:"descripcion"`
 	FriendCode      string              `json:"codigo_amigo"`
 	Roles           []string            `json:"roles"`
 	Mode            string              `json:"modo_actual"`
@@ -286,7 +289,7 @@ func profileResponse(u usuarios.User) ProfileResponse {
 		roles = []string{}
 	}
 	out := ProfileResponse{
-		ID: u.ID.Hex(), Name: u.Name, Email: u.Email, EmailVerified: u.EmailVerified, PhotoURL: u.PhotoURL,
+		ID: u.ID.Hex(), Name: u.Name, Email: u.Email, EmailVerified: u.EmailVerified, PhotoURL: u.PhotoURL, Description: u.Description,
 		FriendCode: u.FriendCode, Roles: roles, Mode: u.Mode, Tastes: tastesResponse(u.Tastes),
 		Preferences: preferencesResponse(u.Preferences), Privacy: privacyResponse(u.Privacy),
 		PhoneRegistered: u.PhoneHash != "", Points: u.Points, Level: u.Level, StreakWeeks: u.StreakWeeks,

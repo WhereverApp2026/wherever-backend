@@ -901,11 +901,17 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-77 — Descripción del perfil (2026-11-21)
+- Estado: `usuarios.descripcion` (≤ 160, una línea) en `PATCH/GET /usuarios/yo`, exportación ARCO y `GET /personas/{id}`. Moderada con las reglas de nv-71 (`account.WithModeracion`): rechazada = 422 sin guardar; dudosa se guarda. Sin rutas nuevas.
+- Decisión: visible para quien ve el perfil, no en búsquedas ni sugerencias; se quitan controles y marcas de dirección (suplantación de texto).
+- A evitar: escribir marcas de dirección reales en el código de pruebas; gosec (G116) y staticcheck (ST1018) las marcan: usar escapes `‮`.
+
 ### Rotación de secretos aplicada: control 14 (2026-11-20)
 - Estado: `crear.sh` aplicó #134 y #135 (24 recursos, CloudTrail entregando a S3 y CloudWatch sin errores, 12 alarmas en OK). Primera rotación de `JWT_KEY`, `CURSOR_HMAC_KEY` y `DATA_KEYS` (llaves `k202611210211` y `k1`), ahora parámetros avanzados con aviso a 90 días. Puntaje 92,5 %.
 - Error a evitar: en Git Bash `openssl rand -base64` termina en `
 `; quitar solo `
-` dejó un `` en los tres secretos y partió `DATA_KEYS` en el `.env` (la API de la b no reinició; las dos siguieron sanas con lo anterior). Se limpiaron los parámetros, se reinició la API en las dos y el script ahora quita `
+` dejó un `
+` en los tres secretos y partió `DATA_KEYS` en el `.env` (la API de la b no reinició; las dos siguieron sanas con lo anterior). Se limpiaron los parámetros, se reinició la API en las dos y el script ahora quita `
 `, rechaza valores con saltos y pasa rutas de Windows (`cygpath -m`) a python y aws.
 - Lección: probar un script que escribe secretos con un parámetro de prueba antes de los reales; y reiniciar con `--env-file imagen.env`.
 

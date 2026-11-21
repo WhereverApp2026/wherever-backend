@@ -3,6 +3,7 @@
   "body": {
     "amigos_en_comun": "null",
     "degradado": "bool",
+    "descripcion": "string",
     "foto_url": "string",
     "grupos_en_comun": "number",
     "id": "string",
