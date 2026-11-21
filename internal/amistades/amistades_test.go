@@ -82,3 +82,53 @@ func TestService_EntradasInvalidas(t *testing.T) {
 		assert.Equal(t, apperr.KindNotFound, appErr.Kind)
 	}
 }
+
+// Con `solicitudes: codigo` solo pasa el código de amigo o el teléfono de la agenda de esa
+// persona; `origen` por sí solo no basta (nv-82).
+func TestAllowed_SolicitudesPorCodigo(t *testing.T) {
+	key := []byte("llave-de-prueba-telefonos")
+	svc := (&Service{}).WithPhoneKey(key)
+	open := usuarios.User{FriendCode: "ABCD2345"}
+	assert.True(t, svc.allowed(open, SendRequest{}), "cualquiera, sin origen")
+	assert.True(t, svc.allowed(open, SendRequest{Origin: OriginSearch}))
+
+	closed := usuarios.User{FriendCode: "ABCD2345", PhoneHash: usuarios.HashPhone(key, "+525512345678")}
+	closed.Privacy.Social.Requests = usuarios.RequestsCode
+	closed.Privacy.PhoneSearchable = true
+	for name, req := range map[string]SendRequest{
+		"sin origen":             {},
+		"búsqueda":               {Origin: OriginSearch},
+		"sugerencia":             {Origin: OriginSuggestion},
+		"código sin código":      {Origin: OriginCode},
+		"código ajeno":           {Origin: OriginCode, Code: "ZZZZ9999"},
+		"código en otro origen":  {Origin: OriginSearch, Code: "ABCD2345"},
+		"contactos sin teléfono": {Origin: OriginContacts},
+		"teléfono ajeno":         {Origin: OriginContacts, Phone: "+525500000000"},
+	} {
+		assert.False(t, svc.allowed(closed, req), name)
+	}
+	assert.True(t, svc.allowed(closed, SendRequest{Origin: OriginCode, Code: " abcd2345 "}))
+	assert.True(t, svc.allowed(closed, SendRequest{Origin: OriginContacts, Phone: "55 1234 5678"}))
+
+	closed.Privacy.PhoneSearchable = false
+	assert.False(t, svc.allowed(closed, SendRequest{Origin: OriginContacts, Phone: "55 1234 5678"}), "no se deja encontrar por teléfono")
+	assert.False(t, (&Service{}).allowed(closed, SendRequest{Origin: OriginContacts, Phone: "55 1234 5678"}), "sin llave")
+
+	err := errRestricted()
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, apperr.KindForbidden, appErr.Kind)
+	assert.Equal(t, "solicitud_restringida", appErr.PublicCode())
+}
+
+func TestSendRequest_Origen(t *testing.T) {
+	v, err := validation.New()
+	require.NoError(t, err)
+	id := bson.NewObjectID().Hex()
+	for _, o := range []string{"", OriginSearch, OriginCode, OriginContacts, OriginSuggestion} {
+		assert.NoError(t, v.Struct(SendRequest{UserID: id, Origin: o}), o)
+	}
+	var appErr *apperr.Error
+	require.ErrorAs(t, v.Struct(SendRequest{UserID: id, Origin: "enlace"}), &appErr)
+	assert.Equal(t, apperr.KindValidation, appErr.Kind)
+}

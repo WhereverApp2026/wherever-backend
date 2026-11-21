@@ -68,6 +68,12 @@ func TestContract_Usuarios(t *testing.T) {
 	check(t, "usuarios/preferencias_200", status, body)
 	status, body = call(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]bool{"ubicacion": true}, access)
 	check(t, "usuarios/privacidad_200", status, body)
+	status, body = call(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{
+		"social": map[string]any{"actividad": "nadie", "compartir_planes": false, "solicitudes": "codigo"},
+	}, access)
+	check(t, "usuarios/privacidad_social_200", status, body)
+	status, body = call(t, app, http.MethodPatch, "/api/v1/usuarios/yo/privacidad", map[string]any{"social": map[string]any{"actividad": "publico"}}, access)
+	check(t, "usuarios/privacidad_social_422", status, body)
 	status, body = call(t, app, http.MethodPut, "/api/v1/usuarios/yo/telefono", map[string]string{"telefono": "+5215512345678"}, access)
 	check(t, "usuarios/telefono_200", status, body)
 	status, body = call(t, app, http.MethodPost, "/api/v1/usuarios/yo/modo", map[string]string{"modo": "explorar"}, access)

@@ -53,6 +53,14 @@
       "estado_animo": "bool",
       "fecha_aceptacion": "string",
       "promociones_correo": "bool",
+      "social": {
+        "actividad": "string",
+        "compartir_planes": "bool",
+        "compartir_postales": "bool",
+        "compartir_resenas": "bool",
+        "en_sugerencias": "bool",
+        "solicitudes": "string"
+      },
       "ubicacion": "bool",
       "version_aviso_privacidad": "string",
       "version_terminos": "string"

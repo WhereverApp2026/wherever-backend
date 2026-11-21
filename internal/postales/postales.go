@@ -198,7 +198,7 @@ func (s *Service) Postal(ctx context.Context, cl *middleware.Claims, raw string)
 	if rel.Dueno {
 		return respuestaPostal(p, true, nil), nil
 	}
-	autores, err := s.autores(ctx, []bson.ObjectID{p.UsuarioID})
+	autores, err := s.autores(ctx, []bson.ObjectID{p.UsuarioID}, &me)
 	if err != nil {
 		return PostalResponse{}, err
 	}
@@ -381,7 +381,7 @@ func (s *Service) itemsGaleria(ctx context.Context, viewer *bson.ObjectID, rows 
 	for _, p := range rows {
 		ids = append(ids, p.UsuarioID)
 	}
-	autores, err := s.autores(ctx, ids)
+	autores, err := s.autores(ctx, ids, viewer)
 	if err != nil {
 		return nil, err
 	}

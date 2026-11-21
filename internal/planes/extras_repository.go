@@ -12,6 +12,8 @@ const (
 	popularRadiusM = 15000
 	popularDays    = 7
 	popularTop     = 3
+	// popularCandidates deja margen para quitar a quien no comparte sus planes (nv-82).
+	popularCandidates = 20
 )
 
 // IncClones suma 1 a `veces_clonado` del plan original en una sola operación.
@@ -21,7 +23,8 @@ func (r *Repository) IncClones(ctx context.Context, id bson.ObjectID) error {
 }
 
 // Popular trae los planes públicos activos de la última semana cerca del punto (radio de
-// 15 km sobre `zona`), los más copiados primero. Usa ix_populares.
+// 15 km sobre `zona`), los más copiados primero, hasta popularCandidates: el service recorta a
+// popularTop tras quitar a quien no comparte sus planes. Usa ix_populares.
 func (r *Repository) Popular(ctx context.Context, lat, lng float64, now time.Time) ([]Plan, error) {
 	pipeline := bson.A{
 		bson.D{{Key: "$geoNear", Value: bson.D{
@@ -35,7 +38,7 @@ func (r *Repository) Popular(ctx context.Context, lat, lng float64, now time.Tim
 			}},
 		}}},
 		bson.D{{Key: "$sort", Value: bson.D{{Key: "veces_clonado", Value: -1}, {Key: "_id", Value: 1}}}},
-		bson.D{{Key: "$limit", Value: popularTop}},
+		bson.D{{Key: "$limit", Value: popularCandidates}},
 	}
 	cur, err := r.col.Aggregate(ctx, pipeline)
 	if err != nil {

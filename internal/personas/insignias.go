@@ -26,7 +26,8 @@ func (s *Service) WithInsignias(i Insignias) *Service {
 }
 
 // InsigniasDe da las insignias ganadas de otra persona con las mismas reglas que su perfil:
-// inexistente, inactiva, propia o con bloqueo en cualquier sentido = el mismo 404.
+// inexistente, inactiva, propia o con bloqueo en cualquier sentido = el mismo 404; con
+// `actividad: nadie`, la lista vacía.
 func (s *Service) InsigniasDe(ctx context.Context, subject, rawID string) (InsigniasResponse, error) {
 	if s.insignias == nil {
 		return InsigniasResponse{}, apperr.Unavailable("servicio no disponible")
@@ -42,6 +43,10 @@ func (s *Service) InsigniasDe(ctx context.Context, subject, rawID string) (Insig
 	u, _, err := s.visiblePerson(ctx, me, id)
 	if err != nil {
 		return InsigniasResponse{}, err
+	}
+	// Con `actividad: nadie` no se ve ninguna (nv-82); la forma de la respuesta no cambia.
+	if u.Privacy.Social.HidesActivity() {
+		return InsigniasResponse{Insignias: []insignias.Ganada{}}, nil
 	}
 	ganadas, err := s.insignias.GanadasDe(ctx, u.ID)
 	if err != nil {

@@ -187,7 +187,7 @@ func (s *Service) Feed(ctx context.Context, cl *middleware.Claims, q ListaQuery)
 	for id := range amigos {
 		ids = append(ids, id)
 	}
-	autores, err := s.autores(ctx, ids)
+	autores, err := s.autores(ctx, ids, &me)
 	if err != nil {
 		return vacio, err
 	}
@@ -266,7 +266,7 @@ func (s *Service) Momento(ctx context.Context, cl *middleware.Claims, raw string
 	if err != nil {
 		return MomentoResponse{}, err
 	}
-	autores, err := s.autores(ctx, []bson.ObjectID{m.AutorID})
+	autores, err := s.autores(ctx, []bson.ObjectID{m.AutorID}, viewer)
 	if err != nil {
 		return MomentoResponse{}, err
 	}
@@ -430,7 +430,7 @@ func (s *Service) MomentosDelNegocio(ctx context.Context, cl *middleware.Claims,
 	for _, m := range rows {
 		ids = append(ids, m.AutorID)
 	}
-	autores, err := s.autores(ctx, ids)
+	autores, err := s.autores(ctx, ids, nil)
 	if err != nil {
 		return vacio, err
 	}
@@ -501,7 +501,7 @@ func (s *Service) MarcarMomento(ctx context.Context, cl *middleware.Claims, raw,
 	if err != nil {
 		return MomentoResponse{}, errStore()
 	}
-	autores, err := s.autores(ctx, []bson.ObjectID{m.AutorID})
+	autores, err := s.autores(ctx, []bson.ObjectID{m.AutorID}, nil)
 	if err != nil {
 		return MomentoResponse{}, err
 	}

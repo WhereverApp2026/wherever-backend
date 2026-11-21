@@ -21,8 +21,11 @@ func HashPhone(key []byte, phone string) string {
 }
 
 // searchProjection limita lo que sale de Mongo en una búsqueda: nunca correo ni teléfono.
+// `privacidad.social` viaja para que cada módulo aplique lo que la persona ocultó (nv-82); no
+// sale en ninguna respuesta.
 var searchProjection = bson.D{
 	{Key: "nombre", Value: 1}, {Key: "nombre_usuario", Value: 1}, {Key: "foto_url", Value: 1},
+	{Key: "privacidad.social", Value: 1},
 }
 
 // SearchByUsernamePrefix busca cuentas activas cuyo nombre de usuario empieza con prefix
@@ -102,8 +105,8 @@ func (r *Repository) FindPublicByIDs(ctx context.Context, ids []bson.ObjectID) (
 	return r.findPublic(ctx, ids, false)
 }
 
-// FindSuggestableByIDs es FindPublicByIDs sin quien apagó `buscable_por_usuario`: nadie le
-// llega por sugerencias de amistad (nv-53).
+// FindSuggestableByIDs es FindPublicByIDs sin quien apagó `buscable_por_usuario` (nv-53) ni
+// `privacidad.social.en_sugerencias` (nv-82): nadie le llega por sugerencias de amistad.
 func (r *Repository) FindSuggestableByIDs(ctx context.Context, ids []bson.ObjectID) ([]User, error) {
 	return r.findPublic(ctx, ids, true)
 }
@@ -137,7 +140,8 @@ func (r *Repository) findPublic(ctx context.Context, ids []bson.ObjectID, search
 	}
 	filter := bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}, {Key: "estado", Value: StatusActive}}
 	if searchable {
-		filter = append(filter, bson.E{Key: "privacidad.buscable_por_usuario", Value: bson.D{{Key: "$ne", Value: false}}})
+		filter = append(filter, bson.E{Key: "privacidad.buscable_por_usuario", Value: bson.D{{Key: "$ne", Value: false}}},
+			bson.E{Key: fieldInSuggestions, Value: bson.D{{Key: "$ne", Value: false}}})
 	}
 	cur, err := r.col.Find(ctx, filter, options.Find().SetProjection(searchProjection))
 	if err != nil {

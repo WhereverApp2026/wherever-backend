@@ -24,9 +24,23 @@ const (
 	DirectionReceived = "recibida"
 )
 
-// SendRequest es el cuerpo de POST /amistades.
+// De dónde sale una solicitud de amistad (nv-82).
+const (
+	OriginSearch     = "busqueda"
+	OriginCode       = "codigo"
+	OriginContacts   = "contactos"
+	OriginSuggestion = "sugerencia"
+)
+
+// SendRequest es el cuerpo de POST /amistades. `origen` es opcional; con `codigo` llega el
+// código de amigo leído y con `contactos` el teléfono de la agenda: si quien la recibe solo
+// acepta solicitudes por código (nv-82), se validan contra su cuenta, nunca se confía en
+// `origen`. El teléfono no se guarda ni se registra.
 type SendRequest struct {
 	UserID string `json:"usuario_id" validate:"required,len=24,hexadecimal"`
+	Origin string `json:"origen" validate:"omitempty,oneof=busqueda codigo contactos sugerencia"`
+	Code   string `json:"codigo" validate:"omitempty,max=20"`
+	Phone  string `json:"telefono" validate:"omitempty,max=40"`
 }
 
 // RespondRequest es el cuerpo de PATCH /amistades/{id}.

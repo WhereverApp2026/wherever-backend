@@ -299,6 +299,7 @@ func (s *Service) PatchPrivacy(ctx context.Context, claims *middleware.Claims, r
 	setIf(&set, "privacidad.buscable_por_telefono", req.PhoneSearchable)
 	setIf(&set, "privacidad.buscable_por_usuario", req.UsernameSearchable)
 	setIf(&set, "privacidad.promociones_correo", req.PromoEmail)
+	setSocial(&set, req.Social)
 	if req.TermsVersion != nil {
 		set = append(set, bson.E{Key: "privacidad.version_terminos", Value: *req.TermsVersion}, bson.E{Key: "privacidad.fecha_aceptacion", Value: time.Now().UTC()})
 	}
@@ -464,6 +465,19 @@ func userIDOf(claims *middleware.Claims) (bson.ObjectID, error) {
 		return bson.ObjectID{}, apperr.Unauthorized("credenciales inválidas")
 	}
 	return id, nil
+}
+
+// setSocial agrega al `$set` lo que llega de `privacidad.social` (nv-82).
+func setSocial(set *bson.D, in *SocialInput) {
+	if in == nil {
+		return
+	}
+	setIf(set, "privacidad.social.actividad", in.Activity)
+	setIf(set, "privacidad.social.compartir_resenas", in.ShareReviews)
+	setIf(set, "privacidad.social.compartir_planes", in.SharePlans)
+	setIf(set, "privacidad.social.compartir_postales", in.SharePostcards)
+	setIf(set, "privacidad.social.en_sugerencias", in.InSuggestions)
+	setIf(set, "privacidad.social.solicitudes", in.Requests)
 }
 
 func setIf[T any](set *bson.D, key string, v *T) {
