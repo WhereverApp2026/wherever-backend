@@ -901,6 +901,10 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### Alertas de seguridad y CloudTrail: control 18 (2026-11-20)
+- Estado: filtros y alarmas de 401 (≥50/5 min), 423 (≥3) y 429 (≥100) en `observabilidad.tf`; `auditoria.tf` con CloudTrail multirregión, validación de archivos, S3 365 días y CloudWatch `/wherever/dev/cloudtrail` con alarmas de cambios de IAM y uso de root; logs a 90 días. Política nueva `iam/wherever-dev-deployer-auditoria.json` y `EnviarEventosDeAuditoria` en el boundary. Plan: 21 nuevos, 2 cambios. Puntaje 90 % al aplicarlo.
+- Decisión: sin KMS ni Object Lock (costo y destruir.sh); la validación de archivos de CloudTrail detecta ediciones. 12 métricas: 2 sobre las 10 gratis.
+
 ### Pruebas que faltaban según la auditoría (2026-11-20)
 - Estado: unitarias de `internal/sincronizacion` (DTOs, cursor firmado, 410 por cursor viejo, `failed`, `split`); `tests/security/auditoria_rutas_security_test.go` (11: sync pendientes, cerrar sesión, inicio, eventos públicos, autocompletar, configuración, `/ready`, docs y sondas); `tests/integration/moderacion_reglas_patch_test.go` (PATCH de reglas por HTTP). Ya no queda ruta sin prueba de integración o seguridad.
 - Lección: las suites con Testcontainers sí corren en Windows dentro de `golang:1.27.3` con `--network host`, el socket de Docker y `TESTCONTAINERS_RYUK_DISABLED=true` (la pila usa `127.0.0.1` con puertos fijos; sin `--network host` no conecta). Sirve para correr solo las pruebas nuevas con `-run` antes del CI.

@@ -33,10 +33,10 @@ Lo que falta para un nivel bancario no está en el código sino alrededor: el go
 | 15 | Integridad de la cadena de suministro | 1 | `cd-dev.yml`: SBOM y provenance de buildx, firma cosign sin llaves del digest del índice; `actualizar.sh` exige `cosign verify` con la identidad `cd-dev.yml@refs/heads/main` antes de instalar (#122) |
 | 16 | Infraestructura con mínimo privilegio | 1 | Deployer IAM con MFA, boundary (`infra/aws-dev/iam/`), sin claves de AWS en GitHub; IMDSv2 obligatorio, SSH cerrado (Systems Manager), 8080 solo desde el balanceador y este solo desde CloudFront (`alb.tf`) |
 | 17 | Perímetro (WAF) | 1 | `infra/aws-dev/waf.tf` (PR E): web ACL en CloudFront con reputación de IP, límite por IP (429 uniforme), entradas maliciosas y OWASP general; el balanceador solo reenvía con la cabecera secreta de CloudFront, así nadie se salta el WAF. Cuenta desde que el operador lo aplica con `crear.sh` |
-| 18 | Registro y monitoreo de seguridad | 0,5 | `slog` JSON con `request_id` y filtro de secretos y correos; CloudWatch con alarmas de errores, 5xx, dependencias y respaldos (`observabilidad.tf`). **Falta:** alertas de eventos de seguridad (picos de 401/423/429), CloudTrail y retención mayor a 14 días |
+| 18 | Registro y monitoreo de seguridad | 1 | `slog` JSON con `request_id` y filtro de secretos y correos; CloudWatch con alarmas de errores, 5xx, dependencias y respaldos, y de ataque: picos de 401, 423 y 429 (`observabilidad.tf`). CloudTrail multirregión con validación de archivos, 365 días en S3, y alarmas por cambios de IAM y uso de root (`auditoria.tf`). Logs a 90 días. Cuenta desde que el operador lo aplica con `crear.sh` |
 | 19 | Respaldo y recuperación | 0,5 | Respaldo semanal de MongoDB a S3 versionado, 28 días, la instancia solo escribe, alarma de 7 días y restauración documentada (#123, #124); `crear.sh` ya no oculta fallos (#125). **Falta:** copia fuera de la cuenta y prueba de restauración periódica; `destruir.sh` borra los respaldos |
 | 20 | Gobierno del repositorio en GitHub | 1 | Ruleset «Protect main» activo: PR obligatorio, `pr-gate` obligatorio, sin force-push ni borrado, sin excepciones. Alertas de Dependabot activas. Secret scanning y push protection activados por el operador (ver abajo) |
-| | **Total** | **17,5 / 20 = 87,5 %** | |
+| | **Total** | **18 / 20 = 90 %** | |
 
 **Estado real de GitHub, consultado con `gh api` el 2026-11-19 después de que el operador lo activó** (la cuenta del agente tiene permiso `write`, no `admin`):
 
@@ -46,7 +46,7 @@ Lo que falta para un nivel bancario no está en el código sino alrededor: el go
 | Alertas de Dependabot | `dependabot/alerts` → 200 con 0 alertas abiertas (antes 403 *«disabled»*). Actualizaciones de seguridad activadas por el operador; su endpoint solo lo lee un administrador | Sí |
 | Secret scanning y push protection | Activados por el operador y la alerta de la llave de prueba cerrada como «Used in tests». No verificable con permiso `write` (`secret-scanning/alerts` → 404, `security_and_analysis` → `null`); el repositorio es público, donde ambos son gratuitos | Sí (reporte del operador) |
 
-**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124), los errores ocultos de `crear.sh` (#125) y el WAF (PR E). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso quedó en 77,5 % antes del WAF, 82,5 % con él y 87,5 % con el gobierno de GitHub.
+**Cómo leer el número.** La auditoría del 2026-11-18 daba ≈75 % (15/20); su desglose no quedó en el repositorio, así que esta tabla se rehízo control por control con evidencia. Desde entonces se cerraron fuzz y ZAP (#118), las pruebas de seguridad faltantes (#119), Dependabot, `trivy config` y gitleaks (#120), la firma con SBOM y provenance (#122), el respaldo con alarma (#123–#124), los errores ocultos de `crear.sh` (#125) y el WAF (PR E). La rúbrica nueva es más estricta en cuatro puntos que la anterior no separaba (TLS de origen, rotación, alertas de seguridad, respaldo fuera de la cuenta), por eso quedó en 77,5 % antes del WAF, 82,5 % con él, 87,5 % con el gobierno de GitHub y 90 % con las alertas de seguridad y CloudTrail.
 
 - Lo que sigue a medias (DAST, protección de datos, rotación, registros, respaldos) y el TLS de origen dependen de staging, dominio propio y procesos (sección 3).
 
@@ -137,7 +137,7 @@ Wherever no custodia dinero: los pagos van por Stripe (Connect Express) y el rep
 | 3.9 | **Respaldos fuera de la cuenta y prueba de restauración periódica** | Una cuenta comprometida o `destruir.sh` borran también los respaldos; un respaldo que no se restaura no está probado | 1–2 días + 2 h al mes | <US$2 al mes (segunda cuenta con replicación S3 y Object Lock) |
 | 3.10 | **Rotación de secretos** (JWT, `DATA_KEYS`, Atlas, Stripe, SMTP, Gemini) con calendario | Hoy se rota a mano y sin fecha; un secreto viejo filtrado sigue sirviendo | 2–4 días | US$0 manual con calendario; ≈US$4–6 al mes con Secrets Manager y rotación automática |
 | 3.11 | **Registros de auditoría inmutables** (CloudTrail + S3 con Object Lock; colección de auditoría de acciones de administrador) | En fintech se debe poder probar quién hizo qué; los logs actuales duran 14 días y se pueden borrar | 3–5 días | US$1–5 al mes |
-| 3.12 | **Alertas de seguridad** (picos de 401, 423, 429; cambios de IAM) | Hoy las alarmas son de disponibilidad, no de ataque | 1 día | <US$1 al mes |
+| 3.12 | **Alertas de seguridad** (picos de 401, 423, 429; cambios de IAM) | Antes las alarmas eran solo de disponibilidad | 1 día | <US$1 al mes. **Hecho** (`observabilidad.tf`, `auditoria.tf`) |
 | 3.13 | **PCI DSS** | Stripe reduce el alcance: el backend nunca ve, guarda ni transmite tarjetas. Con los componentes de Stripe en la app el alcance suele ser el cuestionario SAQ A (confirmarlo con Stripe). No aplica la certificación completa | 1 día para el cuestionario | US$0 |
 | 3.14 | **LFPDPPP** (ley vigente desde marzo de 2025) | Ya hay aviso de privacidad (`docs/aviso-privacidad.md`), consentimiento versionado, derechos ARCO y borrado. Falta: responsable de datos designado, contratos de encargado con los proveedores (Google, Stripe, Brevo, Firebase, AWS), registro de transferencias y procedimiento de vulneraciones (3.8) | 3–5 días con apoyo legal | Asesoría legal: variable |
 | 3.15 | **SOC 2 / ISO 27001** como referencia | No se busca certificar; sirven como lista para ordenar políticas (accesos, cambios, proveedores, continuidad). Una certificación real cuesta decenas de miles de dólares al año | Referencia | US$20 000–60 000 al año si se certificara |
@@ -159,7 +159,7 @@ Ordenada por riesgo dentro de cada horizonte.
 ### Primeros 3 meses
 1. MFA para comerciantes y administradores; opcional para consumidores (3.2).
 2. Respaldo fuera de la cuenta con Object Lock y una restauración probada al mes (3.9).
-3. CloudTrail y auditoría inmutable (3.11); alertas de eventos de seguridad (3.12).
+3. ~~CloudTrail y alertas de eventos de seguridad (3.12)~~: hechos. Falta Object Lock en el bucket de CloudTrail y la colección de auditoría de acciones de administrador (3.11).
 4. Prueba de penetración externa (3.5) antes de crecer la base de usuarios.
 5. Cuestionario PCI SAQ A con Stripe (3.13).
 
