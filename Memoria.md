@@ -905,6 +905,11 @@
 - Estado: filtros y alarmas de 401 (≥50/5 min), 423 (≥3) y 429 (≥100) en `observabilidad.tf`; `auditoria.tf` con CloudTrail multirregión, validación de archivos, S3 365 días y CloudWatch `/wherever/dev/cloudtrail` con alarmas de cambios de IAM y uso de root; logs a 90 días. Política nueva `iam/wherever-dev-deployer-auditoria.json` y `EnviarEventosDeAuditoria` en el boundary. Plan: 21 nuevos, 2 cambios. Puntaje 90 % al aplicarlo.
 - Decisión: sin KMS ni Object Lock (costo y destruir.sh); la validación de archivos de CloudTrail detecta ediciones. 12 métricas: 2 sobre las 10 gratis.
 
+### Pruebas que faltaban según la auditoría (2026-11-20)
+- Estado: unitarias de `internal/sincronizacion` (DTOs, cursor firmado, 410 por cursor viejo, `failed`, `split`); `tests/security/auditoria_rutas_security_test.go` (11: sync pendientes, cerrar sesión, inicio, eventos públicos, autocompletar, configuración, `/ready`, docs y sondas); `tests/integration/moderacion_reglas_patch_test.go` (PATCH de reglas por HTTP). Ya no queda ruta sin prueba de integración o seguridad.
+- Lección: las suites con Testcontainers sí corren en Windows dentro de `golang:1.27.3` con `--network host`, el socket de Docker y `TESTCONTAINERS_RYUK_DISABLED=true` (la pila usa `127.0.0.1` con puertos fijos; sin `--network host` no conecta). Sirve para correr solo las pruebas nuevas con `-run` antes del CI.
+- A evitar: un negocio insertado a mano sin `horario_min` está cerrado y un plan con él se rechaza; el autocompletar busca en `nombre_normalizado`.
+
 ### Medición con IA real: nv-33 y nv-51 (2026-11-20)
 - Estado: `docs/ml-evaluacion.md`. Semántica (nv-51, `gemini-embedding-2`, 30 frases ficticias): top-1 reglas 10/30, semántica 30/30, reglas + afinidad 30/30. Planes (nv-33, servidor con los 40 negocios de Tula): 18/20 por IA, 0 descartes, 0 × 429, p50 2,60 s, p95 3,13 s, ≈1 593 + 199 tokens por plan.
 - Decisión: 4 cuentas `yahiresendiz34+medicion-ia-N@gmail.com` (alias del operador, para que Brevo no rebote) por el límite de 5 planes por hora; quedaron en `eliminacion_pendiente` (purga 2026-12-21).
