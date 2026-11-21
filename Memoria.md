@@ -901,10 +901,23 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### CI: límite de tiempo de las suites (2026-11-21)
+- Error: la suite de Integration tardaba ~625 s y `go test` corta a los 10 min de pruebas (sin contar el arranque de contenedores): con las pruebas de nv-76 se pasó y el CI dio `panic: test timed out`, sin ninguna prueba rota.
+- Decisión: `-timeout 20m` en las cuatro suites con contenedor y el job `pipeline` de 30 a 45 min (hoy ~19 min). Si Integration se acerca a 20 min, partirla en dos jobs en vez de subir más el límite.
+
 ### NV-76 — Insignia del Sello (2026-11-21)
 - Estado: `GET /negocios/{id}/sello/insignia` (dueño, Sello vigente; si no 404): JSON `{negocio_id, nombre, otorgado_en, anio, svg}` o el SVG con `formato=svg`. SVG armado en `internal/negocios/panel/insignia.go` con el nombre escapado (`html.EscapeString`) y recortado a 40 runas. 255 rutas.
 - Decisión: SVG en el servidor (sin PNG); la CSP global `default-src 'none'` ya cubre la descarga, sin relajarla. El menú del negocio ya existía (nv-56): no se hizo spec nueva.
 - A evitar: en Windows `critic-guardrails` y `check_endpoints` fallan en local por App Control (`go run`); córrelos dentro de `golang:1.27.3`.
+
+### Rotación de secretos aplicada: control 14 (2026-11-20)
+- Estado: `crear.sh` aplicó #134 y #135 (24 recursos, CloudTrail entregando a S3 y CloudWatch sin errores, 12 alarmas en OK). Primera rotación de `JWT_KEY`, `CURSOR_HMAC_KEY` y `DATA_KEYS` (llaves `k202611210211` y `k1`), ahora parámetros avanzados con aviso a 90 días. Puntaje 92,5 %.
+- Error a evitar: en Git Bash `openssl rand -base64` termina en `
+`; quitar solo `
+` dejó un `
+` en los tres secretos y partió `DATA_KEYS` en el `.env` (la API de la b no reinició; las dos siguieron sanas con lo anterior). Se limpiaron los parámetros, se reinició la API en las dos y el script ahora quita `
+`, rechaza valores con saltos y pasa rutas de Windows (`cygpath -m`) a python y aws.
+- Lección: probar un script que escribe secretos con un parámetro de prueba antes de los reales; y reiniciar con `--env-file imagen.env`.
 
 ### Alertas de seguridad y CloudTrail: control 18 (2026-11-20)
 - Estado: filtros y alarmas de 401 (≥50/5 min), 423 (≥3) y 429 (≥100) en `observabilidad.tf`; `auditoria.tf` con CloudTrail multirregión, validación de archivos, S3 365 días y CloudWatch `/wherever/dev/cloudtrail` con alarmas de cambios de IAM y uso de root; logs a 90 días. Política nueva `iam/wherever-dev-deployer-auditoria.json` y `EnviarEventosDeAuditoria` en el boundary. Plan: 21 nuevos, 2 cambios. Puntaje 90 % al aplicarlo.

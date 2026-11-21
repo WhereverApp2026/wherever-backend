@@ -50,21 +50,29 @@ aws_() { aws --profile "$profile" --region "$region" "$@"; }
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-random_b64() { openssl rand -base64 "$1" | tr -d '\n'; }
+# openssl en Git Bash termina con \r\n: quitar solo \n dejó un \r en los secretos y partió
+# DATA_KEYS en el .env del servidor (2026-11-20).
+random_b64() { openssl rand -base64 "$1" | tr -d '\r\n'; }
+
+# En Git Bash (Windows), python y aws son programas de Windows y no entienden /tmp/…: se les pasa
+# la ruta de Windows. En Linux cygpath no existe y la ruta queda igual.
+native() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
 # put escribe el valor de un archivo como SecureString avanzado con su aviso de antigüedad.
 put() {
 	local param="$1" value_file="$2" days="$3"
-	python -I - "$param" "$value_file" "$days" "$work/entrada.json" <<'PY'
+	python -I - "$param" "$(native "$value_file")" "$days" "$(native "$work/entrada.json")" <<'PY'
 import json, sys
 name, value_file, days, out = sys.argv[1:]
-value = open(value_file, encoding="utf-8").read()
+value = open(value_file, encoding="utf-8", newline="").read()
+if not value or "\r" in value or "\n" in value:
+    sys.exit("rotar-secretos: valor vacío o con saltos de línea; no se cambió " + name)
 policies = [{"Type": "NoChangeNotification", "Version": "1.0",
              "Attributes": {"After": days, "Unit": "Days"}}]
 json.dump({"Name": name, "Value": value, "Type": "SecureString", "Overwrite": True,
            "Tier": "Advanced", "Policies": json.dumps(policies)}, open(out, "w"))
 PY
-	aws_ ssm put-parameter --cli-input-json "file://$work/entrada.json" --query Version --output text >/dev/null
+	aws_ ssm put-parameter --cli-input-json "file://$(native "$work/entrada.json")" --query Version --output text >/dev/null
 	rm -f "$work/entrada.json"
 	echo "rotar-secretos: $param actualizado (aviso a los $days días sin cambio)"
 }
