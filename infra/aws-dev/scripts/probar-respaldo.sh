@@ -47,13 +47,25 @@ fi
 
 echo "probar-respaldo: MongoDB de prueba ($image)"
 docker network create "$net" >/dev/null
-docker run -d --name "$db" --network "$net" -e MONGO_INITDB_ROOT_USERNAME="$user" \
-	-e MONGO_INITDB_ROOT_PASSWORD="$clave" "$image" >/dev/null
+# La descarga va aparte para que no cuente en la espera del arranque.
+docker pull -q "$image" >/dev/null
 mongosh() { docker exec "$db" mongosh --quiet -u "$user" -p "$clave" --authenticationDatabase admin "$@"; }
-for _ in $(seq 1 60); do
-	mongosh --eval 'db.runCommand({ping: 1}).ok' 2>/dev/null | grep -qx 1 && break
-	sleep 1
-done
+# Arranca MongoDB y espera el ping. Si el contenedor muere (pasó en un runner de GitHub, corrida
+# 297), muestra sus logs y lo intenta una vez más; si tampoco, la prueba falla con la causa a la vista.
+start_mongo() {
+	docker rm -f "$db" >/dev/null 2>&1 || true
+	docker run -d --name "$db" --network "$net" -e MONGO_INITDB_ROOT_USERNAME="$user" \
+		-e MONGO_INITDB_ROOT_PASSWORD="$clave" "$image" >/dev/null
+	for _ in $(seq 1 90); do
+		mongosh --eval 'db.runCommand({ping: 1}).ok' 2>/dev/null | grep -qx 1 && return 0
+		[[ "$(docker inspect -f '{{.State.Running}}' "$db" 2>/dev/null)" == "true" ]] || break
+		sleep 1
+	done
+	echo "probar-respaldo: MongoDB no quedó listo ($(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$db" 2>/dev/null))" >&2
+	docker logs --tail 30 "$db" 2>&1 | grep -vF "$clave" >&2 || true
+	return 1
+}
+start_mongo || start_mongo || { bad "MongoDB de prueba no arrancó"; exit 1; }
 mongosh wherever --eval 'db.lugares.insertMany([{nombre: "a"}, {nombre: "b"}, {nombre: "c"}]); db.usuarios.insertOne({correo: "x@ejemplo.com"})' >/dev/null
 
 echo "probar-respaldo: respaldo en seco"
