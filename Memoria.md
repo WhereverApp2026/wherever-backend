@@ -911,6 +911,12 @@
 - Decisión: visible para quien ve el perfil, no en búsquedas ni sugerencias; se quitan controles y marcas de dirección (suplantación de texto).
 - A evitar: escribir marcas de dirección reales en el código de pruebas; gosec (G116) y staticcheck (ST1018) las marcan: usar escapes `‮`.
 
+### Revisión de la maqueta y specs nv-79 a nv-88 (2026-11-21)
+- Estado: 162 pantallas de Figma («Boceto 2») contra 257 rutas. Specs en Borrador, sin código: nv-79 insignias, puntos y nivel como la maqueta; nv-80 regla y vigencia del Sello; nv-81 perfil con contadores y pestañas; nv-82 privacidad social; nv-83 me gusta y comentarios; nv-84 planes de amigos, historias y votaciones pendientes; nv-85 filtros de Explorar; nv-86 notificaciones por categoría; nv-87 mensajes directos; nv-88 cupo por hora y día; nv-89 reservar todo el plan y permisos al compartir (ver/editar); nv-90 datos del negocio de la maqueta (experiencias, año, WhatsApp, redes).
+- Orden sugerido: nv-82 (las demás la usan) → nv-79 → nv-81 → nv-83 → nv-84 → nv-86 → nv-85 → nv-80 → nv-87 → nv-88 → nv-89 → nv-90. Una a la vez (chocan en main.go, authtest, índices y Memoria).
+- Fuera: menú (ya existe, nv-56), estado de cuenta, facturas, verificación de CLABE e Instagram (diferidos de A5); navegación paso a paso (la hace el mapa del teléfono).
+- Decisión pendiente del revisor: regla del Sello (maqueta: 50 reseñas y 90 % de respuestas con vigencia; hoy: 20 en 90 días sin respuestas ni vigencia).
+
 ### CI: límite de tiempo de las suites (2026-11-21)
 - Error: la suite de Integration tardaba ~625 s y `go test` corta a los 10 min de pruebas (sin contar el arranque de contenedores): con las pruebas de nv-76 se pasó y el CI dio `panic: test timed out`, sin ninguna prueba rota.
 - Decisión: `-timeout 20m` en las cuatro suites con contenedor y el job `pipeline` de 30 a 45 min (hoy ~19 min). Si Integration se acerca a 20 min, partirla en dos jobs en vez de subir más el límite.
