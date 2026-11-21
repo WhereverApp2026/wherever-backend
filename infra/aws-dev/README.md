@@ -97,7 +97,13 @@ curl -i "$(terraform -chdir=infra/aws-dev output -raw cloudfront_url)/ready"
 - **Neo4j en pausa.** Aura Free se pausa tras 72 horas sin uso y **borra la instancia tras 30 días en pausa**. En pausa, `/ready` da 503 y el actualizador no instala imágenes. Para reanudar: consola de Aura → instancia → Resume. Compruébalo antes de la entrega y de la evaluación.
 - **Cuota de Redis.** Upstash Free da 500 000 comandos al mes. Mira el consumo en su consola. Costos por operación: `scripts/medir-redis.sh`. Sin cuota, `/ready` da 200 `degraded` y lo autenticado da 503.
 - **Plan B de Redis.** Regresa el servicio `redis` a `server/compose.yml` (historial de Git), apunta `REDIS_ADDR` a `redis:6379` y corre `instalar-actualizador.sh`.
-- **Rotar credenciales.** Cambia la clave en la consola del servicio y carga el parámetro con `--overwrite`. La API la toma al instalar la siguiente imagen; para aplicarla antes, entra por Systems Manager y corre en `/opt/wherever`, en cada instancia, `./deploy-env.sh /wherever/dev/` y `docker compose --env-file .env --env-file imagen.env up -d --no-deps api`.
+- **Rotar credenciales** (control 14): `scripts/rotar-secretos.sh`. Nunca muestra un valor y reinicia la API en las dos instancias, una a la vez, esperando `/ready`.
+  - `estado`: días desde el último cambio de cada parámetro.
+  - `propios --aplicar`: rota `JWT_KEY` y `CURSOR_HMAC_KEY` y pone una llave nueva al frente de `DATA_KEYS` (las viejas se quedan para descifrar; luego `make migrar-cifrado` con `-aplicar`). Los access vigentes dan 401 y los cursores en uso 422: la app refresca y vuelve a pedir. Cada 90 días.
+  - `cargar NOMBRE --aplicar`: después de rotar en su consola una llave de terceros (Stripe, Gemini, SMTP, Atlas, Firebase…), la pide sin mostrarla y la carga. Cada 180 días.
+  - Cada parámetro queda **avanzado** (US$0,05 al mes) con `NoChangeNotification`: al vencer, EventBridge avisa al correo de alarmas (`rotacion.tf`).
+  - `PHONE_HMAC_KEY` no se rota: los teléfonos solo existen como su HMAC.
+  - **Aplicar:** un administrador crea `wherever-dev-deployer-rotacion` (`iam/wherever-dev-deployer-rotacion.json`) adjunta a `wherever-deployer`; luego `crear.sh` (3 recursos nuevos).
 - **Diagnóstico.** Con una clave de Redis mala, la API registra `i/o timeout`, no `WRONGPASS`. Compruébala con `redis-cli --tls -u` desde un contenedor. Copia la cadena de Upstash en Connect → TCP; no la armes a mano.
 - **Esquema y datos de demostración.** `make siembra`, con `NEO4J_URI` en el entorno. Es idempotente e imprime el tamaño del grafo.
 

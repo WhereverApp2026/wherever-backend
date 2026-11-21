@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReglaDeSecretosSinRotar",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:DeleteRule",
+        "events:DescribeRule",
+        "events:PutTargets",
+        "events:RemoveTargets",
+        "events:ListTargetsByRule",
+        "events:TagResource",
+        "events:UntagResource",
+        "events:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:events:us-east-2:816101201001:rule/wherever-dev-*"
+    },
+    {
+      "Sid": "PoliticaDelTemaDeAlarmas",
+      "Effect": "Allow",
+      "Action": [
+        "sns:SetTopicAttributes",
+        "sns:GetTopicAttributes"
+      ],
+      "Resource": "arn:aws:sns:us-east-2:816101201001:wherever-dev-*"
+    },
+    {
+      "Sid": "AntiguedadDeSecretos",
+      "Effect": "Allow",
+      "Action": "ssm:DescribeParameters",
+      "Resource": "*"
+    }
+  ]
+}
