@@ -88,6 +88,18 @@ type PrivacyRequest struct {
 	UsernameSearchable *bool   `json:"buscable_por_usuario"`
 	PromoEmail         *bool   `json:"promociones_correo"`
 	TermsVersion       *string `json:"version_terminos" validate:"omitempty,max=20"`
+	// Social es parcial: solo cambia lo que llega (nv-82).
+	Social *SocialInput `json:"social" validate:"omitempty"`
+}
+
+// SocialInput es `privacidad.social` en PATCH /usuarios/yo/privacidad (nv-82).
+type SocialInput struct {
+	Activity       *string `json:"actividad" validate:"omitempty,oneof=amigos todos nadie"`
+	ShareReviews   *bool   `json:"compartir_resenas"`
+	SharePlans     *bool   `json:"compartir_planes"`
+	SharePostcards *bool   `json:"compartir_postales"`
+	InSuggestions  *bool   `json:"en_sugerencias"`
+	Requests       *string `json:"solicitudes" validate:"omitempty,oneof=cualquiera codigo"`
 }
 
 // PhoneRequest es el cuerpo de PUT /usuarios/yo/telefono. Se valida ya normalizado.
@@ -160,20 +172,37 @@ type PreferencesResponse struct {
 	Notifications NotificationsResponse `json:"notificaciones"`
 }
 
+// SocialResponse es `privacidad.social` con los valores por omisión ya aplicados (nv-82).
+type SocialResponse struct {
+	Activity       string `json:"actividad"`
+	ShareReviews   bool   `json:"compartir_resenas"`
+	SharePlans     bool   `json:"compartir_planes"`
+	SharePostcards bool   `json:"compartir_postales"`
+	InSuggestions  bool   `json:"en_sugerencias"`
+	Requests       string `json:"solicitudes"`
+}
+
+func socialResponse(s usuarios.Social) SocialResponse {
+	out := SocialResponse{Activity: s.ActivityLevel(), Requests: s.RequestsFrom()}
+	out.ShareReviews, out.SharePlans, out.SharePostcards, out.InSuggestions = s.Switches()
+	return out
+}
+
 // PrivacyResponse son los interruptores de privacidad y la aceptación de términos.
 type PrivacyResponse struct {
-	Location           bool      `json:"ubicacion"`
-	Learning           bool      `json:"aprendizaje_personalizado"`
-	Mood               bool      `json:"estado_animo"`
-	SensitiveData      bool      `json:"datos_sensibles"`
-	UsageData          bool      `json:"datos_uso"`
-	PhoneSearchable    bool      `json:"buscable_por_telefono"`
-	UsernameSearchable bool      `json:"buscable_por_usuario"`
-	TermsVersion       string    `json:"version_terminos"`
-	NoticeVersion      string    `json:"version_aviso_privacidad"`
-	AcceptedAt         time.Time `json:"fecha_aceptacion"`
-	PromoEmail         bool      `json:"promociones_correo"`
-	BusinessData       bool      `json:"datos_negocio,omitempty"`
+	Location           bool           `json:"ubicacion"`
+	Learning           bool           `json:"aprendizaje_personalizado"`
+	Mood               bool           `json:"estado_animo"`
+	SensitiveData      bool           `json:"datos_sensibles"`
+	UsageData          bool           `json:"datos_uso"`
+	PhoneSearchable    bool           `json:"buscable_por_telefono"`
+	UsernameSearchable bool           `json:"buscable_por_usuario"`
+	TermsVersion       string         `json:"version_terminos"`
+	NoticeVersion      string         `json:"version_aviso_privacidad"`
+	AcceptedAt         time.Time      `json:"fecha_aceptacion"`
+	PromoEmail         bool           `json:"promociones_correo"`
+	BusinessData       bool           `json:"datos_negocio,omitempty"`
+	Social             SocialResponse `json:"social"`
 	// ConsentCurrent dice si aceptó las versiones vigentes (nv-19); si es falso, la app vuelve
 	// a pedir la aceptación. No va en "Descargar mis datos".
 	ConsentCurrent *bool `json:"consentimiento_vigente,omitempty"`
@@ -279,7 +308,7 @@ func privacyResponse(p usuarios.Privacy) PrivacyResponse {
 		Location: p.Location, Learning: p.Learning, Mood: p.Mood, SensitiveData: p.SensitiveData, UsageData: p.UsageData,
 		PhoneSearchable: p.PhoneSearchable, UsernameSearchable: p.SearchableByUsername(),
 		TermsVersion: p.TermsVersion, NoticeVersion: p.NoticeVersion, AcceptedAt: p.AcceptedAt, PromoEmail: p.PromoEmail,
-		BusinessData: p.BusinessData,
+		BusinessData: p.BusinessData, Social: socialResponse(p.Social),
 	}
 }
 

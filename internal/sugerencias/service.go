@@ -139,7 +139,7 @@ func (s *Service) others(ctx context.Context, me bson.ObjectID, only string) ([]
 }
 
 // Suggestions devuelve hasta 20 personas con amigos en común, sin amigos, solicitudes ni
-// bloqueos de por medio y sin quien apagó buscable_por_usuario.
+// bloqueos de por medio y sin quien apagó buscable_por_usuario o en_sugerencias (nv-82).
 func (s *Service) Suggestions(ctx context.Context, subject string) (SuggestionsResponse, error) {
 	me, err := self(subject)
 	if err != nil {
@@ -225,9 +225,16 @@ func (s *Service) FriendsAt(ctx context.Context, subject, rawPlace string) (Frie
 	if out.Degraded {
 		return out, nil
 	}
-	people, err := s.users.FindPublicByIDs(ctx, hexIDs(went))
+	found, err := s.users.FindPublicByIDs(ctx, hexIDs(went))
 	if err != nil {
 		return out, unavailable(err)
+	}
+	// Quien no comparte sus planes u oculta su actividad no cuenta (nv-82).
+	people := make([]usuarios.User, 0, len(found))
+	for _, p := range found {
+		if p.Privacy.Social.SharesPlans() {
+			people = append(people, p)
+		}
 	}
 	out.Total = len(people)
 	for _, p := range people[:min(len(people), MaxAvatars)] {

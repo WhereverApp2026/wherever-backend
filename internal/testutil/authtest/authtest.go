@@ -227,7 +227,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	modRepo := moderacion.NewRepository(client.DB())
 	notifRepo := notificaciones.NewRepository(client.DB())
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
-	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB()))
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB())).WithSharing(users)
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	mods := moderacion.NewService(modRepo, cursor, log)
 	images := imagenestest.Build(t, client.DB(), mods, log)
@@ -336,7 +336,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	weather := clima.NewServicio(clima.NewOpenMeteo(openMeteo.URL), log)
 	friends, err := amistades.NewService(friendRepo, users, log)
 	require.NoError(t, err)
-	friends.WithGraph(graph).WithNotifier(notifier)
+	friends.WithGraph(graph).WithNotifier(notifier).WithPhoneKey(cfg.PhoneHMACKey)
 	people, err := personas.NewService(users, friendRepo, cfg.PhoneHMACKey, log)
 	require.NoError(t, err)
 	people.WithProfile(users, friendRepo, groupRepo, nil).WithInsignias(badges) // sin grafo (degradado); las pruebas conectan Neo4j con WithGraph

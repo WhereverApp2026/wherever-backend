@@ -117,6 +117,9 @@ type Privacy struct {
 	// BusinessData es el consentimiento expreso `datos_negocio` (nv-55): INE, comprobante,
 	// datos fiscales y CLABE. Sin él, el expediente del negocio responde 422.
 	BusinessData bool `bson:"datos_negocio,omitempty"`
+	// Social es quién ve su actividad, qué comparte, si sale en sugerencias y quién le manda
+	// solicitudes (nv-82); ausente = valores por omisión.
+	Social Social `bson:"social,omitempty"`
 }
 
 // DefaultPreferences son los ajustes con los que nace una cuenta.

@@ -2,6 +2,7 @@ package amistades
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
+	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -30,6 +32,15 @@ type Service struct {
 	notify notificaciones.Notifier
 	log    *slog.Logger
 	now    func() time.Time
+	// phoneKey valida las solicitudes que llegan desde contactos (nv-82).
+	phoneKey []byte
+}
+
+// WithPhoneKey recibe la llave HMAC de los teléfonos (la de nv-05). Sin ella, una solicitud
+// desde contactos a quien solo acepta por código no prospera.
+func (s *Service) WithPhoneKey(key []byte) *Service {
+	s.phoneKey = key
+	return s
 }
 
 // WithNotifier guarda los avisos en el centro de notificaciones (nv-40).
@@ -107,6 +118,9 @@ func (s *Service) Send(ctx context.Context, subject string, req SendRequest) (It
 		if ok {
 			return s.resolveExisting(ctx, me, existing, person)
 		}
+		if !s.allowed(person, req) {
+			return Item{}, errRestricted()
+		}
 		now := s.now()
 		f := Friendship{
 			ID: bson.NewObjectID(), From: me, To: target, Status: StatusPending,
@@ -122,6 +136,32 @@ func (s *Service) Send(ctx context.Context, subject string, req SendRequest) (It
 		}
 	}
 	return Item{}, apperr.Conflict("la solicitud cambió; inténtalo de nuevo")
+}
+
+func errRestricted() error {
+	return apperr.Forbidden("esta persona solo acepta solicitudes con su código de amigo").WithCode("solicitud_restringida")
+}
+
+// allowed dice si una solicitud nueva puede llegarle a person (nv-82). Con `solicitudes:
+// codigo` solo pasa con su código de amigo o con su teléfono (si se deja encontrar por
+// teléfono); `origen` solo dice qué prueba revisar.
+func (s *Service) allowed(person usuarios.User, req SendRequest) bool {
+	if person.Privacy.Social.RequestsFrom() != usuarios.RequestsCode {
+		return true
+	}
+	switch req.Origin {
+	case OriginCode:
+		code := strings.ToUpper(strings.TrimSpace(req.Code))
+		return code != "" && subtle.ConstantTimeCompare([]byte(code), []byte(person.FriendCode)) == 1
+	case OriginContacts:
+		if len(s.phoneKey) == 0 || !person.Privacy.PhoneSearchable || person.PhoneHash == "" {
+			return false
+		}
+		hash, ok := personas.PhoneHash(s.phoneKey, req.Phone)
+		return ok && subtle.ConstantTimeCompare([]byte(hash), []byte(person.PhoneHash)) == 1
+	default:
+		return false
+	}
 }
 
 // target lee a quien va la solicitud: a uno mismo es 422; una cuenta que no existe o no está

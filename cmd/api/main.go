@@ -210,7 +210,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	searchRepo := busquedas.NewRepository(db)
 	friendRepo := amistades.NewRepository(db)
 	// Extras de planes (nv-68): alternativas, populares, planes públicos y paquete sin conexión.
-	planSvc.WithExtras(businessRepo, friendRepo, reservas.NewRepository(db))
+	planSvc.WithExtras(businessRepo, friendRepo, reservas.NewRepository(db)).WithSharing(users)
 	consentRepo := usuarios.NewConsentRepository(db)
 	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
@@ -567,7 +567,7 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("amistades: %w", err)
 	}
-	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier)
+	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier).WithPhoneKey(d.phoneKey)
 	people, err := personas.NewService(d.users, d.friends, d.phoneKey, log)
 	if err != nil {
 		return nil, err

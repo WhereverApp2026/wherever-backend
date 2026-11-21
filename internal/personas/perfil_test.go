@@ -41,3 +41,15 @@ func TestContactsRequest_Validacion(t *testing.T) {
 	assert.Error(t, v.Struct(ContactsRequest{Phones: make([]string, MaxContacts+1)}))
 	assert.NoError(t, v.Struct(ContactsRequest{Phones: []string{"5512345678"}}))
 }
+
+// PhoneHash normaliza igual que los contactos (nv-82).
+func TestPhoneHash_ComoContactos(t *testing.T) {
+	key := []byte("llave")
+	h, ok := PhoneHash(key, " 55 1234 5678 ")
+	assert.True(t, ok)
+	assert.Equal(t, usuarios.HashPhone(key, "+525512345678"), h)
+	_, ok = PhoneHash(key, "ana")
+	assert.False(t, ok)
+	_, ok = PhoneHash(key, "")
+	assert.False(t, ok)
+}

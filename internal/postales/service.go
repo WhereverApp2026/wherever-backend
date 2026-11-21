@@ -209,8 +209,9 @@ func (s *Service) bloqueados(ctx context.Context, viewer *bson.ObjectID) (map[bs
 	return out, nil
 }
 
-// autores resuelve nombre de usuario y foto; las cuentas no activas no aparecen.
-func (s *Service) autores(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]AutorView, error) {
+// autores resuelve nombre de usuario y foto; las cuentas no activas no aparecen, ni las que
+// no comparten postales (nv-82), salvo cuando quien mira (viewer) es la propia autora.
+func (s *Service) autores(ctx context.Context, ids []bson.ObjectID, viewer *bson.ObjectID) (map[bson.ObjectID]AutorView, error) {
 	out := map[bson.ObjectID]AutorView{}
 	if len(ids) == 0 {
 		return out, nil
@@ -220,6 +221,11 @@ func (s *Service) autores(ctx context.Context, ids []bson.ObjectID) (map[bson.Ob
 		return nil, errStore()
 	}
 	for _, u := range us {
+		// Quien no comparte postales u oculta su actividad (nv-82) cuenta como ausente para
+		// todos menos para sí misma.
+		if !u.Privacy.Social.SharesPostcards() && (viewer == nil || *viewer != u.ID) {
+			continue
+		}
 		out[u.ID] = AutorView{ID: u.ID.Hex(), NombreUsuario: u.Username, FotoURL: u.PhotoURL}
 	}
 	return out, nil

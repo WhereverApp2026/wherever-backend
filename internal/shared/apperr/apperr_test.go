@@ -49,3 +49,12 @@ func TestUpgradeAndMaintenance_Messages(t *testing.T) {
 	assert.Equal(t, "en mantenimiento", m.Message)
 	assert.Equal(t, 60, m.RetryAfter)
 }
+
+// Un código propio cambia el `codigo` público, no el estado HTTP (nv-82).
+func TestWithCode_SoloCambiaElCodigo(t *testing.T) {
+	err := Forbidden("x").WithCode("solicitud_restringida")
+	assert.Equal(t, http.StatusForbidden, err.Kind.Status())
+	assert.Equal(t, "solicitud_restringida", err.PublicCode())
+	assert.Equal(t, "solicitud_restringida: x", err.Error())
+	assert.Equal(t, "prohibido", Forbidden("x").PublicCode())
+}

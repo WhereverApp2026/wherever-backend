@@ -26,7 +26,11 @@ La maqueta (`28_PrivSocial`, `23_AmigosSolic`, `85_Ajustes`, `82_EditarPerfil`) 
 |---|---|---|
 | PATCH | `/api/v1/usuarios/yo/privacidad` | acepta `social{actividad, compartir_resenas, compartir_planes, compartir_postales, en_sugerencias, solicitudes}` |
 | GET | `/api/v1/usuarios/yo` | devuelve `privacidad.social` |
-| POST | `/api/v1/amistades` | agrega `origen` (`busqueda`, `codigo`, `contactos`, `sugerencia`); 403 `solicitud_restringida` |
+| POST | `/api/v1/amistades` | agrega `origen` (`busqueda`, `codigo`, `contactos`, `sugerencia`) con `codigo?` o `telefono?`; 403 `solicitud_restringida` |
+| GET | `/api/v1/personas/{id}`, `/api/v1/personas/{id}/insignias` | con `actividad: nadie`, solo datos básicos e insignias vacías |
+| GET | `/api/v1/momentos/feed`, `/api/v1/momentos/{id}`, `/api/v1/postales/{id}`, `/api/v1/lugares/{id}/postales` | respetan `actividad` y `compartir_postales` |
+| GET | `/api/v1/planes/populares`, `/api/v1/lugares/{id}/amigos` | sin quien no comparte planes |
+| GET | `/api/v1/amistades/sugerencias` | sin quien apagó `en_sugerencias` |
 
 ## Tests
 - Unit: valores por omisión, validación de enums.
@@ -41,8 +45,17 @@ La maqueta (`28_PrivSocial`, `23_AmigosSolic`, `85_Ajustes`, `82_EditarPerfil`) 
 ## Límites
 - Sin listas de amigos cercanos ni privacidad por contenido más allá de la visibilidad de cada momento.
 
+## Drift al ejecutar (2026-11-21)
+- **`amigos` y `todos` no cambian la visibilidad de cada momento:** hoy solo `nadie` y `compartir_postales=false` ocultan momentos y postales (feed, detalle, postal y galería del lugar). Un momento `publica` sigue público con `amigos`; la diferencia entre `amigos` y `todos` llega con las pestañas del perfil (nv-81). Porqué: «los valores por omisión no cambian lo que hoy se ve» y la galería pública del lugar se vaciaría.
+- **Prueba de `origen`:** con `solicitudes=codigo`, `origen: codigo` exige `codigo` (el de amigo de esa persona) y `origen: contactos` exige `telefono` (su HMAC debe coincidir y la persona debe dejarse encontrar por teléfono). `busqueda`, `sugerencia` o sin origen = 403. El teléfono no se guarda ni se registra.
+- **Código público propio:** `apperr.Error.WithCode` permite un `codigo` distinto al del tipo (403 `solicitud_restringida`) sin cambiar el estado HTTP.
+- **Una solicitud recibida se acepta igual:** si la persona con `solicitudes=codigo` ya me envió una, reenviarla la acepta sin código (la relación existente se resuelve antes de la regla).
+- **Rutas extra:** `GET /postales/{id}` (mismo efecto que el momento) y `GET /lugares/{id}/amigos` (sin quien no comparte planes) también lo respetan.
+- **Pendiente en otras specs:** `compartir_resenas` solo se guarda (pestañas y feed de reseñas en nv-81); planes de amigos en nv-84; contadores `null` en nv-81.
+- **Valores desconocidos en la base** caen al valor por omisión, nunca a uno más abierto.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-21): ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** (1) por omisión `amigos`; (2) las reseñas siguen públicas en la ficha del lugar aunque no se compartan en el feed; (3) `solicitudes=codigo` también permite contactos por teléfono.

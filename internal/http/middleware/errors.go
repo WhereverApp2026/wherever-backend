@@ -34,7 +34,7 @@ func NewErrorHandler(showDetail bool, log *slog.Logger) fiber.ErrorHandler {
 // WriteError traduce err a su código HTTP y escribe el cuerpo uniforme.
 func WriteError(c *fiber.Ctx, err error, showDetail bool, log *slog.Logger) error {
 	appErr := resolve(err)
-	status, code := appErr.Kind.Status(), appErr.Kind.Code()
+	status, code := appErr.Kind.Status(), appErr.PublicCode()
 	// Un código HTTP de Fiber sin tipo propio (405, 413...) se conserva tal cual.
 	if fe := (*fiber.Error)(nil); errors.As(err, &fe) && appErr.Kind == apperr.KindInternal && fe.Code < http.StatusInternalServerError {
 		status, code = fe.Code, "error_http"

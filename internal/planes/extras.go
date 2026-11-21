@@ -27,6 +27,11 @@ type Blocks interface {
 	Blocked(ctx context.Context, a, b bson.ObjectID) (bool, error)
 }
 
+// Sharing dice qué dueños no comparten sus planes (nv-82); lo cumple usuarios.Repository.
+type Sharing interface {
+	HidingPlans(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]bool, error)
+}
+
 // Reservas trae las reservas propias de un plan para el paquete (lo cumple reservas).
 type Reservas interface {
 	DelPlan(ctx context.Context, usuario, plan bson.ObjectID) ([]ReservaPaquete, error)
@@ -36,12 +41,20 @@ type extraDeps struct {
 	places   Places
 	blocks   Blocks
 	reservas Reservas
+	sharing  Sharing
 }
 
 // WithExtras activa los extras de nv-68: alternativas, cambiar parada, populares, paquete y
 // planes públicos. reservas puede ser nil.
 func (s *Service) WithExtras(places Places, blocks Blocks, reservas Reservas) *Service {
 	s.extras = extraDeps{places: places, blocks: blocks, reservas: reservas}
+	return s
+}
+
+// WithSharing quita de populares los planes de quien no los comparte (nv-82). Va después de
+// WithExtras.
+func (s *Service) WithSharing(sh Sharing) *Service {
+	s.extras.sharing = sh
 	return s
 }
 
@@ -265,6 +278,9 @@ func (s *Service) Popular(ctx context.Context, q PopularQuery) (PopularResponse,
 	if err != nil {
 		return PopularResponse{}, errStore()
 	}
+	if rows, err = s.shared(ctx, rows); err != nil {
+		return PopularResponse{}, errStore()
+	}
 	ids := []bson.ObjectID{}
 	for _, p := range rows {
 		for _, st := range p.Paradas {
@@ -286,6 +302,29 @@ func (s *Service) Popular(ctx context.Context, q PopularQuery) (PopularResponse,
 		out.Items = append(out.Items, newPublicPlan(p, byID))
 	}
 	return out, nil
+}
+
+// shared quita los planes de quien no comparte sus planes u oculta su actividad (nv-82) y
+// deja los primeros popularTop.
+func (s *Service) shared(ctx context.Context, rows []Plan) ([]Plan, error) {
+	if s.extras.sharing != nil && len(rows) > 0 {
+		owners := make([]bson.ObjectID, 0, len(rows))
+		for _, p := range rows {
+			owners = append(owners, p.OwnerID)
+		}
+		hidden, err := s.extras.sharing.HidingPlans(ctx, owners)
+		if err != nil {
+			return nil, err
+		}
+		kept := rows[:0]
+		for _, p := range rows {
+			if !hidden[p.OwnerID] {
+				kept = append(kept, p)
+			}
+		}
+		rows = kept
+	}
+	return rows[:min(len(rows), popularTop)], nil
 }
 
 // ErrOutOfWindow: el paquete sin conexión solo es del plan de hoy o de mañana.

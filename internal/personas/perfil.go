@@ -69,8 +69,8 @@ type FriendExtras struct {
 	Degraded      bool   `json:"degradado"`
 }
 
-// ProfileResponse es GET /personas/{id}: lo público para cualquiera y, solo entre amigos, los
-// extras.
+// ProfileResponse es GET /personas/{id}: lo público para cualquiera y, solo entre amigos que
+// no ocultan su actividad (nv-82), los extras.
 type ProfileResponse struct {
 	Person
 	// Description es la presentación de la persona (nv-77); la ve quien puede ver su perfil.
@@ -99,7 +99,8 @@ func (s *Service) Profile(ctx context.Context, subject, rawID string) (ProfileRe
 		return ProfileResponse{}, err
 	}
 	out := ProfileResponse{Person: newPerson(u), Description: u.Description, Relation: rel}
-	if rel == RelationFriend {
+	// Con `actividad: nadie` solo salen los datos básicos, aun entre amigos (nv-82).
+	if rel == RelationFriend && !u.Privacy.Social.HidesActivity() {
 		if out.FriendExtras, err = s.friendExtras(ctx, me, u); err != nil {
 			return ProfileResponse{}, err
 		}
@@ -232,6 +233,17 @@ func (s *Service) Contacts(ctx context.Context, subject string, req ContactsRequ
 }
 
 func trimPhone(raw string) string { return strings.TrimSpace(raw) }
+
+// PhoneHash normaliza un teléfono de la agenda como POST /personas/contactos y devuelve su
+// HMAC; ok=false si no es un teléfono válido. Lo usa amistades para validar una solicitud que
+// llega desde contactos (nv-82).
+func PhoneHash(key []byte, raw string) (string, bool) {
+	phone, ok, err := parsePhone(trimPhone(raw))
+	if !ok || err != nil {
+		return "", false
+	}
+	return usuarios.HashPhone(key, phone), true
+}
 
 // sortByIndex deja los resultados en el orden de la agenda.
 func sortByIndex(rows []ContactMatch) {

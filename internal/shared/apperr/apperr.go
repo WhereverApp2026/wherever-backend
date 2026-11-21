@@ -93,9 +93,26 @@ type Error struct {
 	Fields     []FieldError
 	Detail     string
 	RetryAfter int
+	// Code sustituye el `codigo` público del tipo cuando la app necesita distinguir el caso
+	// (p. ej. 403 `solicitud_restringida`, nv-82); vacío = el del tipo.
+	Code string
 }
 
-func (e *Error) Error() string { return e.Kind.Code() + ": " + e.Message }
+func (e *Error) Error() string { return e.PublicCode() + ": " + e.Message }
+
+// PublicCode es el `codigo` que sale en la respuesta.
+func (e *Error) PublicCode() string {
+	if e.Code != "" {
+		return e.Code
+	}
+	return e.Kind.Code()
+}
+
+// WithCode fija un `codigo` público propio sin cambiar el estado HTTP del tipo.
+func (e *Error) WithCode(code string) *Error {
+	e.Code = code
+	return e
+}
 
 // WithDetail agrega un detalle técnico que solo se muestra fuera de prod.
 func (e *Error) WithDetail(detail string) *Error {

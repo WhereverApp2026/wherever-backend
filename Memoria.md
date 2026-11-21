@@ -901,6 +901,12 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-82 — Privacidad social (2026-11-21)
+- Estado: `usuarios.privacidad.social{actividad, compartir_resenas, compartir_planes, compartir_postales, en_sugerencias, solicitudes}` (`internal/usuarios/social.go`), parcial en `PATCH /usuarios/yo/privacidad`, completo en `GET /usuarios/yo` y ARCO. Efectos: perfil e insignias ajenas (`nadie`), momentos, postal y galería (`nadie` o `compartir_postales=false`: solo la autora), populares y amigos en el lugar (`compartir_planes`), sugerencias (`en_sugerencias`), `POST /amistades` con `origen` + `codigo`/`telefono` y 403 `solicitud_restringida`. Sin rutas nuevas.
+- Decisión: todo campo ausente vale lo de por omisión y se lee con métodos (`ActivityLevel`, `SharesPostcards`…), nunca con los campos; en Mongo se filtra con `$ne: false`. `amigos` y `todos` aún no cambian la visibilidad de cada momento (llega con las pestañas de nv-81).
+- Decisión: `searchProjection` trae `privacidad.social` para que cada módulo decida sin otra consulta; nunca sale en una respuesta. `apperr.WithCode` da un `codigo` propio sin cambiar el estado HTTP.
+- A evitar: confiar en `origen`; se valida el código de amigo o el HMAC del teléfono. Editar archivos con Python en Windows sin `newline=''` los deja en CRLF.
+
 ### NV-78 — Insignias de las personas (2026-11-21)
 - Estado: `internal/insignias` con 8 insignias calculadas al pedirlas (planes activos, reseñas publicadas, lugares distintos con check-in válido, amigos, postales listas); la fecha de la primera vez va en `insignias_usuarios` (`ux_insignia_usuario`). `GET /usuarios/yo/insignias` (ganadas y bloqueadas con avance) y `GET /personas/{id}/insignias` (solo ganadas, reglas de nv-70). ARCO exporta y borra.
 - Decisión: sin eventos en cada módulo ni puntos o niveles; una insignia ganada no se pierde. `insignias` no importa módulos de negocio (ciclo personas, insignias, postales/amistades): constantes propias y `TestInsignias_ColeccionesIgualesALosModulos`.
