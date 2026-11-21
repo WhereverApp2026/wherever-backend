@@ -60,7 +60,7 @@ func TestPrivacidadSocial_PerfilEInsignias(t *testing.T) {
 	env, app := amistadesEnv(t)
 	ana, beto := seedAmigo(t, env, "social_perfil_ana"), seedAmigo(t, env, "social_perfil_beto")
 	befriend(t, env, ana, beto)
-	sembrar(t, env.Mongo.DB(), beto.user.ID, 1, 0, 0, 0, nil)
+	sembrarActividad(t, env.Mongo.DB(), beto.user.ID, actividad{grupos: 1}) // anfitrion_grupo
 	insignias := "/api/v1/personas/" + beto.id() + "/insignias"
 
 	full := pcall(t, app, http.MethodGet, "/api/v1/personas/"+beto.id(), nil, ana.token, http.StatusOK)

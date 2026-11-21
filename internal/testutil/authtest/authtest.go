@@ -324,12 +324,14 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	badges := insignias.NewService(insigniasRepo, log)
 	registry.RegisterPurger(insignias.NewPrivacy(insigniasRepo))
 	registry.RegisterExporter(insignias.NewPrivacy(insigniasRepo))
+	registry.RegisterPurger(insignias.NewPrivacyPuntos(insigniasRepo))
+	registry.RegisterExporter(insignias.NewPrivacyPuntos(insigniasRepo))
 	// testutil.Config no fija IA_CONSEJO_DIA: se usa el valor por defecto de producción.
 	tips := consejos.NewService(consejos.NewRepository(client.DB()), businessRepo, log).WithIA(guardia, consejos.CupoPorOmision)
 	acc, err := account.NewService(users, svc, cities, exports, registry,
 		account.Config{PhoneHMACKey: cfg.PhoneHMACKey, GraceDays: cfg.ArcoGraceDays}, log)
 	require.NoError(t, err)
-	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}).WithRetiroDatosNegocio(expPrivacy).WithModeracion(moderacion.New(nil, nil, mods, log))
+	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}).WithRetiroDatosNegocio(expPrivacy).WithModeracion(moderacion.New(nil, nil, mods, log)).WithConciliador(badges)
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
 	openMeteo := climatest.Nuevo(t)
@@ -350,7 +352,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
-		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo)), Mail: mail, Google: google, Log: log, Logs: logs,
+		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo), insignias.NewTarea(badges)), Mail: mail, Google: google, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images, Insignias: badges,
 		modules: []httpapi.Module{
 			auth.NewHandler(svc, v).WithActiveGuard(usuarios.RequireActive(users)),

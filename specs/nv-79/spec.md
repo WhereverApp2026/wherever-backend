@@ -43,6 +43,7 @@ Sin rutas nuevas.
 - Integration: puntos por cada motivo; repetir o borrar y recrear no suma; `$inc` solo con movimiento nuevo; conciliación concurrente sin duplicar; nivel y siguiente; racha; «Querido» bloqueada sin nv-83.
 - Security: los puntos de otra persona no se pueden mover; nada de `puntos_movimientos` en `/personas/{id}`.
 - Database: `ux_movimiento` único. Contract: insignias con nivel; exportación con `puntos_movimientos`.
+- Archivos: `internal/insignias/catalogo_test.go` (Unit), `tests/integration/insignias_test.go`, `tests/security/insignias_security_test.go` (`TestInsigniasSecurity_PuntosAjenos`), `tests/database/indexes_test.go`, `tests/contract/insignias_contract_test.go` y `tests/contract/testdata/usuarios/*` (`nivel_numero`, `puntos_movimientos`).
 
 ## Criterios
 - Los puntos solo suben por acciones verificables y una sola vez por acción.
@@ -52,8 +53,9 @@ Sin rutas nuevas.
 - Sin canjear puntos, sin tabla de líderes, sin insignias por temporada.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
-- **Decisiones para el revisor:** (1) valores de puntos y tabla de niveles (la maqueta muestra «Nv. 4 · Explorador» y «340 de 500 para Anfitrión», que no cuadran entre sí); (2) borrar no resta puntos; (3) los ids de nv-78 dejan de mostrarse; (4) conciliar al pedir más un trabajo nocturno, sin eventos en cada módulo.
-- **Detalle:** `specs/nv-79/checklists/gates.md` al ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-21), ejecutada en el PR de nv-79; sin firma.
+- **Revisores:** Osmar Reséndiz (pendiente de aprobar el PR)
+- **Fecha:** 2026-11-21
+- **Decisiones del revisor (tomadas, 2026-11-21):** (1) tabla de niveles tal como la propone el diseño: Nv. 1–3 «Explorador» (0, 150, 300), Nv. 4–5 «Anfitrión» (500, 800), Nv. 6–7 «Guía local» (1 200, 1 700), Nv. 8+ «Leyenda» (2 300 y +700 por nivel); (2) puntos `registro` 50, `checkin` 20 (un lugar una vez por día), `resena` 30, `postal` 10, `plan` 5 (máx. 5 por semana), `insignia` 50; borrar no resta y recrear no vuelve a sumar (`ref_id`); (3) los ids de nv-78 dejan de mostrarse y el catálogo es el de esta spec, con `querido` bloqueada hasta nv-83; (4) conciliar al pedir (`GET /usuarios/yo/insignias` y `GET /usuarios/yo`) más el trabajo nocturno de nv-05, sin eventos en cada módulo.
+- **Implementado:** `internal/insignias` (`catalogo.go`, `niveles.go`, `racha.go`, `puntos.go`, `repository.go`, `service.go`, `privacy.go`, `tarea.go`); `usuarios.nivel_numero`; `account.WithConciliador`. Referencias: check-in = su id; reseña = el check-in de la reseña; postal = su id; plan = semana ISO y turno (`2026-W47#1…#5`); insignia = su id; registro = la persona (sus 50 puntos ya se dieron al crear la cuenta, no suma otra vez). Nivel y racha se escriben solo si `puntos` no cambió desde la lectura.
+- **Detalle:** `specs/nv-79/checklists/gates.md`.

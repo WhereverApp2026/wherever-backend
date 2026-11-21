@@ -97,6 +97,7 @@ var expected = map[string][]string{
 	postales.MomentosCollection:         {"_id_", "ix_feed", "ix_etiquetados", "ix_momentos_negocio", "ux_momento_postal"},
 	consejos.Collection:                 {"_id_", "ux_consejo_dia", "ttl_consejos"},
 	insignias.Collection:                {"_id_", "ux_insignia_usuario"},
+	insignias.MovimientosColl:           {"_id_", "ux_movimiento"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -178,6 +179,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		postales.MomentosCollection:      {"ux_momento_postal"},
 		consejos.Collection:              {"ux_consejo_dia"},
 		insignias.Collection:             {"ux_insignia_usuario"},
+		insignias.MovimientosColl:        {"ux_movimiento"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {

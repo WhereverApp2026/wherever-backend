@@ -15,6 +15,17 @@
         }
       }
     ],
+    "nivel": {
+      "nombre": "string",
+      "numero": "number",
+      "puntos": "number",
+      "siguiente": {
+        "nombre": "string",
+        "numero": "number",
+        "puntos": "number"
+      }
+    },
+    "racha_semanas": "number",
     "total": "number"
   }
 }

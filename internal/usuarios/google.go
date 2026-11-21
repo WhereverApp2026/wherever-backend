@@ -21,7 +21,7 @@ func NewConsumer(name, email string, birth time.Time, terms string, promoEmail b
 		BirthDate: &birth, Roles: []string{middleware.RoleConsumer}, Mode: ModeExplore,
 		Preferences: DefaultPreferences(),
 		Privacy:     Privacy{TermsVersion: terms, AcceptedAt: now, PromoEmail: promoEmail},
-		Points:      WelcomePoints, Level: InitialLevel, Status: StatusActive,
+		Points:      WelcomePoints, Level: InitialLevel, LevelNumber: InitialLevelNumber, Status: StatusActive,
 	}
 }
 
