@@ -120,6 +120,13 @@ jobs:
           [[ -n "$TOKEN" && "$TOKEN" != "null" ]] || { echo "no se pudo crear la cuenta del escaneo" >&2; exit 1; }
           echo "::add-mask::$TOKEN"
           export TOKEN
+          # Todas las GET registradas (no solo las 38 del OpenAPI), con un id de ejemplo en cada
+          # parámetro y coordenadas de Tula; las sondas y docs quedan fuera por el contexto.
+          go run ./scripts/routes | tr -d '\r' | awk '$1 == "GET" { print $2 }' \
+            | sed -E 's#:[A-Za-z_]+#6b00e7bf3f506b397b1991d3#g' \
+            | awk '{ printf "      - url: http://localhost:8080%s?lat=20.0536&lng=-99.3417\n", $0 }' > rutas-get.txt
+          sed -i '/# RUTAS-GET/r rutas-get.txt' .zap/plan-activo.yaml
+          echo "ZAP activo: $(wc -l < rutas-get.txt) rutas GET sembradas"
           mkdir -p zap-activo
           chmod 777 zap-activo
           docker run --rm --network host -e TOKEN -v "$PWD:/zap/wrk:rw" "$ZAP" zap.sh -cmd -port 8091 -autorun /zap/wrk/.zap/plan-activo.yaml

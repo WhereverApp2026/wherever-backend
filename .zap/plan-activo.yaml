@@ -31,6 +31,12 @@ jobs:
       apiFile: /zap/wrk/internal/http/openapi.json
       targetUrl: http://localhost:8080
       context: wherever-api
+  # El OpenAPI documenta 38 de las 254 rutas: las GET que faltan las visita esta lista, que
+  # nightly.yml arma con scripts/routes (ids de ejemplo y coordenadas de Tula) antes de correr.
+  - type: requestor
+    requests:
+      # RUTAS-GET
+      - url: http://localhost:8080/api/v1/ping
   # El token dura 15 minutos (máximo de la constitución): el escaneo termina antes.
   - type: activeScan
     parameters:
