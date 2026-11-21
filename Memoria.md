@@ -906,6 +906,20 @@
 - Decisión: sin eventos en cada módulo ni puntos o niveles; una insignia ganada no se pierde. `insignias` no importa módulos de negocio (ciclo personas, insignias, postales/amistades): constantes propias y `TestInsignias_ColeccionesIgualesALosModulos`.
 - A evitar: un módulo nuevo va también en `scripts/routes/main.go` (su lista de módulos es propia) o `check_endpoints` no ve sus rutas.
 
+### NV-77 — Descripción del perfil (2026-11-21)
+- Estado: `usuarios.descripcion` (≤ 160, una línea) en `PATCH/GET /usuarios/yo`, exportación ARCO y `GET /personas/{id}`. Moderada con las reglas de nv-71 (`account.WithModeracion`): rechazada = 422 sin guardar; dudosa se guarda. Sin rutas nuevas.
+- Decisión: visible para quien ve el perfil, no en búsquedas ni sugerencias; se quitan controles y marcas de dirección (suplantación de texto).
+- A evitar: escribir marcas de dirección reales en el código de pruebas; gosec (G116) y staticcheck (ST1018) las marcan: usar escapes `‮`.
+
+### CI: límite de tiempo de las suites (2026-11-21)
+- Error: la suite de Integration tardaba ~625 s y `go test` corta a los 10 min de pruebas (sin contar el arranque de contenedores): con las pruebas de nv-76 se pasó y el CI dio `panic: test timed out`, sin ninguna prueba rota.
+- Decisión: `-timeout 20m` en las cuatro suites con contenedor y el job `pipeline` de 30 a 45 min (hoy ~19 min). Si Integration se acerca a 20 min, partirla en dos jobs en vez de subir más el límite.
+
+### NV-76 — Insignia del Sello (2026-11-21)
+- Estado: `GET /negocios/{id}/sello/insignia` (dueño, Sello vigente; si no 404): JSON `{negocio_id, nombre, otorgado_en, anio, svg}` o el SVG con `formato=svg`. SVG armado en `internal/negocios/panel/insignia.go` con el nombre escapado (`html.EscapeString`) y recortado a 40 runas. 255 rutas.
+- Decisión: SVG en el servidor (sin PNG); la CSP global `default-src 'none'` ya cubre la descarga, sin relajarla. El menú del negocio ya existía (nv-56): no se hizo spec nueva.
+- A evitar: en Windows `critic-guardrails` y `check_endpoints` fallan en local por App Control (`go run`); córrelos dentro de `golang:1.27.3`.
+
 ### Rotación de secretos aplicada: control 14 (2026-11-20)
 - Estado: `crear.sh` aplicó #134 y #135 (24 recursos, CloudTrail entregando a S3 y CloudWatch sin errores, 12 alarmas en OK). Primera rotación de `JWT_KEY`, `CURSOR_HMAC_KEY` y `DATA_KEYS` (llaves `k202611210211` y `k1`), ahora parámetros avanzados con aviso a 90 días. Puntaje 92,5 %.
 - Error a evitar: en Git Bash `openssl rand -base64` termina en `

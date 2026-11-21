@@ -143,8 +143,10 @@ type User struct {
 	BirthDate       *time.Time `bson:"-"`
 	BirthDateStored any        `bson:"fecha_nacimiento,omitempty"`
 	// Adult se guarda al registrar: la edad ya se validó y la fecha queda cifrada.
-	Adult       bool            `bson:"mayor_de_edad,omitempty"`
-	PhotoURL    string          `bson:"foto_url,omitempty"`
+	Adult    bool   `bson:"mayor_de_edad,omitempty"`
+	PhotoURL string `bson:"foto_url,omitempty"`
+	// Description es la presentación que la persona escribe en su perfil (nv-77), moderada.
+	Description string          `bson:"descripcion,omitempty"`
 	FriendCode  string          `bson:"codigo_amigo"`
 	Roles       []string        `bson:"roles"`
 	Mode        string          `bson:"modo_actual"`

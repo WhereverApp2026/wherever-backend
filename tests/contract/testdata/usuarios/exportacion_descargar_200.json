@@ -56,6 +56,7 @@
       "correo": "string",
       "correo_verificado": "bool",
       "creado_en": "string",
+      "descripcion": "string",
       "eliminar_en": "null",
       "estado": "string",
       "foto_url": "string",

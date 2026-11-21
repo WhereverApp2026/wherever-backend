@@ -50,6 +50,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Post("/negocios/:id/pausa", with(h.pausa)...)
 	v1.Put("/negocios/:id/reservas-config", with(h.reservas)...)
 	v1.Get("/negocios/:id/qr", with(h.qr)...)
+	v1.Get("/negocios/:id/sello/insignia", with(h.insignia)...)
 	v1.Post("/negocios/:id/ia/descripcion", with(h.descripcion)...)
 	v1.Put("/admin/negocios/:id/sello", limiter.Window(politicaAdmin, limiteAdmin, ventanaAdmin), middleware.RequireRoles(middleware.RoleAdmin), h.sello)
 }
@@ -140,6 +141,28 @@ func (h *Handler) qr(c *fiber.Ctx) error {
 	}
 	c.Set(fiber.HeaderCacheControl, "private, max-age=86400")
 	return c.JSON(out)
+}
+
+// insignia da la insignia del Sello (nv-76): JSON para la app o el SVG para descargar.
+func (h *Handler) insignia(c *fiber.Ctx) error {
+	formato := c.Query("formato", FormatoJSON)
+	if formato != FormatoJSON && formato != FormatoSVG {
+		return apperr.Validation("formato inválido", apperr.FieldError{Field: "formato", Message: "usa json o svg"})
+	}
+	out, err := h.svc.Insignia(c.UserContext(), claims(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "private, max-age=3600")
+	c.Set(fiber.HeaderETag, `W/"`+strconv.Itoa(out.Version())+`"`)
+	if formato == FormatoJSON {
+		return c.JSON(out)
+	}
+	// La CSP global (`default-src 'none'`) también cubre el SVG: abierto directo en el
+	// navegador no puede correr scripts ni cargar nada. El dibujo no necesita estilos en línea.
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="`+out.Archivo()+`"`)
+	c.Set(fiber.HeaderContentType, "image/svg+xml; charset=utf-8")
+	return c.SendString(out.SVG)
 }
 
 func (h *Handler) baja(c *fiber.Ctx) error {

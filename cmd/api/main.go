@@ -280,7 +280,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, fmt.Errorf("usuarios: %w", err)
 	}
-	accountSvc.WithRetiroDatosNegocio(business.privacy)
+	accountSvc.WithRetiroDatosNegocio(business.privacy).WithModeracion(moderacion.New(nil, nil, modSvc, log))
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
 	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active, insignias: insigniasSvc}, db, cursor, log)
