@@ -901,6 +901,11 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-76 — Insignia del Sello (2026-11-21)
+- Estado: `GET /negocios/{id}/sello/insignia` (dueño, Sello vigente; si no 404): JSON `{negocio_id, nombre, otorgado_en, anio, svg}` o el SVG con `formato=svg`. SVG armado en `internal/negocios/panel/insignia.go` con el nombre escapado (`html.EscapeString`) y recortado a 40 runas. 255 rutas.
+- Decisión: SVG en el servidor (sin PNG); la CSP global `default-src 'none'` ya cubre la descarga, sin relajarla. El menú del negocio ya existía (nv-56): no se hizo spec nueva.
+- A evitar: en Windows `critic-guardrails` y `check_endpoints` fallan en local por App Control (`go run`); córrelos dentro de `golang:1.27.3`.
+
 ### Alertas de seguridad y CloudTrail: control 18 (2026-11-20)
 - Estado: filtros y alarmas de 401 (≥50/5 min), 423 (≥3) y 429 (≥100) en `observabilidad.tf`; `auditoria.tf` con CloudTrail multirregión, validación de archivos, S3 365 días y CloudWatch `/wherever/dev/cloudtrail` con alarmas de cambios de IAM y uso de root; logs a 90 días. Política nueva `iam/wherever-dev-deployer-auditoria.json` y `EnviarEventosDeAuditoria` en el boundary. Plan: 21 nuevos, 2 cambios. Puntaje 90 % al aplicarlo.
 - Decisión: sin KMS ni Object Lock (costo y destruir.sh); la validación de archivos de CloudTrail detecta ediciones. 12 métricas: 2 sobre las 10 gratis.
