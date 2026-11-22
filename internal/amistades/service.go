@@ -10,6 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/contadores"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/personas"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
@@ -34,6 +35,15 @@ type Service struct {
 	now    func() time.Time
 	// phoneKey valida las solicitudes que llegan desde contactos (nv-82).
 	phoneKey []byte
+	// contadores del perfil y de la lista de amigos (nv-81); nil = sin conteos.
+	contadores *contadores.Service
+}
+
+// WithContadores invalida los contadores al aceptar, quitar o bloquear una amistad y agrega a
+// la lista de amigos sus planes y si están planeando ahora (nv-81).
+func (s *Service) WithContadores(c *contadores.Service) *Service {
+	s.contadores = c
+	return s
 }
 
 // WithPhoneKey recibe la llave HMAC de los teléfonos (la de nv-05). Sin ella, una solicitud
@@ -231,17 +241,54 @@ func (s *Service) List(ctx context.Context, subject string, q ListQuery) (ListRe
 	if err != nil {
 		return ListResponse{}, err
 	}
-	needle := text.Normalize(strings.TrimPrefix(strings.TrimSpace(q.Query), "@"))
-	out := ListResponse{Results: make([]Item, 0, len(rows)), Pending: pending}
-	for _, f := range rows {
-		// Una cuenta eliminada o suspendida no aparece en la lista.
-		p, ok := byID[f.Other(me)]
-		if !ok || !matches(p, needle) {
-			continue
+	out := ListResponse{Results: listItems(rows, me, byID, q.Query), Pending: pending}
+	if kind == KindFriends {
+		if err := s.withPlans(ctx, out.Results, byID); err != nil {
+			return ListResponse{}, err
 		}
-		out.Results = append(out.Results, newItem(f, me, p))
 	}
 	return out, nil
+}
+
+// listItems arma la lista con las personas activas que coinciden con `q`; una cuenta eliminada
+// o suspendida no aparece.
+func listItems(rows []Friendship, me bson.ObjectID, byID map[bson.ObjectID]usuarios.User, q string) []Item {
+	needle := text.Normalize(strings.TrimPrefix(strings.TrimSpace(q), "@"))
+	out := make([]Item, 0, len(rows))
+	for _, f := range rows {
+		p, ok := byID[f.Other(me)]
+		if ok && matches(p, needle) {
+			out = append(out, newItem(f, me, p))
+		}
+	}
+	return out
+}
+
+// withPlans agrega a cada amigo sus planes públicos y si está planeando ahora (nv-81); quien no
+// comparte sus planes u oculta su actividad (nv-82) los lleva en null.
+func (s *Service) withPlans(ctx context.Context, items []Item, byID map[bson.ObjectID]usuarios.User) error {
+	if s.contadores == nil || len(items) == 0 {
+		return nil
+	}
+	ids := make([]bson.ObjectID, 0, len(items))
+	for _, it := range items {
+		if id, err := bson.ObjectIDFromHex(it.Person.ID); err == nil && byID[id].Privacy.Social.SharesPlans() {
+			ids = append(ids, id)
+		}
+	}
+	counts, err := s.contadores.DeAmigos(ctx, ids)
+	if err != nil {
+		return unavailable(err)
+	}
+	for i := range items {
+		id, _ := bson.ObjectIDFromHex(items[i].Person.ID)
+		if !byID[id].Privacy.Social.SharesPlans() {
+			continue
+		}
+		c := counts[id]
+		items[i].Plans, items[i].PlanningNow = &c.Planes, &c.PlaneandoAhora
+	}
+	return nil
 }
 
 // people lee lo público de la otra persona de cada relación, por id; solo cuentas activas.
@@ -303,6 +350,7 @@ func (s *Service) Respond(ctx context.Context, subject, rawID string, req Respon
 		return Item{}, answered
 	}
 	_ = s.graph.Touch(ctx, me)
+	s.contadores.Invalidar(ctx, me, f.From)
 	s.notify.Emit(ctx, f.From, notificaciones.KindFriendAccepted, map[string]string{"usuario_id": me.Hex()})
 	return newItem(accepted, me, person), nil
 }
@@ -349,6 +397,11 @@ func (s *Service) Remove(ctx context.Context, subject, rawID string) error {
 	if err != nil {
 		return err
 	}
+	// La otra persona también pierde un amigo en sus contadores (nv-81).
+	f, found, err := s.repo.FindForParticipant(ctx, id, me)
+	if err != nil {
+		return unavailable(err)
+	}
 	removed, err := s.repo.Remove(ctx, id, me)
 	if err != nil {
 		return unavailable(err)
@@ -357,6 +410,9 @@ func (s *Service) Remove(ctx context.Context, subject, rawID string) error {
 		return notFound()
 	}
 	_ = s.graph.Touch(ctx, me)
+	if found {
+		s.contadores.Invalidar(ctx, me, f.Other(me))
+	}
 	return nil
 }
 
@@ -410,5 +466,6 @@ func (s *Service) Block(ctx context.Context, subject, rawID string) error {
 		return apperr.Conflict("la relación cambió; inténtalo de nuevo")
 	}
 	_ = s.graph.Touch(ctx, me)
+	s.contadores.Invalidar(ctx, me, f.Other(me))
 	return nil
 }

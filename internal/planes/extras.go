@@ -281,27 +281,11 @@ func (s *Service) Popular(ctx context.Context, q PopularQuery) (PopularResponse,
 	if rows, err = s.shared(ctx, rows); err != nil {
 		return PopularResponse{}, errStore()
 	}
-	ids := []bson.ObjectID{}
-	for _, p := range rows {
-		for _, st := range p.Paradas {
-			ids = append(ids, st.NegocioID)
-		}
-	}
-	cards, err := s.extras.places.FindCards(ctx, ids, s.now())
+	items, err := s.publicPlans(ctx, rows)
 	if err != nil {
-		return PopularResponse{}, errStore()
+		return PopularResponse{}, err
 	}
-	byID := make(map[bson.ObjectID]negocios.PlaceItem, len(cards))
-	for _, c := range cards {
-		if id, err := bson.ObjectIDFromHex(c.ID); err == nil {
-			byID[id] = c
-		}
-	}
-	out := PopularResponse{Items: make([]PublicPlan, 0, len(rows))}
-	for _, p := range rows {
-		out.Items = append(out.Items, newPublicPlan(p, byID))
-	}
-	return out, nil
+	return PopularResponse{Items: items}, nil
 }
 
 // shared quita los planes de quien no comparte sus planes u oculta su actividad (nv-82) y

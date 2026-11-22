@@ -4,6 +4,11 @@
     "actualizado_en": "string",
     "ciudad": "null",
     "codigo_amigo": "string",
+    "contadores": {
+      "amigos": "number",
+      "planes": "number",
+      "resenas": "number"
+    },
     "correo": "string",
     "correo_verificado": "bool",
     "creado_en": "string",

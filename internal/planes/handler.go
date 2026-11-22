@@ -50,6 +50,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Patch("/:id/paradas/:parada_id", h.write(h.patchStop)...)
 	g.Delete("/:id/paradas/:parada_id", h.write(h.removeStop)...)
 	h.extraRoutes(g, limiter)
+	h.personaRoutes(v1, limiter)
 }
 
 func (h *Handler) write(handler fiber.Handler) []fiber.Handler {

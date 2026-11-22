@@ -29,7 +29,7 @@
 | Buscar personas | 30 | 1 h | `GET /api/v1/personas/buscar` por usuario (`rate:personas_buscar:{usuario}`, ventana fija) | nv-35 |
 | Solicitudes de amistad | 20 | 1 h | `POST /api/v1/amistades` por usuario (`rate:amistades_solicitud:{usuario}`, ventana fija); cuenta toda solicitud, también las rechazadas con 404, 409 o 422 | nv-36 |
 | Buscar por código de amigo | 30 | 1 h | `GET /api/v1/personas/codigo/{codigo}` por usuario (`rate:personas_codigo:{usuario}`, ventana fija); contra la enumeración de códigos | nv-64 |
-| Perfil de persona | 120 | 1 h | `GET /api/v1/personas/{id}` por usuario (`rate:personas_perfil:{usuario}`); contra el recorrido de ids | nv-70 |
+| Perfil de persona | 120 | 1 h | `GET /api/v1/personas/{id}`, sus insignias y sus pestañas `momentos`, `planes` y `resenas` por usuario, en una sola cuota (`rate:personas_perfil:{usuario}`); contra el recorrido de ids | nv-70, nv-78, nv-81 |
 | Amigos en contactos | 10 | 24 h | `POST /api/v1/personas/contactos` por usuario (`rate:personas_contactos:{usuario}`); hasta 5 000 números al día, contra la enumeración de teléfonos | nv-70 |
 | Reporte de errores de la app | 30 | 1 h | `POST /api/v1/errores` por usuario (`rate:errores_reporte:{usuario}`, ventana fija) | nv-64 |
 | Invitaciones a grupos | 30 | 1 h | `POST /api/v1/grupos`, `POST /api/v1/grupos/{id}/integrantes` y `POST /api/v1/planes/{id}/invitaciones` por usuario (`rate:grupos_invitacion:{usuario}`, ventana fija); cuenta cada petición, también las rechazadas | nv-37 |

@@ -172,6 +172,9 @@ func (s *Service) Borrar(ctx context.Context, cl *middleware.Claims, raw string)
 	if errors.Is(err, ErrNoAplica) {
 		return nil
 	}
+	if err == nil {
+		s.contadores.Invalidar(ctx, me)
+	}
 	return err
 }
 

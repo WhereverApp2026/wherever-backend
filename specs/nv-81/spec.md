@@ -41,9 +41,21 @@ La maqueta muestra en el perfil propio (`81_Perfil`) y en el de otra persona (`2
 ## Límites
 - Sin seguidores (solo amistad), sin perfil público sin sesión.
 
+## Drift al ejecutar (2026-11-21)
+- **Reglas de nv-82 aplicadas:** `nadie` = pestañas vacías, contadores en `null`, sin `nivel` e `insignias_destacadas` vacía, aun entre amigos. `amigos` (por omisión) = solo los amigos ven pestañas y contadores; a otra persona le salen vacías y en `null`. `todos` = cualquiera con sesión ve las pestañas. Además cada interruptor cierra lo suyo: `compartir_postales` la de momentos, `compartir_planes` la de planes y su contador, `compartir_resenas` la de reseñas y su contador. Una pestaña cerrada responde 200 con la página vacía (no 404), para no distinguirla de una persona sin contenido.
+- **Momentos:** entre amigos salen `publica` y `amigos`; a los demás (con `todos`), solo `publica`. Es la diferencia entre `amigos` y `todos` que nv-82 dejó para aquí.
+- **Planes:** `planes` no tiene visibilidad `amigos` (solo `privado` y `publico`, nv-68): la pestaña muestra solo los `publico` activos, con la forma de los populares (sin dueño, integrantes, notas ni grupo), por fecha descendente.
+- **Contadores:** en `GET /usuarios/yo`, `planes` cuenta todos los activos propios; en el perfil ajeno y en la lista de amigos, solo los `publico` (lo que muestra la pestaña), para que «coincidan con lo que la persona tiene publicado». Se suma `insignias_total` para el «+3» de la maqueta.
+- **Caché:** `cache:perfil_contadores:{usuario}` 5 min (`internal/contadores`). Se invalida al crear, editar (cambia la visibilidad) o borrar un plan, al crear o borrar una reseña y al aceptar, quitar o bloquear una amistad (las dos personas). Lo que cambia por moderación (una reseña que se publica u oculta) se ve al vencer la llave.
+- **`planeando_ahora`:** un plan activo para hoy en America/Mexico_City, aunque sea privado (solo dice «planeando ahora», no lo muestra), o un grupo donde está confirmado con una votación abierta. Con `compartir_planes: false` o `nadie`, `planes` y `planeando_ahora` van en `null`; también en las listas de solicitudes.
+- **Dónde viven las rutas:** las pestañas están en `postales`, `planes` y `resenas` (personas no puede importarlos: `postales` → `amistades` → `personas` sería ciclo); piden permiso con `personas.Service.Pestana` y cuentan en la política `personas_perfil` (120/h compartida con el perfil y sus insignias). `internal/contadores` lee las colecciones por nombre; `TestNombres_IgualesALosDeCadaModulo` lo vigila.
+- **Nivel:** `nivel` pasa de cadena (solo amigos) a `{numero, nombre}` de la tabla de nv-79 para quien ve el perfil; una cuenta sin `nivel_numero` va en el 1. Reseña de un negocio que ya no está visible no sale en la pestaña.
+- **Feed de reseñas:** no existe; `compartir_resenas` aplica a la pestaña y al contador. La lista pública de reseñas del negocio no cambia.
+- **Sin índices nuevos:** los conteos y pestañas usan `ix_dueno_estado_fecha`, `ix_mis_resenas`, `ix_feed`, `ix_de_estado`, `ix_para_estado` e `ix_estado_cierra`. 260 rutas.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-21): ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** (1) nivel e insignias destacadas visibles para quien ve el perfil, no solo amigos; (2) contadores en caché de 5 min; (3) «planeando ahora» = plan para hoy o votación abierta.
-- **Detalle:** `specs/nv-81/checklists/gates.md` al ejecutar.
+- **Decisiones para el revisor:** (1) nivel e insignias destacadas visibles para quien ve el perfil, no solo amigos — tomada así; (2) contadores en caché de 5 min — tomada así; (3) «planeando ahora» = plan para hoy o votación abierta — tomada así.
+- **Detalle:** `specs/nv-81/checklists/gates.md`.

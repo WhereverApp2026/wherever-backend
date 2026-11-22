@@ -90,6 +90,8 @@ type Service struct {
 	notifier  notificaciones.Notifier
 	loc       *time.Location
 	now       func() time.Time
+	// perfiles da permiso sobre la pestaña de momentos (nv-81).
+	perfiles Perfiles
 }
 
 // NewService recibe sus dependencias por constructor. Sin imágenes (sin IMAGENES_*) crear una

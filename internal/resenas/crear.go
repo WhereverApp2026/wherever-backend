@@ -56,6 +56,7 @@ func (s *Service) Crear(ctx context.Context, cl *middleware.Claims, req CrearReq
 		return ResenaResponse{}, errStore()
 	}
 	s.alGuardar(ctx, r, veredicto)
+	s.contadores.Invalidar(ctx, me)
 	if guardada, err := s.repo.Buscar(ctx, r.ID); err == nil {
 		r = guardada
 	}

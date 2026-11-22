@@ -119,6 +119,8 @@ type Service struct {
 	profile profileDeps
 	// insignias son las ganadas que se ven en el perfil (nv-78).
 	insignias Insignias
+	// contadores son los del perfil (nv-81).
+	contadores Contadores
 }
 
 // NewService recibe los repositorios y la llave HMAC del teléfono (la misma de nv-05).

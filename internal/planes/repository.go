@@ -187,6 +187,8 @@ type PageQuery struct {
 	Desc   bool
 	After  *Position
 	Limit  int
+	// Public deja solo los `publico` (pestaña del perfil, nv-81).
+	Public bool
 }
 
 // List trae hasta Limit+1 planes activos del dueño (el extra dice si hay otra página).
@@ -210,6 +212,9 @@ func (r *Repository) List(ctx context.Context, q PageQuery) ([]Plan, error) {
 
 func pageFilter(q PageQuery) bson.D {
 	filter := bson.D{{Key: "dueno_id", Value: q.Owner}, {Key: "estado", Value: StatusActive}}
+	if q.Public {
+		filter = append(filter, bson.E{Key: "visibilidad", Value: VisibilityPublic})
+	}
 	fecha := bson.D{}
 	if !q.Since.IsZero() {
 		fecha = append(fecha, bson.E{Key: "$gte", Value: q.Since})

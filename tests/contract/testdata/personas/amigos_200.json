@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "body": {
+    "pendientes": "number",
+    "resultados": [
+      {
+        "actualizada_en": "string",
+        "creada_en": "string",
+        "direccion": "string",
+        "estado": "string",
+        "id": "string",
+        "persona": {
+          "foto_url": "string",
+          "id": "string",
+          "nombre": "string",
+          "nombre_usuario": "string"
+        },
+        "planeando_ahora": "bool",
+        "planes": "number",
+        "silenciado": "bool"
+      }
+    ]
+  }
+}

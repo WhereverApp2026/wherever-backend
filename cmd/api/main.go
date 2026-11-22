@@ -26,6 +26,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/clima"
 	"github.com/WhereverApp2026/wherever-backend/internal/configuracion"
 	"github.com/WhereverApp2026/wherever-backend/internal/consejos"
+	"github.com/WhereverApp2026/wherever-backend/internal/contadores"
 	"github.com/WhereverApp2026/wherever-backend/internal/cupones"
 	"github.com/WhereverApp2026/wherever-backend/internal/embeddings"
 	"github.com/WhereverApp2026/wherever-backend/internal/errores"
@@ -286,7 +287,13 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	accountSvc.WithRetiroDatosNegocio(business.privacy).WithModeracion(moderacion.New(nil, nil, modSvc, log)).WithConciliador(insigniasSvc)
 	// Con la cuenta en eliminación pendiente solo quedan GET /usuarios/yo y cancelar (nv-05).
 	active := usuarios.RequireActive(users)
-	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active, insignias: insigniasSvc}, db, cursor, log)
+	// Contadores del perfil con caché en Redis (nv-81): planes, reseñas y amistades los invalidan.
+	counters := contadores.NewService(contadores.NewRepository(db), cache.New(redisClient, log), negocios.MexicoCity())
+	accountSvc.WithContadores(counters)
+	planSvc.WithContadores(counters)
+	reviews.WithContadores(counters)
+	social, err := buildExtras(socialDeps{users: users, friends: friendRepo, groups: groupRepo, places: businessRepo, graph: graph, notifier: notifier, phoneKey: cfg.PhoneHMACKey, validator: validator, active: active, insignias: insigniasSvc,
+		contadores: counters, pestanas: func(p *personas.Service) { planSvc.WithPerfiles(p); reviews.WithPerfiles(p); cards.WithPerfiles(p) }}, db, cursor, log)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -546,6 +553,10 @@ type socialDeps struct {
 	validator *validation.Validator
 	active    fiber.Handler
 	insignias *insignias.Service
+	// contadores y pestanas conectan el perfil de nv-81: pestanas recibe el service de personas
+	// para las pestañas que viven en planes, reseñas y postales.
+	contadores *contadores.Service
+	pestanas   func(*personas.Service)
 }
 
 // buildExtras arma los módulos sociales y los errores de la app (nv-64: agrupados por huella,
@@ -570,12 +581,15 @@ func buildSocial(d socialDeps, log *slog.Logger) ([]httpapi.Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("amistades: %w", err)
 	}
-	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier).WithPhoneKey(d.phoneKey)
+	friends.WithGraph(d.graph.queue).WithNotifier(d.notifier).WithPhoneKey(d.phoneKey).WithContadores(d.contadores)
 	people, err := personas.NewService(d.users, d.friends, d.phoneKey, log)
 	if err != nil {
 		return nil, err
 	}
-	people.WithProfile(d.users, d.friends, d.groups, nil).WithInsignias(d.insignias)
+	people.WithProfile(d.users, d.friends, d.groups, nil).WithInsignias(d.insignias).WithContadores(d.contadores)
+	if d.pestanas != nil {
+		d.pestanas(people)
+	}
 	if d.graph.driver != nil {
 		people.WithGraph(d.graph.driver)
 	}
