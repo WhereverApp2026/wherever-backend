@@ -36,6 +36,13 @@ func Indexes() []platformmongo.IndexSet {
 				{Keys: bson.D{{Key: "usuario_id", Value: 1}, {Key: "ultimo_uso", Value: -1}}, Options: options.Index().SetName("ix_usuario_uso")},
 			},
 		},
+		{
+			Collection: GroupedCollection,
+			Models: []mongo.IndexModel{
+				{Keys: bson.D{{Key: "usuario_id", Value: 1}}, Options: options.Index().SetName("ix_agrupada_usuario")},
+				{Keys: bson.D{{Key: "hasta", Value: 1}}, Options: options.Index().SetName("ttl_agrupada").SetExpireAfterSeconds(0)},
+			},
+		},
 	}
 }
 
@@ -43,11 +50,12 @@ func Indexes() []platformmongo.IndexSet {
 type Repository struct {
 	notes   *mongo.Collection
 	devices *mongo.Collection
+	grouped *mongo.Collection
 }
 
 // NewRepository recibe la base por constructor.
 func NewRepository(db *mongo.Database) *Repository {
-	return &Repository{notes: db.Collection(Collection), devices: db.Collection(DevicesCollection)}
+	return &Repository{notes: db.Collection(Collection), devices: db.Collection(DevicesCollection), grouped: db.Collection(GroupedCollection)}
 }
 
 // Insert guarda un aviso.
@@ -131,10 +139,26 @@ func (r *Repository) ListByUser(ctx context.Context, userID bson.ObjectID) ([]No
 	return findAll[Notification](ctx, r.notes, bson.D{{Key: "usuario_id", Value: userID}}, options.Find().SetSort(bson.D{{Key: "creada_en", Value: 1}}))
 }
 
-// DeleteByUser borra los avisos del usuario.
+// DeleteByUser borra los avisos del usuario y sus reservas de avisos agrupados.
 func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) error {
-	_, err := r.notes.DeleteMany(ctx, bson.D{{Key: "usuario_id", Value: userID}})
+	if _, err := r.notes.DeleteMany(ctx, bson.D{{Key: "usuario_id", Value: userID}}); err != nil {
+		return err
+	}
+	_, err := r.grouped.DeleteMany(ctx, bson.D{{Key: "usuario_id", Value: userID}})
 	return err
+}
+
+// ClaimGroup reserva el aviso `key` de userID por `every`. false = ya se avisó dentro del
+// lapso (desde esta petición, otra o la otra instancia). El índice TTL limpia lo vencido.
+func (r *Repository) ClaimGroup(ctx context.Context, userID bson.ObjectID, key string, now time.Time, every time.Duration) (bool, error) {
+	_, err := r.grouped.UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: userID.Hex() + ":" + key}, {Key: "hasta", Value: bson.D{{Key: "$lte", Value: now}}}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "hasta", Value: now.Add(every)}, {Key: "usuario_id", Value: userID}}}},
+		options.UpdateOne().SetUpsert(true))
+	if mongo.IsDuplicateKeyError(err) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // RegisterDevice guarda el token para userID o renueva su uso. Si el token era de otra

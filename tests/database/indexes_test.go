@@ -34,6 +34,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/reacciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/reportesnegocio"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
@@ -70,6 +71,7 @@ var expected = map[string][]string{
 	sincronizacion.ActionsCollection:    {"_id_", "ux_usuario_cliente", "ttl_accion"},
 	notificaciones.Collection:           {"_id_", "ix_usuario_creada", "ttl_notificacion"},
 	notificaciones.DevicesCollection:    {"_id_", "ux_token_hash", "ix_usuario_uso"},
+	notificaciones.GroupedCollection:    {"_id_", "ix_agrupada_usuario", "ttl_agrupada"},
 	expediente.Collection:               {"_id_", "ux_documento", "ix_borrar", "ix_conservar", "ix_propietario"},
 	expediente.AccesosCollection:        {"_id_", "ix_acceso_negocio", "ttl_acceso"},
 	vaca.ExpensesCollection:             {"_id_", "ix_gastos_grupo", "ix_gastos_pagador", "ux_id_cliente"},
@@ -98,6 +100,8 @@ var expected = map[string][]string{
 	consejos.Collection:                 {"_id_", "ux_consejo_dia", "ttl_consejos"},
 	insignias.Collection:                {"_id_", "ux_insignia_usuario"},
 	insignias.MovimientosColl:           {"_id_", "ux_movimiento"},
+	reacciones.MeGustaCollection:        {"_id_", "ux_me_gusta", "ix_me_gusta_objeto", "ix_me_gusta_usuario", "ix_me_gusta_dueno"},
+	reacciones.ComentariosCollection:    {"_id_", "ix_comentarios_objeto", "ix_comentarios_autor", "ix_comentarios_dueno"},
 }
 
 func freshDB(t *testing.T) *mongodrv.Database {
@@ -180,6 +184,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		consejos.Collection:              {"ux_consejo_dia"},
 		insignias.Collection:             {"ux_insignia_usuario"},
 		insignias.MovimientosColl:        {"ux_movimiento"},
+		reacciones.MeGustaCollection:     {"ux_me_gusta"},
 	} {
 		got := specs(t, db, collection)
 		for _, name := range names {
@@ -188,7 +193,7 @@ func TestIndexes_UniqueTTLAndPartial(t *testing.T) {
 		}
 	}
 	for collection, name := range map[string]string{auth.SessionsCollection: "ttl_sesion", auth.TokensCollection: "ttl_token", privacidad.ExportsCollection: "ttl_exportacion", asistente.DescartesCollection: "ttl_descarte", chat.NoticeCollection: "ttl_hasta",
-		pagos.Collection: "ttl_conservar_hasta", pagos.LiquidacionesCollection: "ttl_liquidacion_conservar", consejos.Collection: "ttl_consejos"} {
+		pagos.Collection: "ttl_conservar_hasta", pagos.LiquidacionesCollection: "ttl_liquidacion_conservar", consejos.Collection: "ttl_consejos", notificaciones.GroupedCollection: "ttl_agrupada"} {
 		ttl := specs(t, db, collection)[name]
 		require.NotNil(t, ttl.ExpireAfterSeconds, name)
 		assert.Equal(t, int32(0), *ttl.ExpireAfterSeconds, name)

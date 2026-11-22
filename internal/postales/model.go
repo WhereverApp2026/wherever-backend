@@ -125,13 +125,15 @@ type Momento struct {
 	Estado      string          `bson:"estado"`
 	Etiquetados []bson.ObjectID `bson:"etiquetados"`
 	PlanID      *bson.ObjectID  `bson:"plan_id,omitempty"`
-	// ReaccionesTotal queda en 0 hasta el módulo social B2.
-	ReaccionesTotal int       `bson:"reacciones_total"`
-	Destacado       bool      `bson:"destacado_por_negocio"`
-	Agradecido      bool      `bson:"agradecido_por_negocio"`
-	Version         int       `bson:"version"`
-	CreadoEn        time.Time `bson:"creado_en"`
-	ActualizadoEn   time.Time `bson:"actualizado_en"`
+	// ReaccionesTotal (me gusta) y ComentariosTotal (publicados) los mueve reacciones (nv-83)
+	// con `$inc`; las ediciones del momento no los tocan.
+	ReaccionesTotal  int       `bson:"reacciones_total"`
+	ComentariosTotal int       `bson:"comentarios_total"`
+	Destacado        bool      `bson:"destacado_por_negocio"`
+	Agradecido       bool      `bson:"agradecido_por_negocio"`
+	Version          int       `bson:"version"`
+	CreadoEn         time.Time `bson:"creado_en"`
+	ActualizadoEn    time.Time `bson:"actualizado_en"`
 }
 
 func idx(keys bson.D, o *options.IndexOptionsBuilder) mongo.IndexModel {

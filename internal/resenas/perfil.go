@@ -26,6 +26,17 @@ func (s *Service) WithContadores(c *contadores.Service) *Service {
 	return s
 }
 
+// Avisos avisa agrupado por reseña (nv-83); lo cumple notificaciones.Agrupador.
+type Avisos interface {
+	Emit(ctx context.Context, to bson.ObjectID, kind, objeto string, data map[string]string)
+}
+
+// WithAvisos avisa `resena_util` a la autora con la primera marca de cada lapso (nv-83).
+func (s *Service) WithAvisos(a Avisos) *Service {
+	s.avisos = a
+	return s
+}
+
 // WithPerfiles conecta la pestaña de reseñas del perfil; sin ella la ruta responde 503.
 func (s *Service) WithPerfiles(p Perfiles) *Service {
 	s.perfiles = p

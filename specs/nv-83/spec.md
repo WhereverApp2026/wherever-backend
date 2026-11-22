@@ -39,9 +39,24 @@ La maqueta tiene **me gusta** y **comentarios** en publicaciones y planes: `17_P
 ## Límites
 - Sin emojis variados en momentos (solo me gusta), sin menciones con aviso, sin comentarios en reseñas.
 
+## Drift al ejecutar (2026-11-22)
+- **Módulo propio:** `internal/reacciones` (modelo, repositorio, service, handler, destino de la cola y ARCO). No decide permisos: pregunta a `postales.Service.Visible` (las reglas del detalle del momento con sesión: visibilidad, bloqueo, moderación y `compartir_postales`/`actividad` de la autora) y a `planes.Service.Visible` (dueño, integrante del grupo o `publico` sin bloqueo cuyo dueño comparte sus planes, nv-82). Va antes que grupos y planes en el armado (el grupo `/planes` de planes pide sesión para todo su prefijo).
+- **Planes por nv-84:** nv-84 aún no existe; la visibilidad `amigos` de los planes llega con ella. Hoy un plan se ve si es propio, del grupo o `publico`.
+- **Contadores:** los momentos ya tenían `reacciones_total` (me gusta) y ganan `comentarios_total`; los planes ganan `me_gusta_total` y `comentarios_total` (los nombres de nv-84) en su respuesta. Solo los mueve `reacciones` con `$inc`: el me gusta solo si la inserción no es duplicada y el comentario solo cuando está (o pasa a) `publicado`. Las ediciones del plan y del momento hacen `$set` de sus campos y no los tocan.
+- **`dueno_id` en `me_gusta` y `comentarios`:** el dueño del objeto al reaccionar. Sirve para que la dueña borre comentarios, para avisarle cuando la cola aprueba un comentario y para que ARCO borre lo que recibieron sus objetos al eliminar su cuenta.
+- **Sin `me_gusta_total` en comentarios:** el contrato no tiene ruta para dar me gusta a un comentario; queda fuera (como emojis y menciones).
+- **Avisos agrupados:** `notificaciones.Agrupador` reserva en MongoDB (`notificaciones_agrupadas`, `_id` = persona:tipo:objeto, TTL en `hasta`) el aviso de cada persona, tipo y objeto por 10 min: el primer toque avisa y los demás del lapso no (no hay resumen «Ana y 3 más»). Sin Redis, así que no cambia el costo de `TestPresupuestoRedis_*`. Tipos nuevos `me_gusta`, `comentario` y `resena_util` con texto de push genérico; el aviso solo lleva `momento_id`, `plan_id` o `resena_id`. Nunca avisa a sí misma.
+- **`actividad: nadie` (nv-82):** quien la tiene no sale en «quién reaccionó» ni sus comentarios para terceros; sí para la dueña del objeto y para sí misma. Los totales sí la cuentan (son números).
+- **Quién reaccionó:** sin cursor; trae los 100 me gusta más recientes y luego a quienes van. `relacion` agrega `yo`; `amigos_en_comun` sale de una sola consulta a `amistades` (`CommonWith`) sobre los amigos de quien mira, sin Neo4j. `todos` = me gusta + van − los que hicieron las dos cosas. En momentos `van` siempre vacía. Pestaña desconocida = 422. Las tres rutas de lectura también responden 403 (cuenta no activa) y 422 (cursor o pestaña).
+- **Comentario eliminado:** queda sin texto y sin autor en la respuesta; sale mientras tenga respuestas visibles y deja de salir cuando no (ocupa lugar en la página: una página puede traer menos que `limite`). Una respuesta eliminada no sale. Rechazado por la cola = solo lo ve su autora con `estado: rechazado`.
+- **Borrar:** inexistente, ya eliminado o de un objeto que no veo = 404; lo veo y no soy autora ni dueña = 403. Borrar no lleva límite propio (no estaba en el contrato con 429).
+- **Índices nuevos:** `me_gusta`: `ux_me_gusta`, `ix_me_gusta_objeto`, `ix_me_gusta_usuario`, `ix_me_gusta_dueno`; `comentarios`: `ix_comentarios_objeto` `{objeto_tipo, objeto_id, padre_id, creado_en, _id}`, `ix_comentarios_autor`, `ix_comentarios_dueno`; `notificaciones_agrupadas`: `ix_agrupada_usuario`, `ttl_agrupada`. Hay que crearlos en Atlas con `go run ./scripts/indexes` antes del despliegue (`/ready` da 503 si falta uno).
+- **ARCO:** exporta `reacciones{me_gusta[], comentarios[]}` (sin eliminados). Al borrar la cuenta quita sus me gusta (bajando cada contador), deja sus comentarios como «Comentario eliminado» sin `autor_id` y borra los me gusta y comentarios que recibieron sus objetos; también sus reservas de avisos agrupados.
+- **Fuera por ahora:** saber en el feed si ya di me gusta (`yo.me_gusta` llega con nv-84 en sus listas); la app lo sabe por el 204 y por `reacciones`. 271 rutas (11 nuevas).
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-22): ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** (1) un solo tipo de reacción (me gusta); (2) respuestas de un nivel; (3) «me gusta a tu reseña» = «Útil»; (4) avisos agrupados cada 10 min.
+- **Decisiones para el revisor:** (1) un solo tipo de reacción (me gusta) — tomada así; (2) respuestas de un nivel — tomada así; (3) «me gusta a tu reseña» = «Útil», que ahora avisa `resena_util` — tomada así; (4) avisos agrupados cada 10 min (el primero avisa, los demás del lapso no) — tomada así.
 - **Detalle:** `specs/nv-83/checklists/gates.md` al ejecutar.

@@ -2,6 +2,7 @@ package planes
 
 import (
 	"context"
+	"errors"
 	"math"
 	"regexp"
 	"strconv"
@@ -87,6 +88,34 @@ func (s *Service) publicPlan(ctx context.Context, subject, rawID string) (Plan, 
 		return Plan{}, errPlanNotFound()
 	}
 	return p, nil
+}
+
+// Visible es el permiso de nv-83 para reaccionar y comentar: el dueño, un integrante del grupo
+// o, en un plan `publico`, quien no tiene bloqueo con el dueño si este comparte sus planes
+// (nv-82). Devuelve el dueño; si no, 404 como si no existiera.
+func (s *Service) Visible(ctx context.Context, subject, rawID string) (bson.ObjectID, error) {
+	p, err := s.getMember(ctx, subject, rawID)
+	if err == nil {
+		return p.OwnerID, nil
+	}
+	var appErr *apperr.Error
+	if !errors.As(err, &appErr) || appErr.Kind != apperr.KindNotFound {
+		return bson.ObjectID{}, err
+	}
+	pub, err := s.publicPlan(ctx, subject, rawID)
+	if err != nil {
+		return bson.ObjectID{}, err
+	}
+	if s.extras.sharing != nil {
+		hidden, err := s.extras.sharing.HidingPlans(ctx, []bson.ObjectID{pub.OwnerID})
+		if err != nil {
+			return bson.ObjectID{}, errStore()
+		}
+		if hidden[pub.OwnerID] {
+			return bson.ObjectID{}, errPlanNotFound()
+		}
+	}
+	return pub.OwnerID, nil
 }
 
 // clonePublic copia un plan público ajeno: la copia es privada, `origen: clonado`, con

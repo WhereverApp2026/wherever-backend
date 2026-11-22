@@ -250,8 +250,8 @@ func (r *Repository) AgregarReporte(ctx context.Context, id, por bson.ObjectID, 
 }
 
 // MarcarUtil agrega o quita la marca de la persona y mueve `util` solo si cambió. Devuelve el
-// conteo vigente.
-func (r *Repository) MarcarUtil(ctx context.Context, resena, usuario bson.ObjectID, util bool, now time.Time) (int, error) {
+// conteo vigente y si la marca es nueva (para avisar una sola vez, nv-83).
+func (r *Repository) MarcarUtil(ctx context.Context, resena, usuario bson.ObjectID, util bool, now time.Time) (int, bool, error) {
 	cambio := 0
 	if util {
 		_, err := r.utiles.InsertOne(ctx, Util{ID: bson.NewObjectID(), ResenaID: resena, UsuarioID: usuario, CreadoEn: now})
@@ -259,19 +259,19 @@ func (r *Repository) MarcarUtil(ctx context.Context, resena, usuario bson.Object
 		case err == nil:
 			cambio = 1
 		case !mongo.IsDuplicateKeyError(err):
-			return 0, err
+			return 0, false, err
 		}
 	} else {
 		res, err := r.utiles.DeleteOne(ctx, bson.D{{Key: "resena_id", Value: resena}, {Key: "usuario_id", Value: usuario}})
 		if err != nil {
-			return 0, err
+			return 0, false, err
 		}
 		cambio = -int(res.DeletedCount)
 	}
 	var doc Resena
 	err := r.resenas.FindOneAndUpdate(ctx, bson.D{{Key: "_id", Value: resena}}, bson.D{{Key: "$inc", Value: bson.D{{Key: "util", Value: cambio}}}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(bson.D{{Key: "util", Value: 1}})).Decode(&doc)
-	return doc.Util, err
+	return doc.Util, cambio == 1, err
 }
 
 // FijarRespuesta escribe la respuesta del negocio sin subir `version` (no es un cambio del autor).

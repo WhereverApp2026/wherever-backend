@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "body": {
+    "personas": [
+      {
+        "amigos_en_comun": "number",
+        "foto_url": "string",
+        "id": "string",
+        "me_gusta": "bool",
+        "nombre": "string",
+        "nombre_usuario": "string",
+        "relacion": "string",
+        "va": "bool"
+      }
+    ],
+    "pestana": "string",
+    "totales": {
+      "me_gusta": "number",
+      "todos": "number",
+      "van": "number"
+    }
+  }
+}

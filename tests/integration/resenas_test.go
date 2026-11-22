@@ -17,6 +17,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/reservastest"
@@ -374,6 +375,12 @@ func TestResenas_EditarBorrarYUtil(t *testing.T) {
 		requireStatus(t, resp, http.StatusOK)
 		assert.Equal(t, float64(0), decode(t, resp)["total"])
 	}
+	// La autora recibe un solo `resena_util` (nv-83): la marca repetida no avisa otra vez.
+	requireStatus(t, sendJSON(t, app, http.MethodPut, path+"/util", map[string]any{"util": true}, otro), http.StatusOK)
+	n, err := env.Mongo.DB().Collection(notificaciones.Collection).CountDocuments(context.Background(),
+		bson.D{{Key: "tipo", Value: notificaciones.KindReviewUseful}, {Key: "datos.resena_id", Value: id}})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), n)
 
 	// Pasadas 48 h = 403.
 	setDoc(t, env, resenas.Collection, oidDe(t, id), bson.D{{Key: "creado_en", Value: time.Now().UTC().Add(-49 * time.Hour)}})

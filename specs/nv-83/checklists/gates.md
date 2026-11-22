@@ -1,12 +1,14 @@
 # gates.md — NV-83 Me gusta y comentarios
 
+Evidencia local del 2026-11-22 en Docker `golang:1.27.3` (suites con contenedor con `--network host`, socket de Docker y `TESTCONTAINERS_RYUK_DISABLED=true`). El CI del PR manda.
+
 | Gate | Criterio | Evidencia | Estado |
 |---|---|---|---|
-| critic B1–B4 | Sin secretos; rutas en `docs/endpoints.md` | — | Pendiente |
-| Build, vet y lint | Sin errores; 0 hallazgos | — | Pendiente |
-| Unit | Reglas puras de la spec | — | Pendiente |
-| Integration | Casos de la sección Tests | — | Pendiente |
-| Security | 401/403, propiedad, privacidad y límites | — | Pendiente |
-| Database | Índices nuevos (si los hay) | — | Pendiente |
-| Contract | Formas nuevas capturadas | — | Pendiente |
-| SDD | `check_sdd` OK y `Memoria.md` al día | — | Pendiente |
+| critic B1–B4 | Sin secretos; rutas en `docs/endpoints.md` | `critic-guardrails: PASS`; `check_endpoints: OK (271 rutas)` | ✅ |
+| Build, vet y lint | Sin errores; 0 hallazgos | `go build ./...`, `go vet ./...`; `golangci-lint` v2.15.0 `0 issues` (`hilos` partido en `armarHilos` por gocyclo) | ✅ |
+| Unit | Reglas puras de la spec | `internal/reacciones/reglas_test.go`: `TestMirada_PersonaVisible`, `TestMirada_ComentarioVisible`, `TestPuedeBorrar_AutorODueno`, `TestLimpiarTexto`, `TestPadreValido_UnNivel`, `TestTotales_TodosCuentaUnaVez`, `TestOrdenar_Pestanas`, `TestRelacion`, `TestVista_EliminadoSinAutorNiTexto`, `TestArmarHilos_RespuestasYEliminados`; `internal/amistades`: `TestCountCommon_SoloAmistadesConMisAmigos`; `internal/notificaciones`: `TestPushText_GenericoParaCadaTipo` con los tipos nuevos; `./internal/... ./cmd/... ./scripts/...` verde | ✅ |
+| Integration | Casos de la sección Tests | `-run "TestReacciones_\|TestResenas_EditarBorrarYUtil\|TestMomentos_\|TestPostales_ARCO"` ok: `TestReacciones_MeGustaIdempotenteConcurrenteYAvisos` (repetido y 8 a la vez = 1, contador exacto, un aviso por lapso, propio no avisa, plan privado 404 y público con `me_gusta_total`), `TestReacciones_ComentariosRespuestasModeracionYBorrado` (respuesta de un nivel, rechazado 422, dudoso solo para su autora y aprobado por la cola, borrado por autora y dueña, «Comentario eliminado», cursor de otra persona 422), `TestReacciones_PestanasDeUnPlan` (totales, `van`, relación, amigos en común, `actividad: nadie`), `TestReacciones_ARCO`; `resena_util` una sola vez. `-run PresupuestoRedis` ok (sin cambio de costo) | ✅ |
+| Security | 401/403, propiedad, privacidad y límites | `-run "TestReaccionesSecurity_\|TestPostalesSecurity_\|TestPrivacidadSocialSecurity_"` ok: `TestReaccionesSecurity_SesionYCuentaActiva` (11 rutas), `TestReaccionesSecurity_VisibilidadBloqueoYPropiedad` (sin permiso, bloqueo en los dos sentidos e inexistente = 404; comentario ajeno en objeto ajeno = 403; sin correo ni teléfono), `TestReaccionesSecurity_Limite60PorHora` | ✅ |
+| Database | Índices nuevos | `-run TestIndexes_` ok: `me_gusta` (`ux_me_gusta` único, `ix_me_gusta_objeto`, `ix_me_gusta_usuario`, `ix_me_gusta_dueno`), `comentarios` (`ix_comentarios_objeto`, `ix_comentarios_autor`, `ix_comentarios_dueno`), `notificaciones_agrupadas` (`ix_agrupada_usuario`, `ttl_agrupada` TTL 0) | ✅ |
+| Contract | Formas nuevas capturadas | `CONTRACT_CAPTURE=1`: `reacciones/{me_gusta_204, comentario_201, respuesta_201, comentarios_200, reacciones_200, objeto_404, comentario_422, borrar_204}`; recapturadas `personas/pestana_momentos_200` (`comentarios_total`) y `usuarios/exportacion_descargar_200` (`reacciones`); suite completa sin captura: ok (58 s) | ✅ |
+| SDD | `check_sdd` OK y `Memoria.md` al día | `SDD-OK (91 specs)`; `Memoria.md` con NV-83 | ✅ |

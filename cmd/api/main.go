@@ -61,6 +61,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/redis"
 	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/reacciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/reportesnegocio"
@@ -259,6 +260,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
+	// Me gusta y comentarios (nv-83): avisos agrupados por objeto cada 10 min; «Útil» también avisa.
+	avisos := notificaciones.NewAgrupador(notifRepo, notifier, log)
+	reviews.WithAvisos(avisos)
+	social83 := buildReacciones(reaccionesDeps{db: db, cards: cards, plans: planSvc, groups: groupRepo, friends: friendRepo, users: users, cursor: cursor}, modSvc, avisos, registry, log)
 	registry.RegisterExporter(imagePrivacy)
 	reportRepo := reportesnegocio.NewRepository(db)
 	reports := reportesnegocio.NewService(reportRepo, businessRepo, cursor, log).WithModeracion(moderacion.New(nil, nil, modSvc, log))
@@ -297,7 +302,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
-	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, postales: cards, moderacion: modSvc, consejos: tips, consejoDia: cfg.IA.ConsejoDia, panel: merchant.panel}, businessRepo, users, asistente.NewDescartes(db), log)
+	assistant, sem, err := buildAsistente(cfg.IA, iaDeps{redis: redisClient, usos: iaUses, db: db}, iaClientes{cupones: bookings.cupones, resenas: reviews, postales: cards, reacciones: social83, moderacion: modSvc, consejos: tips, consejoDia: cfg.IA.ConsejoDia, panel: merchant.panel}, businessRepo, users, asistente.NewDescartes(db), log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("asistente: %w", err)
 	}
@@ -334,6 +339,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		// Cola de revisión y reglas (nv-43); las fotos de nv-45 entran y se publican por aquí.
 		moderacion.NewHandler(modSvc, validator),
 		asistente.NewHandler(assistant, validator).WithActiveGuard(active),
+		// Me gusta y comentarios (nv-83) van antes que grupos y planes: atienden /planes/:id/me-gusta, /comentarios y /reacciones.
+		reacciones.NewHandler(social83, validator).WithActiveGuard(active),
 		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),

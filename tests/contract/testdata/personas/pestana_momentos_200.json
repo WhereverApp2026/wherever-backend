@@ -9,6 +9,7 @@
           "id": "string",
           "nombre_usuario": "string"
         },
+        "comentarios_total": "number",
         "creado_en": "string",
         "destacado_por_negocio": "bool",
         "estado": "string",

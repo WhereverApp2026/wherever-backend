@@ -132,3 +132,17 @@ func TestSendRequest_Origen(t *testing.T) {
 	require.ErrorAs(t, v.Struct(SendRequest{UserID: id, Origin: "enlace"}), &appErr)
 	assert.Equal(t, apperr.KindValidation, appErr.Kind)
 }
+
+func TestCountCommon_SoloAmistadesConMisAmigos(t *testing.T) {
+	a, b, mio1, mio2, otro := bson.NewObjectID(), bson.NewObjectID(), bson.NewObjectID(), bson.NewObjectID(), bson.NewObjectID()
+	rows := []Friendship{
+		{From: a, To: mio1}, {From: mio2, To: a}, // a: 2 en común
+		{From: b, To: mio1}, // b: 1
+		{From: a, To: b},    // ninguno de los dos es mi amigo: no cuenta
+		{From: otro, To: mio2},
+	}
+	got := countCommon(rows, []bson.ObjectID{mio1, mio2}, []bson.ObjectID{a, b})
+	assert.Equal(t, 2, got[a])
+	assert.Equal(t, 1, got[b])
+	assert.Zero(t, got[otro])
+}

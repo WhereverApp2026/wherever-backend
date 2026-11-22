@@ -14,6 +14,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/reacciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/resenas"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
@@ -44,6 +45,7 @@ type iaClientes struct {
 	cupones    *cupones.Service
 	resenas    *resenas.Service
 	postales   *postales.Service
+	reacciones *reacciones.Service
 	moderacion *moderacion.Service
 	consejos   *consejos.Service
 	consejoDia int
@@ -52,12 +54,13 @@ type iaClientes struct {
 
 // conectar da la guardia a los títulos de cupones (nv-61) y a las reseñas (nv-62): respuesta
 // sugerida y moderación del texto con los umbrales de `moderacion_reglas`; y a los textos de
-// postales y momentos (nv-63); al consejo del día con su cupo (IA_CONSEJO_DIA) y a la descripción
-// del negocio (nv-75).
+// postales y momentos (nv-63) y de los comentarios (nv-83); al consejo del día con su cupo
+// (IA_CONSEJO_DIA) y a la descripción del negocio (nv-75).
 func (c iaClientes) conectar(guardia *ia.Guardia, log *slog.Logger) {
 	c.consejos.WithIA(guardia, c.consejoDia)
 	c.panel.WithIA(guardia)
 	c.cupones.WithIA(guardia)
 	c.resenas.WithIA(guardia).WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
 	c.postales.WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
+	c.reacciones.WithModeracion(moderacion.New(nil, moderacion.NewTextoIA(guardia), c.moderacion, log), c.moderacion)
 }
