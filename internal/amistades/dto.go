@@ -72,9 +72,13 @@ type Item struct {
 	Direction string          `json:"direccion"`
 	Person    personas.Person `json:"persona"`
 	// Muted es mi marca de silencio (nv-70); la del otro nunca sale.
-	Muted     bool      `json:"silenciado"`
-	CreatedAt time.Time `json:"creada_en"`
-	UpdatedAt time.Time `json:"actualizada_en"`
+	Muted bool `json:"silenciado"`
+	// Plans y PlanningNow solo llevan valor en la lista de amigos (nv-81); null en las
+	// solicitudes y en quien no comparte sus planes.
+	Plans       *int64    `json:"planes"`
+	PlanningNow *bool     `json:"planeando_ahora"`
+	CreatedAt   time.Time `json:"creada_en"`
+	UpdatedAt   time.Time `json:"actualizada_en"`
 }
 
 // ListResponse es la respuesta de GET /amistades.

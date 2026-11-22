@@ -16,6 +16,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/ciudades"
+	"github.com/WhereverApp2026/wherever-backend/internal/contadores"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
@@ -49,6 +50,8 @@ type Service struct {
 	retiro    RetiroDatosNegocio
 	moderador Moderador
 	conciliar Conciliador
+	// contadores van en GET /usuarios/yo (nv-81); nil = no salen.
+	contadores *contadores.Service
 }
 
 // Conciliador pone al día puntos, nivel y racha antes de leer el perfil (insignias, nv-79).
@@ -59,6 +62,12 @@ type Conciliador interface {
 // WithConciliador agrega la conciliación de puntos a GET /usuarios/yo.
 func (s *Service) WithConciliador(c Conciliador) *Service {
 	s.conciliar = c
+	return s
+}
+
+// WithContadores agrega planes, amigos y reseñas a GET /usuarios/yo (nv-81).
+func (s *Service) WithContadores(c *contadores.Service) *Service {
+	s.contadores = c
 	return s
 }
 
@@ -132,7 +141,15 @@ func (s *Service) Profile(ctx context.Context, claims *middleware.Claims) (Profi
 	if err != nil {
 		return ProfileResponse{}, err
 	}
-	return s.profileOf(user), nil
+	out := s.profileOf(user)
+	if s.contadores != nil {
+		c, err := s.contadores.Directo(ctx, user.ID)
+		if err != nil {
+			return ProfileResponse{}, dbError(err)
+		}
+		out.Counters = &CountersResponse{Plans: c.Planes, Friends: c.Amigos, Reviews: c.Resenas}
+	}
+	return out, nil
 }
 
 // PatchProfile edita nombre, nombre de usuario, foto o ciudad solo si `version` sigue vigente (If-Match).

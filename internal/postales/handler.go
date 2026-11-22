@@ -71,6 +71,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/momentos/:id", h.momento)
 	v1.Patch("/momentos/:id", with(false, cualquiera, h.editarMomento)...)
 	v1.Delete("/momentos/:id", with(false, cualquiera, h.borrarMomento)...)
+	h.personaRoutes(v1, limiter)
 	v1.Get("/negocios/:id/momentos", with(false, dueno, h.panel)...)
 	v1.Patch("/negocios/:id/momentos/:mid", with(false, dueno, h.marcar)...)
 }

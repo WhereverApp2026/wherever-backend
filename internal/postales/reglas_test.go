@@ -146,3 +146,11 @@ func TestRespuestaPostal_SoloElDuenoVeImagenYPlan(t *testing.T) {
 	assert.Nil(t, ajena.PlanID)
 	assert.Equal(t, "https://img/i/x/1080.jpg", ajena.ImagenURL)
 }
+
+// En la pestaña del perfil (nv-81) los momentos `amigos` solo salen entre amigos y uno
+// privado nunca.
+func TestVisiblesPara_PestanaDelPerfil(t *testing.T) {
+	assert.Equal(t, []string{VisPublica, VisAmigos}, visiblesPara(true))
+	assert.Equal(t, []string{VisPublica}, visiblesPara(false))
+	assert.NotContains(t, visiblesPara(true), VisPrivada)
+}

@@ -50,9 +50,10 @@ func TestPersonasPerfil_BasicoCompletoY404(t *testing.T) {
 	var basic map[string]any
 	require.NoError(t, json.Unmarshal([]byte(body), &basic))
 	assert.Equal(t, personas.RelationNone, basic["relacion"])
-	for _, hidden := range []string{"nivel", "amigos_en_comun", "grupos_en_comun", "silenciado"} {
+	for _, hidden := range []string{"amigos_en_comun", "grupos_en_comun", "silenciado"} {
 		assert.NotContains(t, basic, hidden)
 	}
+	assert.Contains(t, basic, "nivel", "el nivel lo ve quien puede ver el perfil (nv-81)")
 	assertSnakeCase(t, basic)
 
 	status, body = perfil(t, app, me, friend.id())

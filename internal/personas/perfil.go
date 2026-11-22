@@ -9,6 +9,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/insignias"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
@@ -62,7 +63,6 @@ func (s *Service) WithGraph(g Graph) *Service {
 
 // FriendExtras es lo que solo ve un amigo.
 type FriendExtras struct {
-	Level         string `json:"nivel"`
 	CommonFriends *int64 `json:"amigos_en_comun"`
 	CommonGroups  int64  `json:"grupos_en_comun"`
 	Muted         bool   `json:"silenciado"`
@@ -76,6 +76,13 @@ type ProfileResponse struct {
 	// Description es la presentación de la persona (nv-77); la ve quien puede ver su perfil.
 	Description string `json:"descripcion"`
 	Relation    string `json:"relacion"`
+	// Nivel lo ve quien puede ver el perfil, no solo los amigos (nv-81); con `actividad:
+	// nadie` no sale (nv-82).
+	Nivel *NivelView `json:"nivel,omitempty"`
+	// Contadores, insignias destacadas y su total (nv-81) según su privacidad (nv-82).
+	Contadores          ContadoresView     `json:"contadores"`
+	InsigniasDestacadas []insignias.Ganada `json:"insignias_destacadas"`
+	InsigniasTotal      int                `json:"insignias_total"`
 	*FriendExtras
 }
 
@@ -99,6 +106,15 @@ func (s *Service) Profile(ctx context.Context, subject, rawID string) (ProfileRe
 		return ProfileResponse{}, err
 	}
 	out := ProfileResponse{Person: newPerson(u), Description: u.Description, Relation: rel}
+	if !u.Privacy.Social.HidesActivity() {
+		out.Nivel = nivelDe(u)
+	}
+	if out.Contadores, err = s.contadoresDe(ctx, u, rel == RelationFriend); err != nil {
+		return ProfileResponse{}, err
+	}
+	if out.InsigniasDestacadas, out.InsigniasTotal, err = s.destacadas(ctx, u); err != nil {
+		return ProfileResponse{}, err
+	}
 	// Con `actividad: nadie` solo salen los datos básicos, aun entre amigos (nv-82).
 	if rel == RelationFriend && !u.Privacy.Social.HidesActivity() {
 		if out.FriendExtras, err = s.friendExtras(ctx, me, u); err != nil {
@@ -131,7 +147,7 @@ func (s *Service) visiblePerson(ctx context.Context, me, id bson.ObjectID) (usua
 }
 
 func (s *Service) friendExtras(ctx context.Context, me bson.ObjectID, u usuarios.User) (*FriendExtras, error) {
-	out := &FriendExtras{Level: u.Level}
+	out := &FriendExtras{}
 	var err error
 	if out.Muted, err = s.profile.mutes.Muted(ctx, me, u.ID); err != nil {
 		return nil, errUnavailable(err)

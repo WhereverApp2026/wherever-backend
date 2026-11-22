@@ -1,0 +1,34 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "actualizado_en": "string",
+        "agradecido_por_negocio": "bool",
+        "autor": {
+          "id": "string",
+          "nombre_usuario": "string"
+        },
+        "creado_en": "string",
+        "destacado_por_negocio": "bool",
+        "estado": "string",
+        "etiquetados": [],
+        "id": "string",
+        "negocio_id": "string",
+        "plan_id": "null",
+        "postal": {
+          "estilo": "string",
+          "id": "string",
+          "texto": "string"
+        },
+        "propio": "bool",
+        "reacciones_total": "number",
+        "texto": "string",
+        "version": "number",
+        "visibilidad": "string"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

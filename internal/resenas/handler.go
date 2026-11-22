@@ -76,6 +76,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Get("/negocios/:id/resenas/resumen", with(nil, dueno, h.resumen)...)
 	v1.Put("/negocios/:id/resenas/:rid/respuesta", with(nil, dueno, h.responder)...)
 	v1.Post("/negocios/:id/resenas/:rid/sugerir-respuesta", with(nil, dueno, h.sugerir)...)
+	h.personaRoutes(v1, limiter)
 }
 
 func claims(c *fiber.Ctx) *middleware.Claims {

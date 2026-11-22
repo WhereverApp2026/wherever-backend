@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "aspectos": {
+          "ambiente": "number",
+          "atencion": "number",
+          "espera": "number",
+          "precio_calidad": "number",
+          "sabor": "number"
+        },
+        "calificacion": "number",
+        "chips": [
+          "string"
+        ],
+        "comentario": "string",
+        "creado_en": "string",
+        "fotos": [],
+        "id": "string",
+        "negocio": {
+          "id": "string",
+          "nombre": "string",
+          "slug": "string"
+        },
+        "respuesta_negocio": {
+          "fecha": "string",
+          "texto": "string"
+        },
+        "util": "number"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

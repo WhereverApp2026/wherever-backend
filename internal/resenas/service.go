@@ -10,6 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/contadores"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
 	"github.com/WhereverApp2026/wherever-backend/internal/imagenes"
@@ -73,6 +74,9 @@ type Service struct {
 	loc       *time.Location
 	log       *slog.Logger
 	now       func() time.Time
+	// contadores del perfil y permiso de su pestaña (nv-81).
+	contadores *contadores.Service
+	perfiles   Perfiles
 }
 
 // NewService recibe sus dependencias por constructor. Sin moderador todo comentario queda en

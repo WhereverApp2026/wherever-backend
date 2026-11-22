@@ -61,7 +61,7 @@ func TestPersonasPrivacidad_NadaSensibleSale(t *testing.T) {
 
 	basic := send(t, app, http.MethodGet, "/api/v1/personas/"+stranger.ID.Hex(), nil, token)
 	require.Equal(t, http.StatusOK, basic.status, basic.body)
-	for _, hidden := range []string{"nivel", "amigos_en_comun", "grupos_en_comun"} {
+	for _, hidden := range []string{"amigos_en_comun", "grupos_en_comun"} {
 		assert.NotContains(t, basic.body, hidden)
 	}
 	full := send(t, app, http.MethodGet, "/api/v1/personas/"+friend.ID.Hex(), nil, token)

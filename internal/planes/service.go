@@ -8,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/contadores"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
@@ -29,6 +30,10 @@ type Service struct {
 	now       func() time.Time
 	// cursor firma la paginación de GET /planes (nv-17).
 	cursor *pagination.Signer
+	// contadores se invalidan con cada cambio de un plan (nv-81); nil = sin caché.
+	contadores *contadores.Service
+	// perfiles da permiso sobre la pestaña de planes de otra persona (nv-81).
+	perfiles Perfiles
 }
 
 // Graph recibe al dueño de un plan que cambió para reflejarlo en Neo4j (nv-52). Es
@@ -172,6 +177,7 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 		return Plan{}, errStore()
 	}
 	_ = s.graph.Touch(ctx, p.OwnerID)
+	s.contadores.Invalidar(ctx, p.OwnerID)
 	return *p, nil
 }
 
@@ -278,6 +284,7 @@ func (s *Service) edit(ctx context.Context, subject, rawID string, version int, 
 		return Plan{}, storeError(err)
 	}
 	_ = s.graph.Touch(ctx, p.OwnerID)
+	s.contadores.Invalidar(ctx, p.OwnerID)
 	return p, nil
 }
 
@@ -381,6 +388,7 @@ func (s *Service) Delete(ctx context.Context, subject, rawID string, version int
 		return errStore()
 	}
 	_ = s.graph.Touch(ctx, p.OwnerID)
+	s.contadores.Invalidar(ctx, p.OwnerID)
 	return nil
 }
 

@@ -2,12 +2,22 @@
   "status": 200,
   "body": {
     "amigos_en_comun": "null",
+    "contadores": {
+      "amigos": "number",
+      "planes": "number",
+      "resenas": "number"
+    },
     "degradado": "bool",
     "descripcion": "string",
     "foto_url": "string",
     "grupos_en_comun": "number",
     "id": "string",
-    "nivel": "string",
+    "insignias_destacadas": [],
+    "insignias_total": "number",
+    "nivel": {
+      "nombre": "string",
+      "numero": "number"
+    },
     "nombre": "string",
     "nombre_usuario": "string",
     "relacion": "string",

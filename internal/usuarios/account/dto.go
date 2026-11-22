@@ -255,11 +255,21 @@ type ProfileResponse struct {
 	Level           string              `json:"nivel"`
 	LevelNumber     int                 `json:"nivel_numero"`
 	StreakWeeks     int                 `json:"racha_semanas"`
-	Status          string              `json:"estado"`
-	DeleteAt        *time.Time          `json:"eliminar_en"`
-	Version         int                 `json:"version"`
-	CreatedAt       time.Time           `json:"creado_en"`
-	UpdatedAt       time.Time           `json:"actualizado_en"`
+	// Counters solo va en GET /usuarios/yo (nv-81).
+	Counters  *CountersResponse `json:"contadores,omitempty"`
+	Status    string            `json:"estado"`
+	DeleteAt  *time.Time        `json:"eliminar_en"`
+	Version   int               `json:"version"`
+	CreatedAt time.Time         `json:"creado_en"`
+	UpdatedAt time.Time         `json:"actualizado_en"`
+}
+
+// CountersResponse son los contadores propios: todos los planes activos, amigos y reseñas
+// publicadas (nv-81).
+type CountersResponse struct {
+	Plans   int64 `json:"planes"`
+	Friends int64 `json:"amigos"`
+	Reviews int64 `json:"resenas"`
 }
 
 // EmailAvailableResponse es la respuesta de GET /usuarios/correo-disponible.

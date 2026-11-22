@@ -27,11 +27,11 @@ func TestProfileResponse_FormaSegunRelacion(t *testing.T) {
 	for _, hidden := range []string{"nivel", "amigos_en_comun", "grupos_en_comun", "silenciado", "degradado"} {
 		assert.NotContains(t, string(basic), hidden, "un no amigo no ve "+hidden)
 	}
-	friend, err := json.Marshal(ProfileResponse{Person: Person{ID: "1"}, Relation: RelationFriend, FriendExtras: &FriendExtras{Level: "explorador", Degraded: true}})
+	friend, err := json.Marshal(ProfileResponse{Person: Person{ID: "1"}, Relation: RelationFriend, Nivel: &NivelView{Numero: 2, Nombre: "Explorador"}, FriendExtras: &FriendExtras{Degraded: true}})
 	require.NoError(t, err)
 	assert.Contains(t, string(friend), `"amigos_en_comun":null`, "degradado = null")
 	assert.Contains(t, string(friend), `"degradado":true`)
-	assert.Contains(t, string(friend), `"nivel":"explorador"`)
+	assert.Contains(t, string(friend), `"nivel":{"numero":2,"nombre":"Explorador"}`)
 }
 
 func TestContactsRequest_Validacion(t *testing.T) {
