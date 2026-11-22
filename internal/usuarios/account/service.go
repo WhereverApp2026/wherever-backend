@@ -143,7 +143,7 @@ func (s *Service) Profile(ctx context.Context, claims *middleware.Claims) (Profi
 	}
 	out := s.profileOf(user)
 	if s.contadores != nil {
-		c, err := s.contadores.De(ctx, user.ID)
+		c, err := s.contadores.Directo(ctx, user.ID)
 		if err != nil {
 			return ProfileResponse{}, dbError(err)
 		}

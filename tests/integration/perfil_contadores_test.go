@@ -69,13 +69,15 @@ func ids81(t *testing.T, page map[string]any) []string {
 	return out
 }
 
-// Los contadores propios cuentan todos los planes activos; los de otra persona, solo los
-// públicos. Planes borrados y reseñas ocultas no cuentan. Quitar una amistad invalida la caché.
+// Los contadores propios cuentan todos los planes activos y no pasan por la caché; los de otra
+// persona, solo los públicos, con caché. Planes borrados y reseñas ocultas no cuentan. Quitar
+// una amistad invalida la caché de las dos personas.
 func TestPerfilContadores_PropiosAjenosEInvalidacion(t *testing.T) {
 	env, app := amistadesEnv(t)
 	db := env.Mongo.DB()
-	ana, beto := seedAmigo(t, env, "cont81_ana"), seedAmigo(t, env, "cont81_beto")
+	ana, beto, cleo := seedAmigo(t, env, "cont81_ana"), seedAmigo(t, env, "cont81_beto"), seedAmigo(t, env, "cont81_cleo")
 	befriend(t, env, ana, beto)
+	befriend(t, env, cleo, beto)
 	now := time.Now().UTC()
 	plan81(t, db, beto.user.ID, planes.VisibilityPublic, planes.StatusActive, now)
 	plan81(t, db, beto.user.ID, planes.VisibilityPrivate, planes.StatusActive, now)
@@ -85,21 +87,24 @@ func TestPerfilContadores_PropiosAjenosEInvalidacion(t *testing.T) {
 	resena81(t, db, beto.user.ID, negocio, resenas.EstadoOculta, now)
 
 	yo := pcall(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, beto.token, http.StatusOK)
-	assert.Equal(t, map[string]any{"planes": 2.0, "amigos": 1.0, "resenas": 1.0}, obj(t, yo["contadores"]))
-	ajeno := pcall(t, app, http.MethodGet, perfilPath(beto.id()), nil, ana.token, http.StatusOK)
-	assert.Equal(t, map[string]any{"planes": 1.0, "amigos": 1.0, "resenas": 1.0}, obj(t, ajeno["contadores"]))
+	assert.Equal(t, map[string]any{"planes": 2.0, "amigos": 2.0, "resenas": 1.0}, obj(t, yo["contadores"]))
+	ajeno := pcall(t, app, http.MethodGet, perfilPath(beto.id()), nil, cleo.token, http.StatusOK)
+	assert.Equal(t, map[string]any{"planes": 1.0, "amigos": 2.0, "resenas": 1.0}, obj(t, ajeno["contadores"]))
 	assert.Contains(t, ajeno, "insignias_destacadas")
 
-	// Lo sembrado por fuera de los services no se ve mientras viva la caché...
+	// Lo sembrado por fuera de los services no se ve en el perfil ajeno mientras viva la caché;
+	// el propio cuenta directo en MongoDB.
 	resena81(t, db, beto.user.ID, negocio, resenas.EstadoPublicada, now)
+	ajeno = pcall(t, app, http.MethodGet, perfilPath(beto.id()), nil, cleo.token, http.StatusOK)
+	assert.Equal(t, 1.0, obj(t, ajeno["contadores"])["resenas"], "sigue la caché")
 	yo = pcall(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, beto.token, http.StatusOK)
-	assert.Equal(t, 1.0, obj(t, yo["contadores"])["resenas"], "sigue la caché")
-	// ...y quitar la amistad invalida a las dos personas.
+	assert.Equal(t, 2.0, obj(t, yo["contadores"])["resenas"], "el propio no usa la caché")
+	// Quitar la amistad invalida a las dos personas.
 	amigos := pcall(t, app, http.MethodGet, "/api/v1/amistades", nil, ana.token, http.StatusOK)
 	rel := str(t, obj(t, list(t, amigos["resultados"])[0])["id"])
 	pcall(t, app, http.MethodDelete, "/api/v1/amistades/"+rel, nil, ana.token, http.StatusNoContent)
-	yo = pcall(t, app, http.MethodGet, "/api/v1/usuarios/yo", nil, beto.token, http.StatusOK)
-	assert.Equal(t, map[string]any{"planes": 2.0, "amigos": 0.0, "resenas": 2.0}, obj(t, yo["contadores"]))
+	ajeno = pcall(t, app, http.MethodGet, perfilPath(beto.id()), nil, cleo.token, http.StatusOK)
+	assert.Equal(t, map[string]any{"planes": 1.0, "amigos": 1.0, "resenas": 2.0}, obj(t, ajeno["contadores"]))
 	// Sin amistad y con `actividad: amigos` (por omisión), los contadores van en null.
 	ajeno = pcall(t, app, http.MethodGet, perfilPath(beto.id()), nil, ana.token, http.StatusOK)
 	assert.Equal(t, map[string]any{"planes": nil, "amigos": nil, "resenas": nil}, obj(t, ajeno["contadores"]))

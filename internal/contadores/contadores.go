@@ -237,6 +237,12 @@ func (s *Service) De(ctx context.Context, id bson.ObjectID) (Contadores, error) 
 	})
 }
 
+// Directo cuenta en MongoDB sin pasar por Redis: GET /usuarios/yo es la lectura autenticada de
+// referencia del presupuesto de Upstash (nv-11) y no debe gastar comandos de más.
+func (s *Service) Directo(ctx context.Context, id bson.ObjectID) (Contadores, error) {
+	return s.fuente.Contar(ctx, id)
+}
+
 // DeAmigos da los conteos de la lista de amigos con el «hoy» de la zona; no se cachea.
 func (s *Service) DeAmigos(ctx context.Context, ids []bson.ObjectID) (map[bson.ObjectID]Amigo, error) {
 	now := s.now()

@@ -73,4 +73,7 @@ func TestDeAmigos_HoyEnLaZona(t *testing.T) {
 	n, err := s.De(context.Background(), bson.NewObjectID())
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), n.Planes, "sin caché va directo a la fuente")
+	_, err = s.Directo(context.Background(), bson.NewObjectID())
+	require.NoError(t, err)
+	assert.Equal(t, 2, f.contados, "Directo siempre cuenta en la fuente")
 }
