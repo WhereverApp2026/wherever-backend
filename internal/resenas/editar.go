@@ -10,6 +10,7 @@ import (
 
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
+	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 )
 
@@ -204,9 +205,12 @@ func (s *Service) Util(ctx context.Context, cl *middleware.Claims, raw string, r
 	if err != nil {
 		return UtilResponse{}, err
 	}
-	total, err := s.repo.MarcarUtil(ctx, r.ID, me, *req.Util, s.ahora())
+	total, nueva, err := s.repo.MarcarUtil(ctx, r.ID, me, *req.Util, s.ahora())
 	if err != nil {
 		return UtilResponse{}, errStore()
+	}
+	if nueva && s.avisos != nil && r.UsuarioID != nil && *r.UsuarioID != me {
+		s.avisos.Emit(ctx, *r.UsuarioID, notificaciones.KindReviewUseful, "resena:"+r.ID.Hex(), map[string]string{"resena_id": r.ID.Hex()})
 	}
 	return UtilResponse{Util: *req.Util, Total: total}, nil
 }

@@ -13,6 +13,8 @@ import (
 const (
 	Collection        = "notificaciones"
 	DevicesCollection = "dispositivos"
+	// GroupedCollection reserva el siguiente aviso agrupado de cada persona y objeto (nv-83).
+	GroupedCollection = "notificaciones_agrupadas"
 )
 
 // Tipos de aviso (spec nv-40).
@@ -35,6 +37,11 @@ const (
 	// mensaje; la app pide el texto con GET /reservas/{id}.
 	KindReservaMensaje      = "reserva_mensaje"
 	KindReservaRecordatorio = "reserva_recordatorio"
+	// Avisos sociales (nv-83), uno por persona, tipo y objeto cada GroupEvery: solo el tipo y
+	// el id del momento, plan o reseña, nunca quién ni el texto.
+	KindLike         = "me_gusta"
+	KindComment      = "comentario"
+	KindReviewUseful = "resena_util"
 )
 
 // Límites de la spec.
@@ -42,6 +49,8 @@ const (
 	MaxDevices = 5
 	// Retention es la vida de un aviso: el índice TTL lo borra después.
 	Retention = 90 * 24 * time.Hour
+	// GroupEvery es el lapso de los avisos agrupados (nv-83): un toque más dentro de él no avisa.
+	GroupEvery = 10 * time.Minute
 )
 
 // PlatformAndroid es la única plataforma con push por ahora (sin iOS, nv-41).

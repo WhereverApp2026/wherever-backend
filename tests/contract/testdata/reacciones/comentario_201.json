@@ -1,0 +1,18 @@
+{
+  "status": 201,
+  "body": {
+    "autor": {
+      "foto_url": "string",
+      "id": "string",
+      "nombre": "string",
+      "nombre_usuario": "string"
+    },
+    "creado_en": "string",
+    "estado": "string",
+    "id": "string",
+    "padre_id": "null",
+    "propio": "bool",
+    "puede_borrar": "bool",
+    "texto": "string"
+  }
+}

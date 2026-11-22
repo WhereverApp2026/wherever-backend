@@ -77,6 +77,8 @@ type Service struct {
 	// contadores del perfil y permiso de su pestaña (nv-81).
 	contadores *contadores.Service
 	perfiles   Perfiles
+	// avisos de `resena_util` (nv-83).
+	avisos Avisos
 }
 
 // NewService recibe sus dependencias por constructor. Sin moderador todo comentario queda en

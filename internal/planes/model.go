@@ -88,9 +88,12 @@ type Plan struct {
 	Origen          string        `bson:"origen" json:"origen"`
 	Version         int           `bson:"version" json:"version"`
 	// Visibilidad: `publico` lo pueden ver y copiar otras personas, sin saber de quién es.
-	Visibilidad  string         `bson:"visibilidad,omitempty" json:"visibilidad"`
-	VecesClonado int            `bson:"veces_clonado" json:"veces_clonado"`
-	PlanOrigenID *bson.ObjectID `bson:"plan_origen_id,omitempty" json:"plan_origen_id,omitempty"`
+	Visibilidad  string `bson:"visibilidad,omitempty" json:"visibilidad"`
+	VecesClonado int    `bson:"veces_clonado" json:"veces_clonado"`
+	// Contadores de nv-83: solo los mueve reacciones con `$inc` (las ediciones no los tocan).
+	MeGustaTotal     int            `bson:"me_gusta_total" json:"me_gusta_total"`
+	ComentariosTotal int            `bson:"comentarios_total" json:"comentarios_total"`
+	PlanOrigenID     *bson.ObjectID `bson:"plan_origen_id,omitempty" json:"plan_origen_id,omitempty"`
 	// Zona es la ubicación de la primera parada; la fija Calculadora.Aplicar (populares).
 	Zona *GeoPoint `bson:"zona,omitempty" json:"-"`
 	// SyncSeq es el número del último cambio en la sincronización del dueño (nv-46).

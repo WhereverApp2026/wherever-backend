@@ -299,3 +299,65 @@ func (r *Repository) Blocked(ctx context.Context, a, b bson.ObjectID) (bool, err
 	}
 	return f.Status == StatusBlocked, nil
 }
+
+// RelationsWith son las relaciones de me con cada persona de others en una consulta por `par`
+// (nv-83); quien no tiene relación no aparece.
+func (r *Repository) RelationsWith(ctx context.Context, me bson.ObjectID, others []bson.ObjectID) (map[bson.ObjectID]Friendship, error) {
+	out := map[bson.ObjectID]Friendship{}
+	if len(others) == 0 {
+		return out, nil
+	}
+	pairs := make(bson.A, 0, len(others))
+	for _, o := range others {
+		pairs = append(pairs, PairKey(me, o))
+	}
+	rows, err := r.find(ctx, bson.D{{Key: "par", Value: bson.D{{Key: "$in", Value: pairs}}}}, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range rows {
+		out[f.Other(me)] = f
+	}
+	return out, nil
+}
+
+// CommonWith cuenta, para cada persona de others, cuántas amistades aceptadas tiene con las
+// personas de mine (los amigos de quien pregunta, hasta MaxList), en una sola consulta (nv-83).
+func (r *Repository) CommonWith(ctx context.Context, mine, others []bson.ObjectID) (map[bson.ObjectID]int, error) {
+	if len(mine) == 0 || len(others) == 0 {
+		return map[bson.ObjectID]int{}, nil
+	}
+	in := func(ids []bson.ObjectID) bson.D { return bson.D{{Key: "$in", Value: ids}} }
+	filter := bson.D{{Key: "estado", Value: StatusAccepted}, {Key: "$or", Value: bson.A{
+		bson.D{{Key: "de", Value: in(others)}, {Key: "para", Value: in(mine)}},
+		bson.D{{Key: "para", Value: in(others)}, {Key: "de", Value: in(mine)}},
+	}}}
+	rows, err := r.find(ctx, filter, 0)
+	if err != nil {
+		return nil, err
+	}
+	return countCommon(rows, mine, others), nil
+}
+
+// countCommon suma a cada persona de others sus amistades con alguien de mine.
+func countCommon(rows []Friendship, mine, others []bson.ObjectID) map[bson.ObjectID]int {
+	out := map[bson.ObjectID]int{}
+	set, friends := idSet(others), idSet(mine)
+	for _, f := range rows {
+		if set[f.From] && friends[f.To] {
+			out[f.From]++
+		}
+		if set[f.To] && friends[f.From] {
+			out[f.To]++
+		}
+	}
+	return out
+}
+
+func idSet(ids []bson.ObjectID) map[bson.ObjectID]bool {
+	out := make(map[bson.ObjectID]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out
+}

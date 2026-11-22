@@ -39,6 +39,10 @@
         "ref_id": "string"
       }
     ],
+    "reacciones": {
+      "comentarios": [],
+      "me_gusta": []
+    },
     "recuerdos": [],
     "reportes_negocio": [],
     "resenas": [],

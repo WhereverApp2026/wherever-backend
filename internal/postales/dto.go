@@ -140,12 +140,14 @@ type MomentoResponse struct {
 	Etiquetados     []string    `json:"etiquetados"`
 	PlanID          *string     `json:"plan_id"`
 	ReaccionesTotal int         `json:"reacciones_total"`
-	Destacado       bool        `json:"destacado_por_negocio"`
-	Agradecido      bool        `json:"agradecido_por_negocio"`
-	Propio          bool        `json:"propio"`
-	Version         int         `json:"version"`
-	CreadoEn        time.Time   `json:"creado_en"`
-	ActualizadoEn   time.Time   `json:"actualizado_en"`
+	// ComentariosTotal son los comentarios publicados (nv-83).
+	ComentariosTotal int       `json:"comentarios_total"`
+	Destacado        bool      `json:"destacado_por_negocio"`
+	Agradecido       bool      `json:"agradecido_por_negocio"`
+	Propio           bool      `json:"propio"`
+	Version          int       `json:"version"`
+	CreadoEn         time.Time `json:"creado_en"`
+	ActualizadoEn    time.Time `json:"actualizado_en"`
 }
 
 // RecuerdoResponse es un recuerdo propio.

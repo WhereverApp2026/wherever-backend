@@ -56,6 +56,7 @@ import (
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 	"github.com/WhereverApp2026/wherever-backend/internal/privacidad"
+	"github.com/WhereverApp2026/wherever-backend/internal/reacciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendaciones"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/reportesnegocio"
@@ -110,6 +111,9 @@ type Env struct {
 	ModeradorResenas  *resenastest.Moderador // doble del moderador de texto de nv-42
 	Postales          *postales.Service      // postales, recuerdos y momentos (nv-63) con las imágenes de Imagenes
 	ModeradorPostales *resenastest.Moderador // doble del moderador de texto de nv-42 para postales y momentos
+	Reacciones        *reacciones.Service    // me gusta y comentarios (nv-83) con la cola real de nv-43
+	ModeradorSocial   *resenastest.Moderador // doble del moderador de texto de nv-42 para comentarios
+	Avisos            *notificaciones.Agrupador
 	ModeradorReportes *resenastest.Moderador // doble del moderador del detalle de reportes de negocio (nv-67)
 	Eventos           *eventos.Service       // eventos, ferias y tianguis (nv-65)
 	Consejos          *consejos.Service      // consejo del día (nv-75) con la guardia real sobre el doble
@@ -309,6 +313,16 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(postales.NewPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewRecuerdosPrivacy(cardRepo))
 	registry.RegisterExporter(postales.NewMomentosPrivacy(cardRepo))
+	// Me gusta y comentarios (nv-83) con avisos agrupados; «Útil» de reseñas también avisa.
+	avisos := notificaciones.NewAgrupador(notifRepo, notifier, log)
+	reviews.WithAvisos(avisos)
+	moderadorSocial := resenastest.NuevoModerador()
+	socialRepo := reacciones.NewRepository(client.DB())
+	social := reacciones.NewService(reacciones.Deps{Repo: socialRepo, Momentos: cards, Planes: plans, Grupos: groupRepo, Amigos: friendRepo,
+		Personas: users, Cursor: cursor, Log: log}).WithModeracion(moderadorSocial, mods).WithAvisos(avisos)
+	mods.WithDestino(reacciones.TipoCola, social.Destino())
+	registry.RegisterPurger(reacciones.NewPrivacy(socialRepo))
+	registry.RegisterExporter(reacciones.NewPrivacy(socialRepo))
 	reportRepo := reportesnegocio.NewRepository(client.DB())
 	moderadorReportes := resenastest.NuevoModerador()
 	reports := reportesnegocio.NewService(reportRepo, businessRepo, cursor, log).WithModeracion(moderadorReportes)
@@ -361,7 +375,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
-		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
+		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, Reacciones: social, ModeradorSocial: moderadorSocial, Avisos: avisos, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo), insignias.NewTarea(badges)), Mail: mail, Google: google, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images, Insignias: badges, Contadores: counters,
 		modules: []httpapi.Module{
@@ -389,8 +403,9 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			cupones.NewHandler(coupons, v).WithActiveGuard(usuarios.RequireActive(users)),
 			moderacion.NewHandler(mods, v),
 			asistente.NewHandler(assistant, v).WithActiveGuard(usuarios.RequireActive(users)),
-			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),       // antes que grupos
-			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos
+			reacciones.NewHandler(social, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos y planes
+			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),        // antes que grupos
+			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)),  // antes que grupos
 			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
 			vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(rdb), cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), v).WithActiveGuard(usuarios.RequireActive(users)),

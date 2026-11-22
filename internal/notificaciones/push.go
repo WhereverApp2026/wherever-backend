@@ -53,6 +53,10 @@ var pushText = map[string]string{
 	// nv-73: el push nunca lleva el texto del mensaje.
 	KindReservaMensaje:      "El lugar de tu reserva te escribió",
 	KindReservaRecordatorio: "Tu reserva es en menos de 2 horas",
+	// nv-83: sin nombres; la app arma el texto con el id del objeto.
+	KindLike:         "A alguien le gustó tu publicación",
+	KindComment:      "Comentaron tu publicación",
+	KindReviewUseful: "A alguien le fue útil tu reseña",
 }
 
 // bookingKinds van por el canal `reservas`, que el teléfono no puede apagar (nv-71, nv-73).

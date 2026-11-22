@@ -81,7 +81,7 @@ func idsHex(ids []bson.ObjectID) []string {
 func respuestaMomento(m Momento, p Postal, autor AutorView, propio bool) MomentoResponse {
 	out := MomentoResponse{
 		ID: m.ID.Hex(), Autor: autor, NegocioID: hexPtr(m.NegocioID), Texto: m.Texto, Visibilidad: m.Visibilidad, Estado: m.Estado,
-		Etiquetados: idsHex(m.Etiquetados), ReaccionesTotal: m.ReaccionesTotal, Destacado: m.Destacado, Agradecido: m.Agradecido,
+		Etiquetados: idsHex(m.Etiquetados), ReaccionesTotal: m.ReaccionesTotal, ComentariosTotal: m.ComentariosTotal, Destacado: m.Destacado, Agradecido: m.Agradecido,
 		Propio: propio, Version: m.Version, CreadoEn: m.CreadoEn.UTC(), ActualizadoEn: m.ActualizadoEn.UTC(),
 		Postal: PostalCorta{ID: p.ID.Hex(), Estilo: p.Estilo, Texto: p.Texto},
 	}
@@ -278,6 +278,27 @@ func (s *Service) Momento(ctx context.Context, cl *middleware.Claims, raw string
 		autor = AutorView{ID: m.AutorID.Hex()}
 	}
 	return respuestaMomento(m, p, autor, rel.Dueno), nil
+}
+
+// Visible es el permiso de nv-83 para reaccionar y comentar: las reglas de GET /momentos/{id}
+// con sesión (visibilidad, bloqueo, moderación y privacidad de la autora, nv-82). Devuelve la
+// autora; si no, 404.
+func (s *Service) Visible(ctx context.Context, me bson.ObjectID, raw string) (bson.ObjectID, error) {
+	m, _, rel, err := s.momentoVisible(ctx, &me, raw)
+	if err != nil {
+		return bson.ObjectID{}, err
+	}
+	if rel.Dueno {
+		return m.AutorID, nil
+	}
+	autores, err := s.autores(ctx, []bson.ObjectID{m.AutorID}, &me)
+	if err != nil {
+		return bson.ObjectID{}, err
+	}
+	if _, ok := autores[m.AutorID]; !ok {
+		return bson.ObjectID{}, errMomentoNotFound()
+	}
+	return m.AutorID, nil
 }
 
 // propio trae el momento del autor; ajeno o inexistente = 404.
