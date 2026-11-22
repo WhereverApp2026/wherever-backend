@@ -10,6 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/amistades"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/text"
@@ -23,9 +24,10 @@ type Places interface {
 	FindVisibleSummaries(ctx context.Context, ids []bson.ObjectID) ([]negocios.Business, error)
 }
 
-// Blocks dice si dos personas tienen un bloqueo (lo cumple amistades.Repository).
+// Blocks da la relación entre dos personas (lo cumple amistades.Repository): un bloqueo
+// esconde los planes públicos y una amistad aceptada abre los de `amigos` (nv-84).
 type Blocks interface {
-	Blocked(ctx context.Context, a, b bson.ObjectID) (bool, error)
+	Relation(ctx context.Context, me, other bson.ObjectID) (status string, mine bool, err error)
 }
 
 // Sharing dice qué dueños no comparten sus planes (nv-82); lo cumple usuarios.Repository.
@@ -66,9 +68,10 @@ const (
 	altLimit      = 3
 )
 
-// publicPlan trae un plan `publico` ajeno, activo y sin bloqueo entre su dueño y quien lo
-// pide; si no, 404 como si no existiera.
-func (s *Service) publicPlan(ctx context.Context, subject, rawID string) (Plan, error) {
+// sharedPlan trae un plan ajeno activo que quien lo pide puede ver: `publico` sin bloqueo con
+// el dueño o `amigos` con amistad aceptada y el dueño compartiendo sus planes (nv-82, nv-84);
+// si no, 404 como si no existiera.
+func (s *Service) sharedPlan(ctx context.Context, subject, rawID string) (Plan, error) {
 	reader, id, err := ids(subject, rawID)
 	if err != nil {
 		return Plan{}, err
@@ -77,22 +80,46 @@ func (s *Service) publicPlan(ctx context.Context, subject, rawID string) (Plan, 
 	if err != nil {
 		return Plan{}, storeError(err)
 	}
-	if !p.Public() || s.extras.blocks == nil {
+	if !p.SharedWithFriends() || s.extras.blocks == nil {
 		return Plan{}, errPlanNotFound()
 	}
-	blocked, err := s.extras.blocks.Blocked(ctx, reader, p.OwnerID)
+	status, _, err := s.extras.blocks.Relation(ctx, reader, p.OwnerID)
 	if err != nil {
 		return Plan{}, errStore()
 	}
-	if blocked {
+	if status == amistades.StatusBlocked {
 		return Plan{}, errPlanNotFound()
+	}
+	if p.Public() {
+		return p, nil
+	}
+	if status != amistades.StatusAccepted {
+		return Plan{}, errPlanNotFound()
+	}
+	if err := s.ownerShares(ctx, p.OwnerID); err != nil {
+		return Plan{}, err
 	}
 	return p, nil
 }
 
+// ownerShares da 404 si el dueño no comparte sus planes u oculta su actividad (nv-82).
+func (s *Service) ownerShares(ctx context.Context, ownerID bson.ObjectID) error {
+	if s.extras.sharing == nil {
+		return nil
+	}
+	hidden, err := s.extras.sharing.HidingPlans(ctx, []bson.ObjectID{ownerID})
+	if err != nil {
+		return errStore()
+	}
+	if hidden[ownerID] {
+		return errPlanNotFound()
+	}
+	return nil
+}
+
 // Visible es el permiso de nv-83 para reaccionar y comentar: el dueño, un integrante del grupo
-// o, en un plan `publico`, quien no tiene bloqueo con el dueño si este comparte sus planes
-// (nv-82). Devuelve el dueño; si no, 404 como si no existiera.
+// o quien ve el plan compartido (sharedPlan) si el dueño comparte sus planes (nv-82). Devuelve
+// el dueño; si no, 404 como si no existiera.
 func (s *Service) Visible(ctx context.Context, subject, rawID string) (bson.ObjectID, error) {
 	p, err := s.getMember(ctx, subject, rawID)
 	if err == nil {
@@ -102,30 +129,27 @@ func (s *Service) Visible(ctx context.Context, subject, rawID string) (bson.Obje
 	if !errors.As(err, &appErr) || appErr.Kind != apperr.KindNotFound {
 		return bson.ObjectID{}, err
 	}
-	pub, err := s.publicPlan(ctx, subject, rawID)
+	shared, err := s.sharedPlan(ctx, subject, rawID)
 	if err != nil {
 		return bson.ObjectID{}, err
 	}
-	if s.extras.sharing != nil {
-		hidden, err := s.extras.sharing.HidingPlans(ctx, []bson.ObjectID{pub.OwnerID})
-		if err != nil {
-			return bson.ObjectID{}, errStore()
-		}
-		if hidden[pub.OwnerID] {
-			return bson.ObjectID{}, errPlanNotFound()
+	if shared.Public() {
+		// Los de `amigos` ya lo revisó sharedPlan.
+		if err := s.ownerShares(ctx, shared.OwnerID); err != nil {
+			return bson.ObjectID{}, err
 		}
 	}
-	return pub.OwnerID, nil
+	return shared.OwnerID, nil
 }
 
-// clonePublic copia un plan público ajeno: la copia es privada, `origen: clonado`, con
+// clonePublic copia un plan compartido ajeno («Hacer mi versión»): la copia es privada, `origen: clonado`, con
 // `plan_origen_id`, y el original suma uno a `veces_clonado`.
 func (s *Service) clonePublic(ctx context.Context, subject, rawID string, req CloneRequest) (Plan, error) {
-	src, err := s.publicPlan(ctx, subject, rawID)
+	src, err := s.sharedPlan(ctx, subject, rawID)
 	if err != nil {
 		return Plan{}, err
 	}
-	me, _ := owner(subject) // publicPlan ya lo validó
+	me, _ := owner(subject) // sharedPlan ya lo validó
 	day, err := parseDay("fecha", req.Fecha)
 	if err != nil {
 		return Plan{}, err

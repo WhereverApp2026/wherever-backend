@@ -233,7 +233,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	modRepo := moderacion.NewRepository(client.DB())
 	notifRepo := notificaciones.NewRepository(client.DB())
 	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
-	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB())).WithSharing(users)
+	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB())).WithSharing(users).
+		WithFriendsFeed(friendRepo, users, groupRepo, reacciones.NewRepository(client.DB()))
 	consentRepo := usuarios.NewConsentRepository(client.DB())
 	mods := moderacion.NewService(modRepo, cursor, log)
 	images := imagenestest.Build(t, client.DB(), mods, log)
@@ -305,7 +306,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	cardRepo := postales.NewRepository(client.DB())
 	moderadorPostales := resenastest.NuevoModerador()
 	cards := postales.NewService(postales.Deps{Repo: cardRepo, Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo, Negocios: businessRepo,
-		Autores: users, Cursor: cursor, Log: log}).WithImagenes(images.Service).WithModeracion(moderadorPostales, mods).WithNotifier(notifier)
+		Autores: users, Cursor: cursor, Log: log}).WithImagenes(images.Service).WithModeracion(moderadorPostales, mods).WithNotifier(notifier).
+		WithVisitas(reviewRepo)
 	mods.WithDestino(imagenes.TipoCola, cards.DestinoImagen(images.Service.Destino()))
 	mods.WithDestino(postales.TipoColaPostal, cards.Destino())
 	mods.WithDestino(postales.TipoColaMomento, cards.Destino())
@@ -372,7 +374,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	chats := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
-	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats)
+	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats).WithPendientes(groupRepo)
 	return &Env{
 		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, Reacciones: social, ModeradorSocial: moderadorSocial, Avisos: avisos, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,

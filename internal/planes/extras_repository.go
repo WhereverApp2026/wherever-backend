@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Radio y ventana de los planes populares (nv-68).
@@ -41,6 +42,45 @@ func (r *Repository) Popular(ctx context.Context, lat, lng float64, now time.Tim
 		bson.D{{Key: "$limit", Value: popularCandidates}},
 	}
 	cur, err := r.col.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	out := []Plan{}
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FriendsFeedQuery pide una página de «Planes de tus amigos» (nv-84).
+type FriendsFeedQuery struct {
+	Owners []bson.ObjectID
+	Window FriendsWindow
+	After  *Position
+	Limit  int
+}
+
+// FriendsFeed trae hasta Limit+1 planes activos `amigos` o `publico` de los dueños con fecha en
+// la ventana o creados desde Window.CreatedSince, por fecha y luego id. Usa ix_amigos_feed.
+func (r *Repository) FriendsFeed(ctx context.Context, q FriendsFeedQuery) ([]Plan, error) {
+	and := bson.A{bson.D{{Key: "$or", Value: bson.A{
+		bson.D{{Key: "fecha", Value: bson.D{{Key: "$gte", Value: q.Window.From}, {Key: "$lt", Value: q.Window.To}}}},
+		bson.D{{Key: "creado_en", Value: bson.D{{Key: "$gte", Value: q.Window.CreatedSince}}}},
+	}}}}
+	if q.After != nil {
+		and = append(and, bson.D{{Key: "$or", Value: bson.A{
+			bson.D{{Key: "fecha", Value: bson.D{{Key: "$gt", Value: q.After.Fecha}}}},
+			bson.D{{Key: "fecha", Value: q.After.Fecha}, {Key: "_id", Value: bson.D{{Key: "$gt", Value: q.After.ID}}}},
+		}}})
+	}
+	filter := bson.D{
+		{Key: "dueno_id", Value: bson.D{{Key: "$in", Value: q.Owners}}},
+		{Key: "visibilidad", Value: bson.D{{Key: "$in", Value: bson.A{VisibilityFriends, VisibilityPublic}}}},
+		{Key: "estado", Value: StatusActive},
+		{Key: "$and", Value: and},
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "fecha", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(int64(q.Limit + 1))
+	cur, err := r.col.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}

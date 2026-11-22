@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "apuntados": {
+          "amigos": [],
+          "total": "number"
+        },
+        "autor": {
+          "foto_url": "string",
+          "id": "string",
+          "nombre": "string",
+          "nombre_usuario": "string"
+        },
+        "comentarios_total": "number",
+        "costo_por_persona": "number",
+        "fecha": "string",
+        "id": "string",
+        "me_gusta_total": "number",
+        "nombre": "string",
+        "paradas": [
+          {
+            "hora": "string",
+            "lugar": "null"
+          }
+        ],
+        "yo": {
+          "apuntado": "bool",
+          "me_gusta": "bool"
+        }
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

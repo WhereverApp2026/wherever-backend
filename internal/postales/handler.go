@@ -68,6 +68,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Delete("/recuerdos/:id", with(false, cualquiera, h.borrarRecuerdo)...)
 	v1.Post("/momentos", with(true, consumidor, h.publicar)...)
 	v1.Get("/momentos/feed", with(false, cualquiera, h.feed)...)
+	v1.Get("/momentos/historias", with(false, cualquiera, h.historias)...)
 	v1.Get("/momentos/:id", h.momento)
 	v1.Patch("/momentos/:id", with(false, cualquiera, h.editarMomento)...)
 	v1.Delete("/momentos/:id", with(false, cualquiera, h.borrarMomento)...)
@@ -253,6 +254,14 @@ func (h *Handler) feed(c *fiber.Ctx) error {
 		return err
 	}
 	out, err := h.svc.Feed(c.UserContext(), claims(c), q)
+	if err != nil {
+		return err
+	}
+	return send(c, fiber.StatusOK, out)
+}
+
+func (h *Handler) historias(c *fiber.Ctx) error {
+	out, err := h.svc.Historias(c.UserContext(), claims(c))
 	if err != nil {
 		return err
 	}

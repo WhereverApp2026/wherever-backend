@@ -8,6 +8,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/postales"
 )
 
 // Errores del repositorio; el service los traduce a HTTP.
@@ -375,4 +377,30 @@ func (r *Repository) BorrarUtiles(ctx context.Context, usuario bson.ObjectID) er
 // ResenasDe trae las reseñas que escribió la persona (exportación ARCO).
 func (r *Repository) ResenasDe(ctx context.Context, usuario bson.ObjectID) ([]Resena, error) {
 	return listar[Resena](ctx, r.resenas, bson.D{{Key: "usuario_id", Value: usuario}}, bson.D{{Key: "creado_en", Value: -1}}, 0)
+}
+
+// Validas dice cuáles de las visitas tienen un check-in válido de esa persona en ese negocio y
+// día («Verificado» de las historias, nv-84). Usa ux_checkin_dia.
+func (r *Repository) Validas(ctx context.Context, vs []postales.Visita) (map[postales.Visita]bool, error) {
+	out := map[postales.Visita]bool{}
+	if len(vs) == 0 {
+		return out, nil
+	}
+	or := make(bson.A, 0, len(vs))
+	for _, v := range vs {
+		or = append(or, bson.D{{Key: "usuario_id", Value: v.Usuario}, {Key: "negocio_id", Value: v.Negocio}, {Key: "dia", Value: v.Dia}})
+	}
+	cur, err := r.checkins.Find(ctx, bson.D{{Key: "valido", Value: true}, {Key: "$or", Value: or}},
+		options.Find().SetProjection(bson.D{{Key: "usuario_id", Value: 1}, {Key: "negocio_id", Value: 1}, {Key: "dia", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var rows []Checkin
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, c := range rows {
+		out[postales.Visita{Usuario: c.UsuarioID, Negocio: c.NegocioID, Dia: c.Dia}] = true
+	}
+	return out, nil
 }

@@ -30,6 +30,11 @@ func Indexes() []platformmongo.IndexSet {
 				Keys:    bson.D{{Key: "zona", Value: "2dsphere"}, {Key: "visibilidad", Value: 1}, {Key: "veces_clonado", Value: -1}},
 				Options: options.Index().SetName("ix_populares"),
 			},
+			// «Planes de tus amigos» (nv-84): dueños en $in, visibilidad compartida y fecha.
+			{
+				Keys:    bson.D{{Key: "dueno_id", Value: 1}, {Key: "visibilidad", Value: 1}, {Key: "estado", Value: 1}, {Key: "fecha", Value: 1}},
+				Options: options.Index().SetName("ix_amigos_feed"),
+			},
 		},
 	}}
 }

@@ -51,8 +51,10 @@ type Service struct {
 	plans   Plans
 	applier Applier
 	places  Places
-	log     *slog.Logger
-	now     func() time.Time
+	// myGroups lista los grupos de quien llama para «Falta tu voto» (nv-84).
+	myGroups MyGroups
+	log      *slog.Logger
+	now      func() time.Time
 }
 
 // NewService recibe sus dependencias por constructor.

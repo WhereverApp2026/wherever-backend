@@ -172,3 +172,15 @@ func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) err
 		bson.D{{Key: "$unset", Value: bson.D{{Key: key, Value: ""}}}})
 	return err
 }
+
+// Pending trae las votaciones abiertas de los grupos que cierran después de now y donde
+// userID no votó, la que cierra antes primero. Usa ix_grupo_creada.
+func (r *Repository) Pending(ctx context.Context, groupIDs []bson.ObjectID, userID bson.ObjectID, now time.Time) ([]Vote, error) {
+	filter := bson.D{
+		{Key: "grupo_id", Value: bson.D{{Key: "$in", Value: groupIDs}}},
+		{Key: "estado", Value: StatusOpen},
+		{Key: "cierra_en", Value: bson.D{{Key: "$gt", Value: now}}},
+		{Key: "votos." + userID.Hex(), Value: bson.D{{Key: "$exists", Value: false}}},
+	}
+	return r.find(ctx, filter, options.Find().SetSort(bson.D{{Key: "cierra_en", Value: 1}, {Key: "_id", Value: 1}}))
+}

@@ -1,0 +1,14 @@
+{
+  "status": 422,
+  "body": {
+    "campos": [
+      {
+        "campo": "string",
+        "mensaje": "string"
+      }
+    ],
+    "codigo": "string",
+    "mensaje": "string",
+    "traza_id": "string"
+  }
+}

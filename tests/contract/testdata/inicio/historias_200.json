@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "body": {
+    "personas": [
+      {
+        "autor": {
+          "id": "string",
+          "nombre_usuario": "string"
+        },
+        "momentos": [
+          {
+            "creado_en": "string",
+            "id": "string",
+            "imagen_url": "string",
+            "negocio": "null",
+            "verificado": "bool"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -211,6 +211,30 @@ func (r *Repository) CanRead(ctx context.Context, planID, userID bson.ObjectID) 
 	return n > 0, err
 }
 
+// GoingTo da, por plan, los integrantes confirmados de su grupo vivo sin el organizador: los que
+// «van» (nv-84). Usa ux_plan; los planes sin grupo no aparecen.
+func (r *Repository) GoingTo(ctx context.Context, planIDs []bson.ObjectID) (map[bson.ObjectID][]bson.ObjectID, error) {
+	out := map[bson.ObjectID][]bson.ObjectID{}
+	if len(planIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.find(ctx, bson.D{{Key: "plan_id", Value: bson.D{{Key: "$in", Value: planIDs}}}, alive()},
+		options.Find().SetProjection(bson.D{{Key: "plan_id", Value: 1}, {Key: "integrantes", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	for _, g := range rows {
+		ids := []bson.ObjectID{}
+		for _, m := range g.Members {
+			if m.Role == RoleMember && m.Status == StatusConfirmed {
+				ids = append(ids, m.UserID)
+			}
+		}
+		out[g.PlanID] = ids
+	}
+	return out, nil
+}
+
 // CommonGroups cuenta los grupos vivos donde a y b están y ninguno declinó (perfil de
 // persona, nv-70).
 func (r *Repository) CommonGroups(ctx context.Context, a, b bson.ObjectID) (int64, error) {

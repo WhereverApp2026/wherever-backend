@@ -213,6 +213,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	friendRepo := amistades.NewRepository(db)
 	// Extras de planes (nv-68): alternativas, populares, planes públicos y paquete sin conexión.
 	planSvc.WithExtras(businessRepo, friendRepo, reservas.NewRepository(db)).WithSharing(users)
+	// «Planes de tus amigos» (nv-84): quién va sale de grupos y el me gusta de reacciones.
+	planSvc.WithFriendsFeed(friendRepo, users, groupRepo, reacciones.NewRepository(db))
 	consentRepo := usuarios.NewConsentRepository(db)
 	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
@@ -260,6 +262,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
+	// Historias (nv-84): «Verificado» = check-in válido del mismo negocio y día.
+	cards.WithVisitas(resenas.NewRepository(db))
 	// Me gusta y comentarios (nv-83): avisos agrupados por objeto cada 10 min; «Útil» también avisa.
 	avisos := notificaciones.NewAgrupador(notifRepo, notifier, log)
 	reviews.WithAvisos(avisos)
@@ -343,7 +347,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		reacciones.NewHandler(social83, validator).WithActiveGuard(active),
 		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
-		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc), validator).WithActiveGuard(active),
+		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc).WithPendientes(groupRepo), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), validator).WithActiveGuard(active),
 		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),
 		favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), validator).WithActiveGuard(active),

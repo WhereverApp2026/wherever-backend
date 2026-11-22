@@ -34,6 +34,8 @@ func (h *Handler) Routes(v1 fiber.Router, _ *middleware.Limiter) {
 	v1.Post("/grupos/:id/votaciones", append([]fiber.Handler{auth}, h.write(h.open)...)...)
 	v1.Get("/grupos/:id/votaciones", auth, h.list)
 	g := v1.Group("/votaciones", auth)
+	// «Falta tu voto» (nv-84): lectura con cuenta activa; va antes de /:id.
+	g.Get("/pendientes", h.write(h.pendientes)...)
 	g.Put("/:id/voto", h.write(h.cast)...)
 	g.Post("/:id/cerrar", h.write(h.close)...)
 }
@@ -93,4 +95,9 @@ func (h *Handler) cast(c *fiber.Ctx) error {
 func (h *Handler) close(c *fiber.Ctx) error {
 	v, err := h.svc.Close(c.UserContext(), subject(c), c.Params("id"))
 	return send(c, fiber.StatusOK, v, err)
+}
+
+func (h *Handler) pendientes(c *fiber.Ctx) error {
+	out, err := h.svc.Pendientes(c.UserContext(), subject(c))
+	return send(c, fiber.StatusOK, out, err)
 }
