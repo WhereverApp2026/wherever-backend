@@ -479,7 +479,7 @@ func (s *Service) ReservasConfig(ctx context.Context, claims *middleware.Claims,
 	if !slices.Contains(publicados, b.State) {
 		return ReservasConfigResponse{}, errEstado()
 	}
-	cfg, err := reservasConfig(req, b.Cobros)
+	cfg, err := reservasConfig(req, b.Cobros, b.ReservasConfig)
 	if err != nil {
 		return ReservasConfigResponse{}, err
 	}
@@ -496,8 +496,9 @@ func (s *Service) ReservasConfig(ctx context.Context, claims *middleware.Claims,
 	return ReservasConfigResponse{ReservasConfig: cfg, Version: nb.Version}, nil
 }
 
-// reservasConfig valida las combinaciones que el validador no ve.
-func reservasConfig(req ReservasConfigRequest, cobros *negocios.Cobros) (negocios.ReservasConfig, error) {
+// reservasConfig valida las combinaciones que el validador no ve. Conserva el cupo por hora
+// y, si no vienen, las mesas y el máximo de personas guardados (nv-88).
+func reservasConfig(req ReservasConfigRequest, cobros *negocios.Cobros, previa *negocios.ReservasConfig) (negocios.ReservasConfig, error) {
 	if req.DuracionTurnoMin%15 != 0 {
 		return negocios.ReservasConfig{}, invalido("duracion_turno_min", "debe ser múltiplo de 15")
 	}
@@ -507,11 +508,36 @@ func reservasConfig(req ReservasConfigRequest, cobros *negocios.Cobros) (negocio
 	if req.Anticipo.Valor > 0 && (cobros == nil || cobros.Estado != negocios.CobrosActivo) {
 		return negocios.ReservasConfig{}, apperr.Validation("cobros_no_activos", apperr.FieldError{Field: "anticipo", Message: "cobros_no_activos"})
 	}
-	return negocios.ReservasConfig{
+	cfg := negocios.ReservasConfig{
 		AceptaReservas: *req.AceptaReservas, CapacidadPorHorario: req.CapacidadPorHorario, DuracionTurnoMin: req.DuracionTurnoMin,
 		Anticipo:            negocios.Anticipo{Tipo: req.Anticipo.Tipo, Valor: req.Anticipo.Valor},
 		PoliticaCancelacion: req.PoliticaCancelacion, Confirmacion: req.Confirmacion, PermiteCambios: *req.PermiteCambios,
-	}, nil
+	}
+	return operacion(cfg, req, previa)
+}
+
+// operacion conserva el cupo por hora y, si no vienen, las mesas y el máximo de personas
+// guardados; con máximo, ni la capacidad general ni una hora lo pasan (nv-88).
+func operacion(cfg negocios.ReservasConfig, req ReservasConfigRequest, previa *negocios.ReservasConfig) (negocios.ReservasConfig, error) {
+	if previa != nil {
+		cfg.Mesas, cfg.MaxPersonas, cfg.CupoPorHora = previa.Mesas, previa.MaxPersonas, previa.CupoPorHora
+	}
+	if req.Mesas != nil {
+		cfg.Mesas = *req.Mesas
+	}
+	if req.MaxPersonas != nil {
+		cfg.MaxPersonas = *req.MaxPersonas
+	}
+	if cfg.MaxPersonas == 0 {
+		return cfg, nil
+	}
+	if cfg.CapacidadPorHorario > cfg.MaxPersonas {
+		return negocios.ReservasConfig{}, invalido("capacidad_por_horario", "no puede superar max_personas")
+	}
+	if slices.ContainsFunc(cfg.CupoPorHora, func(c negocios.CupoHora) bool { return c.Lugares > cfg.MaxPersonas }) {
+		return negocios.ReservasConfig{}, invalido("max_personas", "hay horas con más cupo; bájalas primero")
+	}
+	return cfg, nil
 }
 
 // QR es el contenido del QR de mostrador; `qr_checkin` no cambia (nv-20).

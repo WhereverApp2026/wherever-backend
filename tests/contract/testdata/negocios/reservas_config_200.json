@@ -10,6 +10,8 @@
       "capacidad_por_horario": "number",
       "confirmacion": "string",
       "duracion_turno_min": "number",
+      "max_personas": "number",
+      "mesas": "number",
       "permite_cambios": "bool",
       "politica_cancelacion": "string"
     },

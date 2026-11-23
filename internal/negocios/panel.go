@@ -36,6 +36,12 @@ type ReservasConfig struct {
 	PoliticaCancelacion string   `bson:"politica_cancelacion" json:"politica_cancelacion"`
 	Confirmacion        string   `bson:"confirmacion" json:"confirmacion"`
 	PermiteCambios      bool     `bson:"permite_cambios" json:"permite_cambios"`
+	// Mesas y MaxPersonas son de `45_NegOper` (nv-88); 0 = sin fijar. El cupo de una hora no
+	// pasa de MaxPersonas.
+	Mesas       int `bson:"mesas,omitempty" json:"mesas,omitempty"`
+	MaxPersonas int `bson:"max_personas,omitempty" json:"max_personas,omitempty"`
+	// CupoPorHora es el cupo por hora y día (nv-88); lo edita PUT /negocios/{id}/cupo.
+	CupoPorHora []CupoHora `bson:"cupo_por_hora,omitempty" json:"cupo_por_hora,omitempty"`
 }
 
 // CambiosPendientes guarda nombre, dirección o ubicación nuevos hasta que el administrador los

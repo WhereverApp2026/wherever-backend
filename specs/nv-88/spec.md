@@ -34,9 +34,19 @@
 ## Límites
 - Sin cupos por fecha específica (para eso los bloqueos de nv-59) ni por zona (interior/terraza).
 
+## Drift al ejecutar (2026-11-23)
+- **Código:** modelo y reglas puras en `internal/negocios/cupo.go` (`CupoHora`, `HoraEntera`, `FormatoHora`, `MinutosHorario`, `ReservasConfig.CupoEn`, `HorasAbiertas`, `CrowdAt`; `CrowdLevel` de nv-85 usa los mismos umbrales); `ReservasConfig` ganó `mesas`, `max_personas` y `cupo_por_hora` (`omitempty`). Rutas en el panel (`internal/negocios/panel/cupo.go`, `Service.Cupo` y `Service.CambiarCupo`), sin cableado nuevo en `main.go`, `authtest` ni `scripts/routes` (el handler del panel ya estaba registrado). Disponibilidad en `internal/reservas/disponibilidad.go` (`CupoTurno`, `Disponibilidad` con el negocio y la configuración, `Sugerir`).
+- **Días y medianoche:** `dia` es el día de la semana en que de verdad cae la hora (America/Mexico_City). Un tramo que cruza la medianoche (viernes 22:00–01:00) pone la hora 00:00 en el sábado, tanto en la tabla como en la disponibilidad. GET devuelve siempre los 7 días; un día cerrado va con `horas: []`.
+- **Horas fuera de horario:** el PUT las rechaza (422). Si después el dueño cambia `horarios`, las entradas que quedaron fuera no se borran: no salen en GET ni se usan, porque no hay turnos en esas horas.
+- **Sin «Horas y cupo»:** GET responde con todo en 0 y PUT da 422 (`cupo_por_hora`: primero guarda reservas-config). `PUT /reservas-config` conserva `cupo_por_hora` y, si no vienen, `mesas` y `max_personas`; con `max_personas` fijado, `capacidad_por_horario` o una hora del cupo por encima = 422 (la spec solo pedía el tope en el cupo; la capacidad general es el cupo por omisión y se trata igual).
+- **Reservar:** crear, cambiar y confirmar un pago tardío (nv-60) usan el cupo del turno (`CupoTurno`, el menor de las horas que toca) dentro del mismo candado `lock:reserva:{negocio}:{hora}`; la idempotencia y el 503 con Redis caído no cambian. Sin comandos de Redis nuevos.
+- **Afluencia y sugerencia:** `afluencia` es la de la hora local en que empieza el turno, con los umbrales de Explorar (0–33 `poco`, 34–66 `moderado`, 67–100 `pico`); null si el negocio no tiene curva o el día está en ceros. La disponibilidad aceptó `hora=HH:MM` opcional (la hora pedida): `sugerida` marca a lo más un horario, el disponible con menor afluencia a ±2 h de la pedida; sin `hora`, en todo el día; empate, el más cercano a la pedida y luego el más temprano. Sin curva no hay sugerencia.
+- **Índices y variables:** ninguno nuevo.
+- **Pruebas:** Unit `internal/reservas/disponibilidad_test.go` (`TestCupoTurno_*`, `TestDisponibilidad_CupoPorHoraYAfluencia`, `TestSugerir_*`) e `internal/negocios/panel/cupo_test.go`; Integration `tests/integration/reservas_cupo_test.go`; Security `tests/security/reservas_cupo_security_test.go`; Contract `tests/contract/reservas_cupo_contract_test.go` (`reservas/disponibilidad_200`) y en `TestContract_NegociosPanel` (`negocios/cupo_200`, `negocios/cupo_put_200`, `negocios/reservas_config_200` con `mesas` y `max_personas`).
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-23), ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** (1) cupo en lugares (personas), no en mesas, como el resto de reservas; (2) `PUT` reemplaza la tabla completa; (3) la sugerencia usa la afluencia histórica.
-- **Detalle:** `specs/nv-88/checklists/gates.md` al ejecutar.
+- **Decisiones para el revisor:** (1) cupo en lugares (personas), no en mesas, como el resto de reservas; (2) `PUT` reemplaza la tabla completa; (3) la sugerencia usa la afluencia histórica. Se ejecutó con las tres como están.
+- **Detalle:** `specs/nv-88/checklists/gates.md`.

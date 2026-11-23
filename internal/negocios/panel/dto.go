@@ -51,6 +51,42 @@ type ReservasConfigRequest struct {
 	PoliticaCancelacion string          `json:"politica_cancelacion" validate:"required,oneof=flexible moderada estricta"`
 	Confirmacion        string          `json:"confirmacion" validate:"required,oneof=automatica manual"`
 	PermiteCambios      *bool           `json:"permite_cambios" validate:"required"`
+	// Mesas y MaxPersonas (nv-88) son opcionales: sin ellos se queda lo guardado.
+	Mesas       *int `json:"mesas" validate:"omitempty,min=1,max=200"`
+	MaxPersonas *int `json:"max_personas" validate:"omitempty,min=1,max=2000"`
+}
+
+// CupoHoraRequest son los lugares de una hora ("HH:00") de un día (0 = domingo … 6).
+type CupoHoraRequest struct {
+	Dia     *int   `json:"dia" validate:"required,min=0,max=6"`
+	Hora    string `json:"hora" validate:"required,max=5"`
+	Lugares *int   `json:"lugares" validate:"required,min=0,max=500"`
+}
+
+// CupoRequest es la tabla completa del cupo por hora (nv-88); reemplaza la anterior. Vacía =
+// todas las horas con `capacidad_por_horario`.
+type CupoRequest struct {
+	CupoPorHora []CupoHoraRequest `json:"cupo_por_hora" validate:"required,max=168,dive"`
+}
+
+// CupoHoraResponse es una hora del horario con sus lugares y su afluencia (null sin curva).
+type CupoHoraResponse struct {
+	Hora      string  `json:"hora"`
+	Lugares   int     `json:"lugares"`
+	Afluencia *string `json:"afluencia"`
+}
+
+// CupoDiaResponse son las horas abiertas de un día (0 = domingo); un día cerrado va sin horas.
+type CupoDiaResponse struct {
+	Dia   int                `json:"dia"`
+	Horas []CupoHoraResponse `json:"horas"`
+}
+
+// CupoResponse es la tabla de «Horas y cupo» (`55_NegHoras`).
+type CupoResponse struct {
+	Dias                []CupoDiaResponse `json:"dias"`
+	CapacidadPorHorario int               `json:"capacidad_por_horario"`
+	Version             int               `json:"version"`
 }
 
 // BajaRequest confirma la baja con el nombre exacto del negocio.
