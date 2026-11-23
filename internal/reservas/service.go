@@ -185,7 +185,15 @@ func (s *Service) Disponibilidad(ctx context.Context, rawID string, q Disponibil
 	if err != nil {
 		return DisponibilidadResponse{}, errStore()
 	}
-	out.Horarios = Disponibilidad(turnos, cfg.CapacidadPorHorario, cfg.DuracionTurnoMin, q.Personas, Ocupadas(rs, now), bloqueos, now)
+	out.Horarios = Disponibilidad(turnos, b, cfg, q.Personas, Ocupadas(rs, now), bloqueos, now, s.loc)
+	var pedida *time.Time
+	if q.Hora != "" {
+		y, m, d := fecha.Date()
+		hh, _ := minutos(q.Hora)
+		t := time.Date(y, m, d, 0, 0, 0, 0, s.loc).Add(time.Duration(hh) * time.Minute).UTC()
+		pedida = &t
+	}
+	Sugerir(out.Horarios, pedida)
 	return out, nil
 }
 
@@ -300,8 +308,9 @@ func (s *Service) crear(ctx context.Context, me bson.ObjectID, req CrearRequest)
 	if monto == 0 {
 		r.Anticipo.Tipo = ""
 	}
+	cupo := CupoTurno(cfg, hora, cfg.DuracionTurnoMin, s.loc)
 	err = s.conCupo(ctx, b.ID, hora, cfg.DuracionTurnoMin, nil, func(ocupadas int) error {
-		if cfg.CapacidadPorHorario-ocupadas < req.Personas {
+		if cupo-ocupadas < req.Personas {
 			return errOcupado()
 		}
 		return s.insertar(ctx, &r)
@@ -587,7 +596,7 @@ func (s *Service) Cambiar(ctx context.Context, cl *middleware.Claims, raw string
 	}
 	var out Reserva
 	err = s.conCupo(ctx, r.NegocioID, hora, cfg.DuracionTurnoMin, &r.ID, func(ocupadas int) error {
-		if cfg.CapacidadPorHorario-ocupadas < personas {
+		if CupoTurno(cfg, hora, cfg.DuracionTurnoMin, s.loc)-ocupadas < personas {
 			return errOcupado()
 		}
 		var errC error
@@ -751,7 +760,7 @@ func (s *Service) confirmarTardio(ctx context.Context, r Reserva, cfg negocios.R
 	}
 	var out Reserva
 	err := s.conCupo(ctx, r.NegocioID, r.FechaHora, cfg.DuracionTurnoMin, &r.ID, func(ocupadas int) error {
-		if !r.FechaHora.After(now) || cfg.CapacidadPorHorario-ocupadas < r.Personas {
+		if !r.FechaHora.After(now) || CupoTurno(cfg, r.FechaHora, cfg.DuracionTurnoMin, s.loc)-ocupadas < r.Personas {
 			return ErrCupoPerdido
 		}
 		var errCambio error

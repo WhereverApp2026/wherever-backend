@@ -63,14 +63,15 @@ func TestDisponibilidad_CupoBloqueosYPasado(t *testing.T) {
 		{FechaHora: local(16, 0), Personas: 12, Estado: EstadoConfirmada},
 	}
 	bloqueos := []Bloqueo{{ID: bson.NewObjectID(), Desde: local(15, 30), Hasta: local(15, 45)}}
-	got := Disponibilidad(turnos, 10, 60, 2, Ocupadas(rs, now), bloqueos, now)
+	cfg := negocios.ReservasConfig{CapacidadPorHorario: 10, DuracionTurnoMin: 60}
+	got := Disponibilidad(turnos, negocios.Business{}, cfg, 2, Ocupadas(rs, now), bloqueos, now, cdmx)
 	require.Len(t, got, 4)
 	assert.Equal(t, Horario{Hora: local(13, 0), Disponible: false, LugaresLibres: 0}, got[0], "ya empezó")
 	assert.Equal(t, Horario{Hora: local(14, 0), Disponible: false, LugaresLibres: 1}, got[1], "6+2+1; el apartado vencido y la cancelada no cuentan")
 	assert.Equal(t, Horario{Hora: local(15, 0), Disponible: false, LugaresLibres: 0}, got[2], "el bloqueo se cruza con el turno")
 	assert.Equal(t, Horario{Hora: local(16, 0), Disponible: false, LugaresLibres: 0}, got[3], "nunca negativo")
 
-	libre := Disponibilidad([]time.Time{local(14, 0)}, 10, 60, 1, Ocupadas(rs, now), nil, now)
+	libre := Disponibilidad([]time.Time{local(14, 0)}, negocios.Business{}, cfg, 1, Ocupadas(rs, now), nil, now, cdmx)
 	assert.True(t, libre[0].Disponible, "alcanza para 1")
 }
 
@@ -78,4 +79,66 @@ func TestEsTurno(t *testing.T) {
 	turnos := []time.Time{local(13, 0), local(14, 0)}
 	assert.True(t, EsTurno(turnos, local(14, 0)))
 	assert.False(t, EsTurno(turnos, local(14, 30)))
+}
+
+func TestCupoTurno_EntradaPorOmisionCeroYDosHoras(t *testing.T) {
+	cfg := negocios.ReservasConfig{CapacidadPorHorario: 10, CupoPorHora: []negocios.CupoHora{
+		{Dia: 1, Hora: "14:00", Lugares: 4}, {Dia: 1, Hora: "15:00", Lugares: 6}, {Dia: 1, Hora: "18:00", Lugares: 0}, {Dia: 2, Hora: "13:00", Lugares: 2},
+	}}
+	assert.Equal(t, 4, CupoTurno(cfg, local(14, 0), 60, cdmx), "entrada del dueño")
+	assert.Equal(t, 10, CupoTurno(cfg, local(13, 0), 60, cdmx), "sin entrada = capacidad; la del martes no cuenta el lunes")
+	assert.Equal(t, 0, CupoTurno(cfg, local(18, 0), 60, cdmx), "0 cierra la hora")
+	assert.Equal(t, 4, CupoTurno(cfg, local(14, 30), 60, cdmx), "14:30–15:30 cae en dos horas: el menor")
+	assert.Equal(t, 6, CupoTurno(cfg, local(15, 0), 30, cdmx))
+	assert.Equal(t, 4, CupoTurno(cfg, local(13, 30), 90, cdmx), "13:30–15:00 toca 13 y 14, no 15")
+	medianoche := negocios.ReservasConfig{CapacidadPorHorario: 10, CupoPorHora: []negocios.CupoHora{{Dia: 2, Hora: "00:00", Lugares: 3}}}
+	assert.Equal(t, 3, CupoTurno(medianoche, local(23, 30), 60, cdmx), "la madrugada usa el día en que cae (martes)")
+}
+
+func TestDisponibilidad_CupoPorHoraYAfluencia(t *testing.T) {
+	now := local(8, 0)
+	turnos := []time.Time{local(13, 0), local(14, 0), local(15, 0)}
+	cfg := negocios.ReservasConfig{CapacidadPorHorario: 10, DuracionTurnoMin: 60, CupoPorHora: []negocios.CupoHora{{Dia: 1, Hora: "14:00", Lugares: 3}, {Dia: 1, Hora: "15:00", Lugares: 0}}}
+	traffic := make([][]int, 7)
+	for d := range traffic {
+		traffic[d] = make([]int, 24)
+	}
+	traffic[1][13], traffic[1][14], traffic[1][15] = 80, 20, 50
+	got := Disponibilidad(turnos, negocios.Business{Traffic: traffic}, cfg, 2, Ocupadas([]Reserva{{FechaHora: local(14, 0), Personas: 1, Estado: EstadoConfirmada}}, now), nil, now, cdmx)
+	require.Len(t, got, 3)
+	assert.Equal(t, 10, got[0].LugaresLibres)
+	assert.Equal(t, 2, got[1].LugaresLibres, "cupo 3 − 1")
+	assert.Equal(t, 0, got[2].LugaresLibres, "hora cerrada")
+	assert.False(t, got[2].Disponible)
+	require.NotNil(t, got[0].Afluencia)
+	assert.Equal(t, negocios.CrowdPeak, *got[0].Afluencia)
+	assert.Equal(t, negocios.CrowdLow, *got[1].Afluencia)
+
+	sin := Disponibilidad(turnos, negocios.Business{}, cfg, 2, nil, nil, now, cdmx)
+	assert.Nil(t, sin[0].Afluencia, "sin curva = null")
+}
+
+func TestSugerir_MenorAfluenciaCercaDeLaPedida(t *testing.T) {
+	poco, pico := negocios.CrowdLow, negocios.CrowdPeak
+	hs := []Horario{
+		{Hora: local(12, 0), Disponible: true, Afluencia: &poco, valor: 5},
+		{Hora: local(17, 0), Disponible: true, Afluencia: &poco, valor: 20},
+		{Hora: local(18, 0), Disponible: true, Afluencia: &pico, valor: 90},
+		{Hora: local(19, 0), Disponible: false, Afluencia: &poco, valor: 1},
+		{Hora: local(20, 0), Disponible: true, Afluencia: &poco, valor: 20},
+	}
+	pedida := local(18, 0)
+	Sugerir(hs, &pedida)
+	assert.True(t, hs[1].Sugerida, "17:00: la más tranquila a ±2 h; empata con 20:00 y gana la más cercana")
+	for _, i := range []int{0, 2, 3, 4} {
+		assert.False(t, hs[i].Sugerida, i)
+	}
+
+	todo := []Horario{{Hora: local(12, 0), Disponible: true, Afluencia: &poco, valor: 5}, {Hora: local(17, 0), Disponible: true, Afluencia: &poco, valor: 20}}
+	Sugerir(todo, nil)
+	assert.True(t, todo[0].Sugerida, "sin hora pedida mira todo el día")
+
+	nada := []Horario{{Hora: local(12, 0), Disponible: true}}
+	Sugerir(nada, nil)
+	assert.False(t, nada[0].Sugerida, "sin curva no sugiere")
 }

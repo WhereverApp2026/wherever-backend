@@ -333,13 +333,7 @@ func CrowdLevel(matrix [][]int, now time.Time) *string {
 	if !t.Enough || t.CurrentHour == nil {
 		return nil
 	}
-	level := CrowdPeak
-	switch v := t.Hours[*t.CurrentHour]; {
-	case v <= crowdLowMax:
-		level = CrowdLow
-	case v <= crowdMedMax:
-		level = CrowdMedium
-	}
+	level := crowdOf(t.Hours[*t.CurrentHour])
 	return &level
 }
 

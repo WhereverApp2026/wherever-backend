@@ -109,9 +109,21 @@ func TestContract_NegociosPanel(t *testing.T) {
 	check(t, "negocios/panel_200", status, body)
 
 	cfg := map[string]any{"acepta_reservas": true, "capacidad_por_horario": 20, "duracion_turno_min": 30,
-		"anticipo": map[string]any{"tipo": "fijo", "valor": 0}, "politica_cancelacion": "moderada", "confirmacion": "automatica", "permite_cambios": true}
+		"anticipo": map[string]any{"tipo": "fijo", "valor": 0}, "politica_cancelacion": "moderada", "confirmacion": "automatica", "permite_cambios": true,
+		"mesas": 8, "max_personas": 40}
 	status, body = callHeaders(t, app, http.MethodPut, "/api/v1/negocios/"+b.ID+"/reservas-config", cfg, token, map[string]string{"If-Match": strconv.Itoa(b.Version)})
 	check(t, "negocios/reservas_config_200", status, body)
+
+	// Cupo por hora y día (nv-88): la tabla y su reemplazo.
+	status, body = call(t, app, http.MethodGet, "/api/v1/negocios/"+b.ID+"/cupo", nil, token)
+	check(t, "negocios/cupo_200", status, body)
+	tabla, ok := body.(map[string]any)
+	require.True(t, ok)
+	version, ok := tabla["version"].(float64)
+	require.True(t, ok)
+	status, body = callHeaders(t, app, http.MethodPut, "/api/v1/negocios/"+b.ID+"/cupo", map[string]any{"cupo_por_hora": []any{}}, token,
+		map[string]string{"If-Match": strconv.Itoa(int(version))})
+	check(t, "negocios/cupo_put_200", status, body)
 
 	_, err := env.Menu.Crear(context.Background(), authtest.Comerciante(duena), b.ID, menu.CrearRequest{Seccion: "Tacos", Nombre: "Pastor", Precio: 25, Etiquetas: []string{"picante"}})
 	require.NoError(t, err)

@@ -59,28 +59,28 @@ func TestDTOs_Validador(t *testing.T) {
 
 func TestReservasConfig_Combinaciones(t *testing.T) {
 	r := reservasValida()
-	cfg, err := reservasConfig(r, nil)
+	cfg, err := reservasConfig(r, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, negocios.ReservasConfig{AceptaReservas: true, CapacidadPorHorario: 40, DuracionTurnoMin: 90,
 		Anticipo: negocios.Anticipo{Tipo: "fijo"}, PoliticaCancelacion: "moderada", Confirmacion: "automatica", PermiteCambios: true}, cfg)
 
 	r.DuracionTurnoMin = 50
-	_, err = reservasConfig(r, nil)
+	_, err = reservasConfig(r, nil, nil)
 	assert.Error(t, err, "múltiplo de 15")
 
 	r = reservasValida()
 	r.Anticipo = AnticipoRequest{Tipo: "porcentaje", Valor: 101}
-	_, err = reservasConfig(r, &negocios.Cobros{Estado: negocios.CobrosActivo})
+	_, err = reservasConfig(r, &negocios.Cobros{Estado: negocios.CobrosActivo}, nil)
 	assert.Error(t, err, "porcentaje hasta 100")
 
 	r.Anticipo.Valor = 20
-	_, err = reservasConfig(r, nil)
+	_, err = reservasConfig(r, nil, nil)
 	var ae *apperr.Error
 	require.ErrorAs(t, err, &ae)
 	assert.Equal(t, "cobros_no_activos", ae.Message)
-	_, err = reservasConfig(r, &negocios.Cobros{Estado: "pendiente"})
+	_, err = reservasConfig(r, &negocios.Cobros{Estado: "pendiente"}, nil)
 	assert.Error(t, err)
-	_, err = reservasConfig(r, &negocios.Cobros{Estado: negocios.CobrosActivo})
+	_, err = reservasConfig(r, &negocios.Cobros{Estado: negocios.CobrosActivo}, nil)
 	assert.NoError(t, err)
 }
 

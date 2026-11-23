@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "body": {
+    "capacidad_por_horario": "number",
+    "dias": [
+      {
+        "dia": "number",
+        "horas": []
+      }
+    ],
+    "version": "number"
+  }
+}

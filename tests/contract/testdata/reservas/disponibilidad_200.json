@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "fecha": "string",
+    "horarios": [
+      {
+        "afluencia": "string",
+        "disponible": "bool",
+        "hora": "string",
+        "lugares_libres": "number",
+        "sugerida": "bool"
+      }
+    ]
+  }
+}

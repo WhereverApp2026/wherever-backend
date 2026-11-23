@@ -49,6 +49,8 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Delete("/negocios/:id", with(h.baja)...)
 	v1.Post("/negocios/:id/pausa", with(h.pausa)...)
 	v1.Put("/negocios/:id/reservas-config", with(h.reservas)...)
+	v1.Get("/negocios/:id/cupo", with(h.cupo)...)
+	v1.Put("/negocios/:id/cupo", with(h.cambiarCupo)...)
 	v1.Get("/negocios/:id/qr", with(h.qr)...)
 	v1.Get("/negocios/:id/sello/insignia", with(h.insignia)...)
 	v1.Post("/negocios/:id/ia/descripcion", with(h.descripcion)...)
@@ -128,6 +130,30 @@ func (h *Handler) reservas(c *fiber.Ctx) error {
 		return err
 	}
 	out, err := h.svc.ReservasConfig(c.UserContext(), claims(c), c.Params("id"), version, req)
+	if err != nil {
+		return err
+	}
+	return noStore(c, out)
+}
+
+func (h *Handler) cupo(c *fiber.Ctx) error {
+	out, err := h.svc.Cupo(c.UserContext(), claims(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return noStore(c, out)
+}
+
+func (h *Handler) cambiarCupo(c *fiber.Ctx) error {
+	version, err := ifMatch(c)
+	if err != nil {
+		return err
+	}
+	var req CupoRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	out, err := h.svc.CambiarCupo(c.UserContext(), claims(c), c.Params("id"), version, req)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,9 @@ import (
 type DisponibilidadQuery struct {
 	Fecha    string `query:"fecha" validate:"required,datetime=2006-01-02"`
 	Personas int    `query:"personas" validate:"required,min=1,max=20"`
+	// Hora es la hora pedida ("HH:MM", hora de México) para sugerir la más tranquila cerca de
+	// ella (nv-88); sin ella la sugerencia mira todo el día.
+	Hora string `query:"hora" validate:"omitempty,hhmm"`
 }
 
 // DisponibilidadResponse son los horarios del día con cupo.
