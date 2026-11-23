@@ -69,7 +69,7 @@ func (h *Handler) list(c *fiber.Ctx) error {
 	if err := h.validator.Struct(q); err != nil {
 		return err
 	}
-	out, err := h.svc.List(c.UserContext(), q)
+	out, err := h.svc.List(c.UserContext(), viewerOf(c), q)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (h *Handler) mapa(c *fiber.Ctx) error {
 	if err := h.validator.Struct(q); err != nil {
 		return err
 	}
-	out, err := h.svc.Map(c.UserContext(), q)
+	out, err := h.svc.Map(c.UserContext(), viewerOf(c), q)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (h *Handler) count(c *fiber.Ctx) error {
 	if err := h.validator.Struct(q); err != nil {
 		return err
 	}
-	out, err := h.svc.Count(c.UserContext(), q)
+	out, err := h.svc.Count(c.UserContext(), viewerOf(c), q)
 	if err != nil {
 		return err
 	}
@@ -174,4 +174,13 @@ func (h *Handler) traffic(c *fiber.Ctx) error {
 		return err
 	}
 	return c.JSON(out)
+}
+
+// viewerOf es el sujeto del token si llegó uno válido (el JWT es opcional en estas rutas);
+// "" = sin sesión.
+func viewerOf(c *fiber.Ctx) string {
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		return claims.Subject
+	}
+	return ""
 }

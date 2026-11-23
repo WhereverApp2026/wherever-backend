@@ -295,6 +295,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterPurger(cupones.NewPrivacy(couponRepo))
 	registry.RegisterExporter(cupones.NewPrivacy(couponRepo))
 	reviewRepo := resenas.NewRepository(client.DB())
+	// Explorar (nv-85): «De amigos», amigos que fueron y mejor cupón.
+	businesses.WithExplore(friendRepo, reviewRepo, couponRepo)
 	moderadorResenas := resenastest.NuevoModerador()
 	reviews := resenas.NewService(reviewRepo, businessRepo, businesses, users, cursor, log).
 		WithModeracion(moderadorResenas, mods).WithFotos(resenastest.Fotos{P: fotosNegocio}).WithIA(guardia)

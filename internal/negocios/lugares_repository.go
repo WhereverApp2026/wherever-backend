@@ -130,7 +130,7 @@ func (r *Repository) FindVisible(ctx context.Context, id bson.ObjectID) (Busines
 type mapArea struct {
 	MinLat, MinLng, MaxLat, MaxLng float64
 	CellDeg                        float64
-	Category                       string
+	Match                          bson.A // filtros de Explorar (matchConditions)
 }
 
 func (a mapArea) filter() bson.D {
@@ -142,9 +142,7 @@ func (a mapArea) filter() bson.D {
 	conditions := bson.A{bson.D{{Key: "ubicacion", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
 		{Key: "$geometry", Value: bson.D{{Key: "type", Value: "Polygon"}, {Key: "coordinates", Value: bson.A{ring}}}},
 	}}}}}}
-	if a.Category != "" {
-		conditions = append(conditions, bson.D{{Key: "categoria", Value: a.Category}})
-	}
+	conditions = append(conditions, a.Match...)
 	return visibleAnd(conditions)
 }
 

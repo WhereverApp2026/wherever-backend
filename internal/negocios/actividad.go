@@ -23,9 +23,7 @@ const (
 // CountQuery son los filtros de GET /lugares/conteo: los mismos de la lista, sin orden,
 // cursor ni límite.
 type CountQuery struct {
-	Category string   `query:"categoria" validate:"omitempty,max=40"`
-	MaxPrice int      `query:"precio_max" validate:"omitempty,min=1,max=4"`
-	OpenNow  bool     `query:"abierto_ahora"`
+	ExploreFilters
 	Lat      *float64 `query:"lat" validate:"omitempty,latitude"`
 	Lng      *float64 `query:"lng" validate:"omitempty,longitude"`
 	RadiusM  int      `query:"radio_m" validate:"omitempty,min=1,max=20000"`
@@ -47,12 +45,15 @@ type TrafficResponse struct {
 
 // countFilter arma el mismo filtro que la lista: visibilidad, categoría, precio, abierto y,
 // con ubicación, un círculo con `$geoWithin` (CountDocuments no admite `$near`).
-func (s *Service) countFilter(q CountQuery) (bson.D, error) {
-	list := ListQuery{Category: q.Category, MaxPrice: q.MaxPrice, OpenNow: q.OpenNow, Lat: q.Lat, Lng: q.Lng, RadiusM: q.RadiusM}
+func (s *Service) countFilter(ctx context.Context, subject string, q CountQuery) (bson.D, error) {
 	if (q.Lat == nil) != (q.Lng == nil) {
 		return nil, apperr.Validation("lat y lng van juntos", apperr.FieldError{Field: "lat", Message: "lat y lng van juntos"})
 	}
-	match, err := s.matchConditions(list)
+	v, err := s.loadViewer(ctx, subject, q.ExploreFilters, false)
+	if err != nil {
+		return nil, err
+	}
+	match, err := s.matchConditions(ctx, q.ExploreFilters, v)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +71,8 @@ func (s *Service) countFilter(q CountQuery) (bson.D, error) {
 
 // Count cuenta los lugares de los filtros hasta MaxConteo con plazo de 2 s. Plazo vencido o
 // MongoDB caído = 503 (sin el texto del error: podría repetir la ubicación).
-func (s *Service) Count(ctx context.Context, q CountQuery) (CountResponse, error) {
-	filter, err := s.countFilter(q)
+func (s *Service) Count(ctx context.Context, subject string, q CountQuery) (CountResponse, error) {
+	filter, err := s.countFilter(ctx, subject, q)
 	if err != nil {
 		return CountResponse{}, err
 	}

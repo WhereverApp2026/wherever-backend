@@ -54,7 +54,7 @@ var expected = map[string][]string{
 	privacidad.ExportsCollection:        {"_id_", "ix_exportacion_estado", "ix_usuario_exportaciones", "ttl_exportacion"},
 	auth.SessionsCollection:             {"_id_", "ix_familia", "ix_refresh_previo", "ix_usuario_sesiones", "ttl_sesion", "ux_refresh_hash"},
 	auth.TokensCollection:               {"_id_", "ix_usuario_tipo", "ttl_token", "ux_token_hash"},
-	negocios.Collection:                 {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision"},
+	negocios.Collection:                 {"_id_", "ix_geo_filtros", "ix_texto", "ix_autocompletar", "ix_categoria_calif", "ux_slug", "ix_propietario", "ix_destacados", "ux_qr_checkin", "ix_revision", "ix_negocios_sello"},
 	planes.Collection:                   {"_id_", "ix_dueno_estado_fecha", "ix_estado_fecha", "ix_dueno_sync", "ix_populares", "ix_amigos_feed"},
 	asistente.DescartesCollection:       {"_id_", "ttl_descarte", "ix_motivo_fecha"},
 	recomendaciones.Collection:          {"_id_", "ux_usuario_negocio"},

@@ -31,6 +31,8 @@ type Service struct {
 	cursor *pagination.Signer
 	// cache guarda categorías y fichas en Redis (nv-18); nil = sin caché.
 	cache *cache.Cache
+	// explore da cupones y amigos a Explorar (nv-85); nil = sin ellos.
+	explore *exploreDeps
 }
 
 // Vida en la caché (nv-18). Las fichas se invalidan al importar; las categorías también.

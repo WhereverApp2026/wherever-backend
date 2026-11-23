@@ -361,3 +361,17 @@ func idSet(ids []bson.ObjectID) map[bson.ObjectID]bool {
 	}
 	return out
 }
+
+// FriendIDs son las amistades aceptadas de me (hasta MaxList): el filtro «De amigos» y la
+// tarjeta de Explorar (nv-85). Cumple negocios.FriendIDs.
+func (r *Repository) FriendIDs(ctx context.Context, me bson.ObjectID) ([]bson.ObjectID, error) {
+	rows, err := r.List(ctx, me, KindFriends)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]bson.ObjectID, 0, len(rows))
+	for _, f := range rows {
+		out = append(out, f.Other(me))
+	}
+	return out, nil
+}

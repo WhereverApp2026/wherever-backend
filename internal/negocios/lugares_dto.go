@@ -24,12 +24,10 @@ const (
 	cellsPerTile = 4
 )
 
-// ListQuery es `?categoria=&precio_max=&abierto_ahora=&lat=&lng=&radio_m=&orden=&cursor=&limite=`.
+// ListQuery son los filtros de Explorar más `?lat=&lng=&radio_m=&orden=&cursor=&limite=`.
 // La ubicación solo se usa en la consulta: no se guarda ni se registra.
 type ListQuery struct {
-	Category string   `query:"categoria" validate:"omitempty,max=40"`
-	MaxPrice int      `query:"precio_max" validate:"omitempty,min=1,max=4"`
-	OpenNow  bool     `query:"abierto_ahora"`
+	ExploreFilters
 	Lat      *float64 `query:"lat" validate:"omitempty,latitude"`
 	Lng      *float64 `query:"lng" validate:"omitempty,longitude"`
 	RadiusM  int      `query:"radio_m" validate:"omitempty,min=1,max=20000"`
@@ -45,7 +43,7 @@ type MapQuery struct {
 	MaxLat   *float64 `query:"max_lat" validate:"required,latitude"`
 	MaxLng   *float64 `query:"max_lng" validate:"required,longitude"`
 	Zoom     int      `query:"zoom" validate:"required,min=3,max=20"`
-	Category string   `query:"categoria" validate:"omitempty,max=40"`
+	ExploreFilters
 }
 
 // Point es una coordenada en la respuesta.
@@ -73,6 +71,16 @@ type PlaceItem struct {
 	Location     Point         `json:"ubicacion"`
 	DistanceM    *float64      `json:"distancia_m,omitempty"`
 	OpenNow      bool          `json:"abierto_ahora"`
+}
+
+// ExploreItem es la tarjeta de GET /lugares (nv-85): el lugar más Sello, afluencia de la hora,
+// mejor cupón y, con sesión, amigos que fueron. Las demás listas siguen con PlaceItem.
+type ExploreItem struct {
+	PlaceItem
+	ExcellenceSeal bool         `json:"sello_excelencia"`
+	CrowdNow       *string      `json:"afluencia_ahora"`
+	Coupon         *CardCoupon  `json:"cupon"`
+	FriendsWent    *FriendsWent `json:"amigos_fueron,omitempty"`
 }
 
 // PlaceDetail es la ficha pública de GET /lugares/{id}. No lleva dueño, QR de check-in,
@@ -161,6 +169,12 @@ func toItem(row placeRow, now time.Time) PlaceItem {
 		DistanceM:    row.DistanceM,
 		OpenNow:      OpenAt(row.ScheduleMin, now),
 	}
+}
+
+// toExploreItem agrega a la tarjeta el Sello de hoy (nv-56/nv-76; su regla y vigencia llegan
+// con nv-80) y la afluencia de la hora; cupón y amigos los pone decorate.
+func toExploreItem(row placeRow, now time.Time) ExploreItem {
+	return ExploreItem{PlaceItem: toItem(row, now), ExcellenceSeal: row.ExcellenceSeal, CrowdNow: CrowdLevel(row.Traffic, now)}
 }
 
 func toDetail(b Business, now time.Time) PlaceDetail {
