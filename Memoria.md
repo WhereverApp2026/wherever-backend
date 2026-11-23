@@ -901,6 +901,13 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-85 — Filtros y tarjetas de Explorar (2026-11-22)
+- Estado: `GET /lugares`, `/lugares/conteo` y `/lugares/mapa` aceptan `categorias` (hasta 6), `precio` (lista 1–4), `con_sello`, `con_cupon` y `de_amigos` (sesión: 401 sin ella, 403 cuenta no activa). La tarjeta de `GET /lugares` (`ExploreItem`) agrega `sello_excelencia`, `afluencia_ahora` (`poco`/`moderado`/`pico`/`null`), `cupon{id, titulo}` y, con sesión, `amigos_fueron{total, iniciales[≤ 3]{id, iniciales}}`. Sin rutas nuevas (274). **Índice nuevo `ix_negocios_sello` en `negocios`; crearlo en Atlas (`go run ./scripts/indexes`) antes del despliegue.** Sin Redis.
+- Decisión: negocios no importa amistades, reseñas ni cupones: interfaces `FriendIDs`, `Visits` y `Coupons` conectadas con `WithExplore` en `main.go`/`authtest`. `con_cupon` filtra por `cupones_activos > 0` (mismo filtro en lista, conteo y mapa); el cupón de la tarjeta se lee vigente en `cupones`.
+- Decisión: la tarjeta nueva es un tipo aparte (`ExploreItem` envuelve `PlaceItem`) para no cambiar los contratos de búsquedas, recientes, grupos y planes, que reutilizan `PlaceItem`.
+- Decisión: la cuenta de quien consulta se lee junto con las de sus amigos (`FindPublicByIDs`): si no vuelve, no está activa; así `de_amigos` = 403 sin otra consulta.
+- A evitar: ya existía `negocios.Filters` (facetas de `/categorias`): buscar el nombre antes de crear un tipo. Fiber v2 sí lee un struct embebido en `QueryParser` (probado en Unit). Sello: se usa `sello_excelencia` tal cual; la regla nueva es de nv-80.
+
 ### NV-84 — Inicio social: planes de amigos, historias y votaciones pendientes (2026-11-22)
 - Estado: 3 rutas (274): `GET /planes/amigos`, `GET /momentos/historias` y `GET /votaciones/pendientes`. Visibilidad nueva de planes `amigos` en `POST`/`PATCH /planes`; la ven las amistades aceptadas si el dueño comparte sus planes (detalle, clonar, me apunto, me gusta y comentarios). **Índice nuevo `ix_amigos_feed` en `planes`; crearlo en Atlas (`go run ./scripts/indexes`) antes del despliegue.** Sin Redis.
 - Decisión: la regla de quién ve un plan ajeno está solo en `planes.Service.sharedPlan` (una consulta a `amistades` por `Relation` decide bloqueo y amistad). `amigos` no entra a populares ni al perfil ajeno: ahí sigue solo `publico`.

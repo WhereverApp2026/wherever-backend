@@ -31,8 +31,8 @@ func (s *Service) WithCursor(signer *pagination.Signer) *Service {
 
 // listScope ata el cursor al orden y a los filtros de la búsqueda (nv-17): uno de otra
 // búsqueda es 422. El hash lleva llave, así la ubicación no se lee del cursor.
-func (s *Service) listScope(q ListQuery, p listParams) string {
-	parts := []string{p.Order, q.Category, strconv.Itoa(q.MaxPrice), strconv.FormatBool(q.OpenNow), strconv.FormatFloat(p.RadiusM, 'g', -1, 64)}
+func (s *Service) listScope(q ListQuery, p listParams, v *viewer) string {
+	parts := append([]string{p.Order, strconv.FormatFloat(p.RadiusM, 'g', -1, 64)}, filtersScope(q.ExploreFilters, v)...)
 	if p.Near != nil {
 		parts = append(parts, strconv.FormatFloat(p.Near.Lat, 'g', -1, 64), strconv.FormatFloat(p.Near.Lng, 'g', -1, 64))
 	}
@@ -96,33 +96,41 @@ func (s *Service) WithClock(now func() time.Time) *Service {
 	return s
 }
 
-// List resuelve GET /lugares. Todos los filtros van dentro de MongoDB antes del límite.
-func (s *Service) List(ctx context.Context, q ListQuery) (pagination.PageResult[PlaceItem], error) {
-	params, err := s.listParams(q)
+// List resuelve GET /lugares para subject ("" = sin sesión). Todos los filtros van dentro de
+// MongoDB antes del límite; con sesión la tarjeta lleva los amigos que fueron (nv-85).
+func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagination.PageResult[ExploreItem], error) {
+	v, err := s.loadViewer(ctx, subject, q.ExploreFilters, true)
 	if err != nil {
-		return pagination.PageResult[PlaceItem]{}, err
+		return pagination.PageResult[ExploreItem]{}, err
+	}
+	params, err := s.listParams(ctx, q, v)
+	if err != nil {
+		return pagination.PageResult[ExploreItem]{}, err
 	}
 	rows, err := s.repo.List(ctx, params)
 	if err != nil {
 		// Sin el texto del error: podría repetir la ubicación de la consulta.
-		return pagination.PageResult[PlaceItem]{}, apperr.Unavailable("servicio no disponible")
+		return pagination.PageResult[ExploreItem]{}, apperr.Unavailable("servicio no disponible")
 	}
 	next := ""
 	if len(rows) > params.Limit {
 		rows = rows[:params.Limit]
 		if next, err = s.encodeCursor(params.Scope, params.Order, rows[len(rows)-1]); err != nil {
-			return pagination.PageResult[PlaceItem]{}, apperr.Unavailable("servicio no disponible")
+			return pagination.PageResult[ExploreItem]{}, apperr.Unavailable("servicio no disponible")
 		}
 	}
 	now := s.now()
-	items := make([]PlaceItem, 0, len(rows))
+	items := make([]ExploreItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, toItem(row, now))
+		items = append(items, toExploreItem(row, now))
+	}
+	if err := s.decorate(ctx, rows, items, v); err != nil {
+		return pagination.PageResult[ExploreItem]{}, apperr.Unavailable("servicio no disponible")
 	}
 	return pagination.NewPageResult(items, next, params.Limit), nil
 }
 
-func (s *Service) listParams(q ListQuery) (listParams, error) {
+func (s *Service) listParams(ctx context.Context, q ListQuery, v *viewer) (listParams, error) {
 	if (q.Lat == nil) != (q.Lng == nil) {
 		return listParams{}, apperr.Validation("lat y lng van juntos",
 			apperr.FieldError{Field: "lat", Message: "lat y lng van juntos"})
@@ -139,12 +147,12 @@ func (s *Service) listParams(q ListQuery) (listParams, error) {
 		return listParams{}, apperr.Validation("ordenar por distancia requiere lat y lng",
 			apperr.FieldError{Field: "orden", Message: "requiere lat y lng"})
 	}
-	match, err := s.matchConditions(q)
+	match, err := s.matchConditions(ctx, q.ExploreFilters, v)
 	if err != nil {
 		return listParams{}, err
 	}
 	p.Match = match
-	p.Scope = s.listScope(q, p)
+	p.Scope = s.listScope(q, p, v)
 	after, err := s.decodeCursor(p.Scope, q.Cursor, p.Order)
 	if err != nil {
 		return listParams{}, err
@@ -163,24 +171,6 @@ func resolveOrder(order string, hasLocation bool) string {
 	default:
 		return OrderRating
 	}
-}
-
-// matchConditions traduce categoría, precio máximo y abierto ahora a condiciones de MongoDB.
-func (s *Service) matchConditions(q ListQuery) (bson.A, error) {
-	var match bson.A
-	if q.Category != "" {
-		if !knownCategory(q.Category) {
-			return nil, unknownCategory()
-		}
-		match = append(match, bson.D{{Key: "categoria", Value: q.Category}})
-	}
-	if q.MaxPrice > 0 {
-		match = append(match, bson.D{{Key: "nivel_precio", Value: bson.D{{Key: "$lte", Value: q.MaxPrice}}}})
-	}
-	if q.OpenNow {
-		match = append(match, bson.D{openAtFilter(s.now())})
-	}
-	return match, nil
 }
 
 func knownCategory(id string) bool {
@@ -231,18 +221,24 @@ func CellDegrees(zoom int) float64 {
 	return 360 / math.Pow(2, float64(zoom)) / cellsPerTile
 }
 
-// Map resuelve GET /lugares/mapa: pines sueltos hasta MaxMapPins; si hay más, celdas.
-func (s *Service) Map(ctx context.Context, q MapQuery) (MapResponse, error) {
+// Map resuelve GET /lugares/mapa con los filtros de Explorar: pines sueltos hasta MaxMapPins;
+// si hay más, celdas.
+func (s *Service) Map(ctx context.Context, subject string, q MapQuery) (MapResponse, error) {
 	if *q.MinLat >= *q.MaxLat || *q.MinLng >= *q.MaxLng || *q.MaxLng-*q.MinLng >= 180 {
 		return MapResponse{}, apperr.Validation("área inválida",
 			apperr.FieldError{Field: "min_lng", Message: "el área debe tener mínimo < máximo y menos de 180° de ancho"})
 	}
-	if q.Category != "" && !knownCategory(q.Category) {
-		return MapResponse{}, unknownCategory()
+	v, err := s.loadViewer(ctx, subject, q.ExploreFilters, false)
+	if err != nil {
+		return MapResponse{}, err
+	}
+	match, err := s.matchConditions(ctx, q.ExploreFilters, v)
+	if err != nil {
+		return MapResponse{}, err
 	}
 	area := mapArea{
 		MinLat: *q.MinLat, MinLng: *q.MinLng, MaxLat: *q.MaxLat, MaxLng: *q.MaxLng,
-		CellDeg: CellDegrees(q.Zoom), Category: q.Category,
+		CellDeg: CellDegrees(q.Zoom), Match: match,
 	}
 	unavailable := func(err error) error {
 		return apperr.Unavailable("servicio no disponible").WithDetail(err.Error())

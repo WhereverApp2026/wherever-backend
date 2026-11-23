@@ -215,6 +215,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planSvc.WithExtras(businessRepo, friendRepo, reservas.NewRepository(db)).WithSharing(users)
 	// «Planes de tus amigos» (nv-84): quién va sale de grupos y el me gusta de reacciones.
 	planSvc.WithFriendsFeed(friendRepo, users, groupRepo, reacciones.NewRepository(db))
+	// Explorar (nv-85): «De amigos» y amigos que fueron salen de check-ins; el mejor cupón, de cupones.
+	businessSvc.WithExplore(friendRepo, resenas.NewRepository(db), cupones.NewRepository(db))
 	consentRepo := usuarios.NewConsentRepository(db)
 	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {

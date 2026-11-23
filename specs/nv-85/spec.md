@@ -33,8 +33,21 @@ Explorar en la maqueta (`30_Explorar`, `31_Filtros`, `32_ExpMapa`, `34_Sello`) f
 ## Límites
 - Sin filtros por servicios (terraza, pet friendly) en esta spec; sin orden por popularidad entre amigos.
 
+## Drift al ejecutar (2026-11-22)
+- **Código:** `internal/negocios/explorar.go` (filtros `ExploreFilters` embebidos en `ListQuery`, `CountQuery` y `MapQuery`; tarjeta `ExploreItem`; `CrowdLevel`, `BestCoupon`, `Initials`). Adaptadores: `amistades.Repository.FriendIDs`, `resenas.Repository.VisitedPlaces`/`VisitsAt` (`internal/resenas/explorar.go`) y `cupones.Repository.OffersFor` (`internal/cupones/explorar.go`), conectados con `negocios.Service.WithExplore` en `cmd/api/main.go` y `authtest`.
+- **Tarjeta en un tipo propio:** `ExploreItem` (solo `GET /lugares`) envuelve a `PlaceItem`; búsquedas, recientes, grupos y planes siguen con la tarjeta de antes y sus contratos no cambian.
+- **`con_cupon`:** filtra por `negocios.cupones_activos > 0` (lo recalcula cupones al cambiar un cupón y su trabajo cada 5 min), no por `ix_cupones_vigentes`, que no existe. Así lista, conteo y mapa filtran en la misma consulta de `negocios`. El cupón de la tarjeta sí se lee vigente al momento con `ix_cupones_negocio` (`estado` + fechas, como nv-61): en el hueco de hasta 5 min un lugar puede salir con `con_cupon` y `cupon: null`.
+- **Mejor cupón:** «mayor descuento» = mayor ahorro estimado con `precio_promedio` del lugar: porcentaje × promedio, monto tal cual, 2×1 = un promedio, regalo = 0 (sale si es el único). Empate: el que vence antes y luego el id menor.
+- **`precio`:** niveles 1–4 (como `nivel_precio` y `precio_max`), no 1–3; `precio_max` sigue y se combina con `precio`.
+- **Afluencia:** tres niveles fijos sobre la curva 0–100 de nv-66: 0–33 `poco`, 34–66 `moderado`, 67–100 `pico`; sin curva o con el día en ceros = `null`.
+- **Amigos:** amistades aceptadas (hasta 500, `MaxList`) activas y sin `actividad: nadie`. Con `de_amigos` la cuenta debe estar activa (en eliminación pendiente = 403, como `RequireActive`); quien consulta va en la misma lectura de cuentas, sin consulta extra. `amigos_fueron` sale solo con sesión: `{total, iniciales[≤ 3]{id, iniciales}}`, del check-in más reciente al más viejo; iniciales = primer y último nombre.
+- **Sello:** usa `sello_excelencia` tal como existe hoy (nv-56/nv-76). La regla y la vigencia del Sello son de nv-80 (pendiente del revisor); no se inventó ninguna.
+- **Índice nuevo:** `ix_negocios_sello` = `{estado: 1, calificacion.promedio: -1}` parcial con `sello_excelencia: true`. Hay que crearlo en Atlas (`go run ./scripts/indexes`) antes del despliegue.
+- **Cursor:** con `de_amigos` el ámbito firmado incluye a quien consulta (otro = 422).
+- **Pruebas:** Unit `internal/negocios/explorar_test.go`; Integration `tests/integration/explorar_test.go`; Security `tests/security/explorar_security_test.go`; Contract `tests/contract/explorar_contract_test.go` (`negocios/lugares_tarjeta_200`) y `negocios/lugares_200` con los campos nuevos; Database `ix_negocios_sello` en `tests/database/indexes_test.go`. Sin Redis nuevo.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-22), ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** (1) «de amigos» = check-in de un amigo en 180 días; (2) solo iniciales de amigos en la tarjeta; (3) afluencia en tres niveles con la curva existente.

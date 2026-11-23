@@ -4,17 +4,20 @@
     "items": [
       {
         "abierto_ahora": "bool",
+        "afluencia_ahora": "null",
         "calificacion": {
           "promedio": "number",
           "total_resenas": "number"
         },
         "categoria": "string",
+        "cupon": "null",
         "distancia_m": "number",
         "foto_portada": "string",
         "id": "string",
         "nivel_precio": "number",
         "nombre": "string",
         "precio_promedio": "number",
+        "sello_excelencia": "bool",
         "slug": "string",
         "ubicacion": {
           "lat": "number",

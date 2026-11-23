@@ -1,0 +1,42 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "abierto_ahora": "bool",
+        "afluencia_ahora": "string",
+        "amigos_fueron": {
+          "iniciales": [
+            {
+              "id": "string",
+              "iniciales": "string"
+            }
+          ],
+          "total": "number"
+        },
+        "calificacion": {
+          "promedio": "number",
+          "total_resenas": "number"
+        },
+        "categoria": "string",
+        "cupon": {
+          "id": "string",
+          "titulo": "string"
+        },
+        "foto_portada": "string",
+        "id": "string",
+        "nivel_precio": "number",
+        "nombre": "string",
+        "precio_promedio": "number",
+        "sello_excelencia": "bool",
+        "slug": "string",
+        "ubicacion": {
+          "lat": "number",
+          "lng": "number"
+        }
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

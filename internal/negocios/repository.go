@@ -56,6 +56,11 @@ func Indexes() []platformmongo.IndexSet {
 				{Key: "estado", Value: 1},
 				{Key: "revision.enviado_en", Value: 1},
 			}, Options: options.Index().SetName("ix_revision")},
+			// «Con Sello» de Explorar (nv-85): solo los negocios con Sello, por calificación.
+			{Keys: bson.D{
+				{Key: "estado", Value: 1},
+				{Key: "calificacion.promedio", Value: -1},
+			}, Options: options.Index().SetName("ix_negocios_sello").SetPartialFilterExpression(bson.D{{Key: "sello_excelencia", Value: true}})},
 		},
 	}}
 }

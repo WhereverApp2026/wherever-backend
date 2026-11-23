@@ -113,14 +113,14 @@ func TestLugaresCursor_ScopeFollowsFilters(t *testing.T) {
 	require.NoError(t, err)
 	s := (&Service{}).WithCursor(signer)
 	base := listParams{Order: OrderRating, RadiusM: DefaultRadiusM}
-	a := s.listScope(ListQuery{}, base)
-	assert.Equal(t, a, s.listScope(ListQuery{}, base))
-	assert.NotEqual(t, a, s.listScope(ListQuery{MaxPrice: 2}, base))
-	assert.NotEqual(t, a, s.listScope(ListQuery{Category: "cafe"}, base))
+	a := s.listScope(ListQuery{}, base, nil)
+	assert.Equal(t, a, s.listScope(ListQuery{}, base, nil))
+	assert.NotEqual(t, a, s.listScope(ListQuery{ExploreFilters: ExploreFilters{MaxPrice: 2}}, base, nil))
+	assert.NotEqual(t, a, s.listScope(ListQuery{ExploreFilters: ExploreFilters{Category: "cafe"}}, base, nil))
 	near := base
 	near.Near = &geoPoint{Lat: 19.4, Lng: -99.1}
-	assert.NotEqual(t, a, s.listScope(ListQuery{}, near))
-	assert.NotContains(t, s.listScope(ListQuery{}, near), "19.4")
+	assert.NotEqual(t, a, s.listScope(ListQuery{}, near, nil))
+	assert.NotContains(t, s.listScope(ListQuery{}, near, nil), "19.4")
 }
 
 func TestLugares_CellDegreesShrinkWithZoom(t *testing.T) {
