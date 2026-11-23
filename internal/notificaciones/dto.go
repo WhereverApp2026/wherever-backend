@@ -52,9 +52,10 @@ type MarkRequest struct {
 	Read *bool `json:"leida" validate:"required"`
 }
 
-// ListQuery es GET /notificaciones.
+// ListQuery es GET /notificaciones; sin `categoria` trae todo (nv-86).
 type ListQuery struct {
-	Cursor string `query:"cursor" validate:"omitempty,max=300,cursor"`
+	Category string `query:"categoria" validate:"omitempty,oneof=social reservas planes"`
+	Cursor   string `query:"cursor" validate:"omitempty,max=300,cursor"`
 	Limit  int    `query:"limite" validate:"min=1,max=50"`
 }
 
@@ -65,14 +66,17 @@ func NewListQuery() ListQuery { return ListQuery{Limit: pagination.DefaultLimit}
 type Item struct {
 	ID        string            `json:"id"`
 	Kind      string            `json:"tipo"`
+	Category  *string           `json:"categoria"`
 	Data      map[string]string `json:"datos"`
 	Read      bool              `json:"leida"`
 	CreatedAt time.Time         `json:"creada_en"`
 }
 
-// UnreadResponse es la respuesta de GET /notificaciones/no-leidas.
+// UnreadResponse es la respuesta de GET /notificaciones/no-leidas; `por_categoria` siempre trae
+// las tres pestañas (nv-86).
 type UnreadResponse struct {
-	Total int64 `json:"total"`
+	Total      int64            `json:"total"`
+	ByCategory map[string]int64 `json:"por_categoria"`
 }
 
 func newItem(n Notification) Item {
@@ -80,5 +84,9 @@ func newItem(n Notification) Item {
 	if data == nil {
 		data = map[string]string{}
 	}
-	return Item{ID: n.ID.Hex(), Kind: n.Kind, Data: data, Read: n.ReadAt != nil, CreatedAt: n.CreatedAt}
+	var category *string
+	if c := CategoryOf(n.Kind); c != "" {
+		category = &c
+	}
+	return Item{ID: n.ID.Hex(), Kind: n.Kind, Category: category, Data: data, Read: n.ReadAt != nil, CreatedAt: n.CreatedAt}
 }

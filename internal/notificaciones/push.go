@@ -57,6 +57,10 @@ var pushText = map[string]string{
 	KindLike:         "A alguien le gustó tu publicación",
 	KindComment:      "Comentaron tu publicación",
 	KindReviewUseful: "A alguien le fue útil tu reseña",
+	// nv-86: genéricos; la app arma el texto con los ids.
+	KindReviewPending:  "Cuéntanos cómo te fue",
+	KindCouponExpiring: "Uno de tus cupones vence pronto",
+	KindTimeToLeave:    "Es hora de salir a tu siguiente parada",
 	// nv-87: sin texto ni autor.
 	KindDirectMessage: "Tienes mensajes nuevos de un amigo",
 }
@@ -203,6 +207,14 @@ var groupKinds = map[string]bool{KindPlanInvite: true, KindVoteOpened: true, Kin
 // ChannelOf es el canal del teléfono de un tipo de aviso (nv-71); vacío = sin canal (siempre
 // pasa).
 func ChannelOf(kind string) string {
+	switch kind {
+	case KindCouponExpiring:
+		return ChannelCoupons
+	case KindReviewPending:
+		return ChannelReviews
+	case KindTimeToLeave:
+		return ChannelGroups
+	}
 	if groupKinds[kind] {
 		return ChannelGroups
 	}
@@ -212,10 +224,13 @@ func ChannelOf(kind string) string {
 	return ""
 }
 
-// Wanted dice si el aviso debe sonar: el tipo está encendido y no es horario silencioso (en
+// Wanted dice si el aviso debe sonar: el tipo (y su interruptor de nv-86) está encendido y no es horario silencioso (en
 // la hora de México, la zona por defecto de la constitución §5).
 func Wanted(prefs usuarios.Preferences, kind string, now time.Time) bool {
 	if groupKinds[kind] && !prefs.Notifications.Groups {
+		return false
+	}
+	if on, _ := switchOn(prefs.Notifications, kind); !on {
 		return false
 	}
 	return !inQuietHours(prefs.QuietHours, now.In(negocios.MexicoCity()))

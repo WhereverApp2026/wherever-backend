@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "body": {
+    "por_categoria": {
+      "planes": "number",
+      "reservas": "number",
+      "social": "number"
+    },
+    "total": "number"
+  }
+}

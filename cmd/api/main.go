@@ -145,6 +145,7 @@ func run() error {
 	waitBookings := startReservas(ctx, mongoClient.DB(), jobNotifier, log)
 	waitCoupons := startCupones(ctx, mongoClient.DB(), log)
 	waitStats := startEstadisticas(ctx, mongoClient.DB(), log)
+	waitAvisos := startAvisos(ctx, mongoClient.DB(), jobNotifier, log)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- app.Listen(":" + strconv.Itoa(cfg.Port)) }()
@@ -163,6 +164,7 @@ func run() error {
 	waitBookings()
 	waitCoupons()
 	waitStats()
+	waitAvisos()
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	// Antes de cerrar las bases se vacía la cola de correo (con el mismo plazo).
@@ -206,7 +208,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	modSvc := moderacion.NewService(modRepo, cursor, log)
 	// Centro de avisos (nv-40): amistades, grupos y votaciones guardan ahí sus avisos.
 	notifRepo := notificaciones.NewRepository(db)
-	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
+	// Con WithUsers, un tipo apagado en las preferencias no se guarda ni se envía (nv-86).
+	notifier := notificaciones.NewService(notifRepo, cursor, log).WithUsers(users).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	planSvc := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph.queue).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo)
 	recoRepo := recomendaciones.NewRepository(db)
 	searchRepo := busquedas.NewRepository(db)
@@ -659,10 +662,11 @@ func startVotes(ctx context.Context, db *mongodriver.Database, queue *grafo.Queu
 }
 
 // backgroundNotifier es el centro de avisos con push de los trabajos en segundo plano
-// (votaciones de nv-39 y recordatorio de reservas de nv-73); no usa cursor.
+// (votaciones de nv-39, recordatorio de reservas de nv-73 y avisos de nv-86); no usa cursor.
 func backgroundNotifier(db *mongodriver.Database, fcm config.FCM, dataKeys string, log *slog.Logger) notificaciones.Notifier {
 	notifRepo := notificaciones.NewRepository(db)
-	return notificaciones.NewService(notifRepo, nil, log).WithPush(notificaciones.PusherFromConfig(fcm, usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log)), notifRepo, log))
+	users := usuarios.NewRepository(db).WithCipher(fieldCipher(dataKeys, log))
+	return notificaciones.NewService(notifRepo, nil, log).WithUsers(users).WithPush(notificaciones.PusherFromConfig(fcm, users, notifRepo, log))
 }
 
 // fieldCipher arma el llavero de DATA_KEYS (nv-48). config.Load ya lo validó; sin llaves
