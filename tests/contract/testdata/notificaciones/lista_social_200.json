@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "categoria": "string",
+        "creada_en": "string",
+        "datos": {
+          "momento_id": "string"
+        },
+        "id": "string",
+        "leida": "bool",
+        "tipo": "string"
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string"
+  }
+}

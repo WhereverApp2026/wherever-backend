@@ -10,8 +10,10 @@
       "cupones": "bool",
       "grupos": "bool",
       "promociones": "bool",
+      "recordatorios_plan": "bool",
       "resenas": "bool",
-      "reservas": "bool"
+      "reservas": "bool",
+      "social": "bool"
     },
     "tema": "string",
     "unidades": "string"

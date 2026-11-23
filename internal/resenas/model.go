@@ -172,6 +172,8 @@ func Indexes() []platformmongo.IndexSet {
 			idx(bson.D{{Key: "negocio_id", Value: 1}, {Key: "creado_en", Value: -1}}, options.Index().SetName("ix_checkins_negocio")),
 			idx(bson.D{{Key: "usuario_id", Value: 1}, {Key: "creado_en", Value: -1}}, options.Index().SetName("ix_por_resenar").SetPartialFilterExpression(valido)),
 			idx(bson.D{{Key: "usuario_id", Value: 1}, {Key: "negocio_id", Value: 1}, {Key: "dia", Value: 1}}, options.Index().SetName("ux_checkin_dia").SetUnique(true).SetPartialFilterExpression(valido)),
+			// Barrido de reseñas pendientes (nv-86): check-ins válidos por fecha, de todas las personas.
+			idx(bson.D{{Key: "creado_en", Value: 1}}, options.Index().SetName("ix_checkins_pendientes").SetPartialFilterExpression(valido)),
 		}},
 		{Collection: Collection, Models: []mongo.IndexModel{
 			idx(bson.D{{Key: "checkin_id", Value: 1}}, options.Index().SetName("ux_resena_checkin").SetUnique(true)),

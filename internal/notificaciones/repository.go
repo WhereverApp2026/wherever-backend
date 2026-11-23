@@ -27,6 +27,8 @@ func Indexes() []platformmongo.IndexSet {
 			Models: []mongo.IndexModel{
 				{Keys: bson.D{{Key: "usuario_id", Value: 1}, {Key: "creada_en", Value: -1}, {Key: "_id", Value: -1}}, Options: options.Index().SetName("ix_usuario_creada")},
 				{Keys: bson.D{{Key: "expira_en", Value: 1}}, Options: options.Index().SetName("ttl_notificacion").SetExpireAfterSeconds(0)},
+				// Pestañas de la bandeja (nv-86): la categoría se resuelve a tipos con $in.
+				{Keys: bson.D{{Key: "usuario_id", Value: 1}, {Key: "tipo", Value: 1}, {Key: "creada_en", Value: -1}, {Key: "_id", Value: -1}}, Options: options.Index().SetName("ix_notif_categoria")},
 			},
 		},
 		{
@@ -70,9 +72,13 @@ type Position struct {
 	ID        bson.ObjectID
 }
 
-// List trae hasta limit+1 avisos del usuario, del más nuevo al más viejo.
-func (r *Repository) List(ctx context.Context, userID bson.ObjectID, after *Position, limit int) ([]Notification, error) {
+// List trae hasta limit+1 avisos del usuario, del más nuevo al más viejo; con kinds, solo
+// esos tipos (una pestaña, ix_notif_categoria).
+func (r *Repository) List(ctx context.Context, userID bson.ObjectID, kinds []string, after *Position, limit int) ([]Notification, error) {
 	filter := bson.D{{Key: "usuario_id", Value: userID}}
+	if kinds != nil {
+		filter = append(filter, bson.E{Key: "tipo", Value: bson.D{{Key: "$in", Value: kinds}}})
+	}
 	if after != nil {
 		filter = append(filter, bson.E{Key: "$or", Value: bson.A{
 			bson.D{{Key: "creada_en", Value: bson.D{{Key: "$lt", Value: after.CreatedAt}}}},
@@ -95,9 +101,27 @@ func findAll[T any](ctx context.Context, col *mongo.Collection, filter bson.D, o
 	return out, nil
 }
 
-// CountUnread cuenta los avisos sin leer del usuario.
-func (r *Repository) CountUnread(ctx context.Context, userID bson.ObjectID) (int64, error) {
-	return r.notes.CountDocuments(ctx, bson.D{{Key: "usuario_id", Value: userID}, {Key: "leida_en", Value: bson.D{{Key: "$exists", Value: false}}}})
+// UnreadByKind cuenta los avisos sin leer del usuario por tipo (nv-86), en una consulta.
+func (r *Repository) UnreadByKind(ctx context.Context, userID bson.ObjectID) (map[string]int64, error) {
+	cur, err := r.notes.Aggregate(ctx, mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "usuario_id", Value: userID}, {Key: "leida_en", Value: bson.D{{Key: "$exists", Value: false}}}}}},
+		{{Key: "$group", Value: bson.D{{Key: "_id", Value: "$tipo"}, {Key: "n", Value: bson.D{{Key: "$sum", Value: 1}}}}}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Kind string `bson:"_id"`
+		N    int64  `bson:"n"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	out := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		out[row.Kind] = row.N
+	}
+	return out, nil
 }
 
 // SetRead marca (o desmarca) un aviso del usuario y devuelve cómo quedó.

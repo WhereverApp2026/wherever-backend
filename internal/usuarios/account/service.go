@@ -310,6 +310,8 @@ func (s *Service) PatchPreferences(ctx context.Context, claims *middleware.Claim
 		setIf(&set, "preferencias.notificaciones.grupos", n.Groups)
 		setIf(&set, "preferencias.notificaciones.resenas", n.Reviews)
 		setIf(&set, "preferencias.notificaciones.promociones", n.Promotions)
+		setIf(&set, "preferencias.notificaciones.social", n.Social)
+		setIf(&set, "preferencias.notificaciones.recordatorios_plan", n.PlanReminders)
 	}
 	user, err := s.users.Update(ctx, userID, set)
 	if err != nil {
