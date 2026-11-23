@@ -47,6 +47,8 @@ const (
 	KindReviewPending  = "resena_pendiente"
 	KindCouponExpiring = "cupon_por_vencer"
 	KindTimeToLeave    = "hora_de_salir"
+	// KindDirectMessage es el mensaje directo de un amigo (nv-87), agrupado por conversación.
+	KindDirectMessage = "mensaje_directo"
 )
 
 // Límites de la spec.

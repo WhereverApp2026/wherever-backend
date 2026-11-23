@@ -61,6 +61,8 @@ var pushText = map[string]string{
 	KindReviewPending:  "Cuéntanos cómo te fue",
 	KindCouponExpiring: "Uno de tus cupones vence pronto",
 	KindTimeToLeave:    "Es hora de salir a tu siguiente parada",
+	// nv-87: sin texto ni autor.
+	KindDirectMessage: "Tienes mensajes nuevos de un amigo",
 }
 
 // bookingKinds van por el canal `reservas`, que el teléfono no puede apagar (nv-71, nv-73).

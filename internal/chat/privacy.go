@@ -75,14 +75,14 @@ type exported struct {
 	Reactions []exportedReaction `json:"reacciones"`
 }
 
-// Export devuelve los mensajes propios no borrados y las reacciones propias; nunca mensajes
-// ni reacciones de otras personas.
+// Export devuelve los mensajes propios no borrados y las reacciones propias del chat de grupos
+// (los directos los exporta DirectPrivacy); nunca mensajes ni reacciones de otras personas.
 func (p *Privacy) Export(ctx context.Context, userID bson.ObjectID) (any, error) {
-	mine, err := p.repo.ListByAuthor(ctx, userID)
+	mine, err := p.repo.ListByAuthor(ctx, fieldGroup, userID)
 	if err != nil {
 		return nil, err
 	}
-	reacted, err := p.repo.ListReactedBy(ctx, userID)
+	reacted, err := p.repo.ListReactedBy(ctx, fieldGroup, userID)
 	if err != nil {
 		return nil, err
 	}

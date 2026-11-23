@@ -28,6 +28,7 @@ var categoryOf = map[string]string{
 	KindLike:           CategorySocial,
 	KindComment:        CategorySocial,
 	KindReviewUseful:   CategorySocial,
+	KindDirectMessage:  CategorySocial,
 
 	KindReservaMensaje:      CategoryBookings,
 	KindReservaRecordatorio: CategoryBookings,
@@ -56,7 +57,7 @@ var allKinds = []string{
 	KindFriendRequest, KindFriendAccepted, KindPlanInvite, KindVoteOpened, KindVoteClosed,
 	KindBusinessReviewed, KindGroupMessage, KindMomentTagged, KindMomentThanked, KindMomentFeatured,
 	KindReservaMensaje, KindReservaRecordatorio, KindLike, KindComment, KindReviewUseful,
-	KindReviewPending, KindCouponExpiring, KindTimeToLeave,
+	KindReviewPending, KindCouponExpiring, KindTimeToLeave, KindDirectMessage,
 }
 
 // switchOn dice si el interruptor de `preferencias.notificaciones` que apaga el tipo del todo: con

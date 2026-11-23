@@ -5,6 +5,11 @@
     "busquedas_recientes": [],
     "checkins": [],
     "consentimientos": [],
+    "conversaciones": {
+      "conversaciones": [],
+      "mensajes": [],
+      "reacciones": []
+    },
     "cupones": [],
     "descartes_usuario": [],
     "deudas_vaca": [],

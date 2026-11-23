@@ -43,9 +43,21 @@ La maqueta tiene **mensajes directos** entre amigos: la sección «Mensajes dire
 ## Límites
 - Sin mensajes a no amigos, sin grupos desde aquí (para eso nv-37), sin canal en vivo, sin audios ni archivos.
 
+## Drift al ejecutar (2026-11-23)
+- **Código:** dentro de `internal/chat` (reutiliza repositorio, reacciones, cursor y `CleanText` de nv-57): `directos_model.go`, `directos_repository.go` (`ConversationRepository`, `UnreadCounts`, `Newest`), `directos_dto.go`, `directos_service.go` (`DirectService`), `directos_handler.go` (`DirectHandler`, módulo aparte en `main.go`, `authtest` y `scripts/routes`) y `directos_privacy.go` (`DirectPrivacy`). El repositorio de `mensajes` recibe la conversación (`grupo_id` o `conversacion_id`) en vez del id del grupo; `Message` ganó `conversacion_id` y `adjunto`, y `grupo_id` pasó a `omitempty`.
+- **Índices:** además de `ux_conversacion_par` y `ix_mensajes_conversacion`: `ix_conversacion_participante` `{participantes, actualizada_en}` (la lista y ARCO) y `ux_id_cliente_conversacion` `{conversacion_id, id_cliente}` parcial (el `ux_id_cliente` de nv-57 es por grupo). Hay que crearlos en Atlas (`go run ./scripts/indexes`) antes del despliegue. El `ux_id_cliente` viejo también ve los directos con `grupo_id` nulo: dos UUID v4 iguales en conversaciones distintas darían 503; no se cambió para no recrear un índice vivo.
+- **Lectura y escritura:** leer, borrar lo propio y marcar leído piden participar sin bloqueo; escribir y reaccionar piden además la amistad aceptada (si la eliminaron, el historial se lee pero no se escribe). Todo lo demás es 404 igual. Todas las rutas piden cuenta activa (403).
+- **Lista:** sin paginación, las 100 más recientes (`MaxConversations`); una conversación abierta sin mensajes no sale. `otro` sale `null` si la cuenta ya no está activa. `no_leidos` se cuenta en una sola agregación.
+- **Invitar a un plan:** sin ruta nueva. El mensaje lleva el adjunto `plan` y la app llama `POST /planes/{id}/invitaciones`; la tarjeta trae `adjunto.invitacion` = `enviada` (quien lo recibió está `invitado` en el grupo del plan) o `aceptada` (`confirmado`), calculado al leer.
+- **Adjuntos:** el servidor guarda `{tipo, id, nombre}` (nombre del plan o del lugar al enviarlo). Plan con `planes.Service.Visible` (nv-83/nv-84, respeta `compartir_planes`), lugar visible en `negocios`, momento con `postales.Service.Visible` (respeta `actividad` y `compartir_postales` de nv-82). Lo que no veo o no existe = 422 `adjunto`.
+- **Avisos:** `mensaje_directo` con `notificaciones.Agrupador` (uno por persona y conversación cada 10 min, `datos.conversacion_id`, sin texto ni autor); no se avisa si quien recibe silenció a quien escribe (nv-70); el horario silencioso lo aplica el push. Va en la categoría `social` de nv-86.
+- **Límite:** 120 por hora contados en MongoDB (`ix_autor`, solo mensajes con `conversacion_id`), sin política de Redis: no sube `TestPresupuestoRedis_*`. El límite de 30/min del chat de grupo ya no cuenta los directos.
+- **ARCO:** `DirectPrivacy` (`conversaciones` en la exportación: conversaciones con el id de la otra persona, mis mensajes y mis reacciones); borrar la cuenta vacía sus mensajes sin autor, quita su lectura y su vista previa, y borra la conversación con sus mensajes cuando la otra persona ya había borrado la suya. El exportador del chat de grupo dejó de incluir los directos.
+- **Pruebas:** Unit `internal/chat/directos_test.go`; Integration `tests/integration/directos_test.go`; Security `tests/security/directos_security_test.go`; Contract `tests/contract/directos_contract_test.go` (`testdata/directos/*`) y `usuarios/exportacion_descargar_200` con `conversaciones`; Database en `tests/database/indexes_test.go`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-23), ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** (1) solo entre amigos; (2) reutilizar `mensajes` de nv-57 con `conversacion_id`; (3) sin «En línea»; (4) moderación solo por reglas en privado.
+- **Decisiones para el revisor:** (1) solo entre amigos; (2) reutilizar `mensajes` de nv-57 con `conversacion_id`; (3) sin «En línea»; (4) moderación solo por reglas en privado. Se ejecutó con las cuatro como están.
 - **Detalle:** `specs/nv-87/checklists/gates.md` al ejecutar.
