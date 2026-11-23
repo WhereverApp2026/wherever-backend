@@ -89,7 +89,17 @@ type Notifications struct {
 	Groups     bool `bson:"grupos"`
 	Reviews    bool `bson:"resenas"`
 	Promotions bool `bson:"promociones"`
+	// Social y PlanReminders llegan con nv-86; ausentes = encendidos (las cuentas de antes no
+	// los tienen). Se leen con SocialOn y PlanRemindersOn, nunca directo.
+	Social        *bool `bson:"social,omitempty"`
+	PlanReminders *bool `bson:"recordatorios_plan,omitempty"`
 }
+
+// SocialOn dice si recibe me gusta, comentarios, «útil» y avisos de momentos (nv-86).
+func (n Notifications) SocialOn() bool { return n.Social == nil || *n.Social }
+
+// PlanRemindersOn dice si recibe la hora de salir a la siguiente parada (nv-86).
+func (n Notifications) PlanRemindersOn() bool { return n.PlanReminders == nil || *n.PlanReminders }
 
 // Preferences son los ajustes de la app.
 type Preferences struct {

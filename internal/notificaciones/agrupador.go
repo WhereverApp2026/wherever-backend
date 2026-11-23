@@ -51,3 +51,21 @@ func (a *Agrupador) Emit(ctx context.Context, to bson.ObjectID, kind, objeto str
 		a.n.Emit(ctx, to, kind, data)
 	}
 }
+
+// Once avisa `kind` a `to` sobre `objeto` una sola vez (nv-86: reseña pendiente, cupón por
+// vencer, hora de salir): la reserva dura OnceKeep, más que la ventana de cada tarea, así que
+// correr la tarea otra vez o en la otra instancia no repite el aviso.
+func (a *Agrupador) Once(ctx context.Context, to bson.ObjectID, kind, objeto string, data map[string]string) bool {
+	if a == nil {
+		return false
+	}
+	ok, err := a.repo.ClaimGroup(ctx, to, kind+":"+objeto, a.now().UTC(), OnceKeep)
+	if err != nil {
+		a.log.WarnContext(ctx, "notificaciones: no se reservó el aviso único", slog.String("evento", "aviso_fallido"), slog.String("tipo", kind))
+		return false
+	}
+	if ok {
+		a.n.Emit(ctx, to, kind, data)
+	}
+	return ok
+}

@@ -34,9 +34,20 @@ La bandeja de la maqueta (`18_Notif`, `87_PushBloqueo`, `88_PushBanner`) tiene p
 ## Límites
 - Sin avisos por correo de estos tipos; sin resumen semanal.
 
+## Drift al ejecutar (2026-11-23)
+- **Código:** `internal/notificaciones/categoria.go` (tipo → categoría, `KindsOf`, interruptores `Storable`), `barrido.go` (tarea cada 5 min, interfaz `Unico`), `Agrupador.Once`; tareas en su módulo: `resenas.AvisoPendiente` (`internal/resenas/avisos.go`), `cupones.AvisoPorVencer` (`internal/cupones/avisos.go`) y `planes.AvisoSalida` (`internal/planes/salida.go`), conectadas en `cmd/api/avisos.go`. Preferencias en `usuarios.Notifications` (`social`, `recordatorios_plan`; `cupones` ya existía).
+- **Categoría sin campo guardado:** la pestaña se resuelve a tipos con `tipo $in` y el índice es `ix_notif_categoria` = `{usuario_id, tipo, creada_en: -1, _id: -1}` (no `{usuario_id, categoria, _id}`): los avisos de antes entran sin migrar y el mapa se puede cambiar en código. El orden sigue siendo `creada_en` y el cursor queda atado a la categoría (otro = 422).
+- **Categorías:** `social` = amistad, invitación a plan, mensajes de grupo, momentos, me gusta, comentario y útil; `reservas` = mensaje y recordatorio de reserva (los tipos de pago y cambio aún no existen); `planes` = votaciones y hora de salir. `negocio_revisado`, `resena_pendiente` y `cupon_por_vencer` no tienen pestaña: salen solo en «todo» con `categoria: null` y cuentan solo en `total`.
+- **Agrupado de me gusta:** ya lo hacía nv-83 (`Agrupador`, 10 min por objeto); el texto «Mariana y 3 más» lo arma la app con `GET /{objeto}/{id}/reacciones`. Sin cambio aquí.
+- **Interruptores:** `social` apaga me gusta, comentario, útil y los avisos de momentos (no las solicitudes de amistad, invitaciones ni mensajes); `cupones` apaga `cupon_por_vencer`; `resenas` (existente) apaga `resena_pendiente`; `recordatorios_plan` apaga `hora_de_salir`. Apagado = no se guarda ni se envía (el centro lee a la persona solo para esos tipos; si no puede leerla, no guarda). `grupos` sigue callando solo el push. `social` y `recordatorios_plan` ausentes = encendidos.
+- **Trabajos:** los tres avisos van en una tarea cada 5 min por instancia (no en el trabajo nocturno): la reseña a las 2 h y la hora de salir no caben en una corrida diaria. Cada aviso se reserva una vez en `notificaciones_agrupadas` (30 días, TTL), así que las dos instancias no lo repiten y no se usa Redis. Cupón por vencer solo de 10:00 a 21:59 de México; reseña pendiente para check-ins de hace 2 a 24 h; hora de salir solo a quien hizo el plan, con planes activos de hoy (`ix_estado_fecha`, no `ix_dueno_estado_fecha`, porque mira a todas las personas).
+- **Canal del teléfono (nv-71):** `cupon_por_vencer` → `cupones`, `resena_pendiente` → `resenas`, `hora_de_salir` → `grupos`.
+- **Índices nuevos:** `ix_notif_categoria` (notificaciones) e `ix_checkins_pendientes` = `{creado_en: 1}` parcial con `valido: true` (checkins). Hay que crearlos en Atlas (`go run ./scripts/indexes`) antes del despliegue.
+- **Pruebas:** Unit `internal/notificaciones/categoria_test.go`, `internal/planes/salida_test.go`, `internal/cupones/avisos_test.go`; Integration `tests/integration/notificaciones_categorias_test.go`; Security `TestNotificacionesSecurity_CategoriasSoloMiasYSoloIDs`; Contract `tests/contract/notificaciones_contract_test.go` (`notificaciones/lista_social_200`, `notificaciones/no_leidas_200`) y las preferencias de `usuarios/*`; Database los dos índices en `tests/database/indexes_test.go`. Sin Redis nuevo.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador con evidencia (2026-11-23), ejecutada; ver `checklists/gates.md`.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
-- **Decisiones para el revisor:** (1) tres categorías; (2) «hora de salir» con una tarea cada 5 min; (3) reseña pendiente a las 2 h del check-in.
-- **Detalle:** `specs/nv-86/checklists/gates.md` al ejecutar.
+- **Decisiones para el revisor:** (1) tres categorías, con reseña pendiente, cupón por vencer y negocio revisado solo en «todo»; (2) «hora de salir» con una tarea cada 5 min; (3) reseña pendiente a las 2 h del check-in; (4) qué apaga `social`.
+- **Detalle:** `specs/nv-86/checklists/gates.md`.

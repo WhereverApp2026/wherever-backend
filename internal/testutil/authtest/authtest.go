@@ -232,7 +232,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	chatRepo := chat.NewRepository(client.DB())
 	modRepo := moderacion.NewRepository(client.DB())
 	notifRepo := notificaciones.NewRepository(client.DB())
-	notifier := notificaciones.NewService(notifRepo, cursor, log).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
+	notifier := notificaciones.NewService(notifRepo, cursor, log).WithUsers(users).WithPush(notificaciones.PusherFromConfig(cfg.FCM, users, notifRepo, log))
 	plans := planes.NewService(planRepo, planes.NewCalculadora(businessRepo, planes.DefaultVelocidades())).WithGraph(graph).WithCursor(cursor).WithMembers(groupRepo).WithSurprises(groupRepo).WithSync(syncRepo).WithExtras(businessRepo, friendRepo, reservas.NewRepository(client.DB())).WithSharing(users).
 		WithFriendsFeed(friendRepo, users, groupRepo, reacciones.NewRepository(client.DB()))
 	consentRepo := usuarios.NewConsentRepository(client.DB())

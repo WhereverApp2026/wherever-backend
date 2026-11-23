@@ -13,12 +13,14 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/pagination"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/validation"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
 // Service atiende el centro de avisos y el registro de teléfonos, y cumple Notifier.
 type Service struct {
 	repo   *Repository
 	pusher *Pusher
+	users  Users
 	cursor *pagination.Signer
 	log    *slog.Logger
 	now    func() time.Time
@@ -33,6 +35,15 @@ func NewService(repo *Repository, cursor *pagination.Signer, log *slog.Logger) *
 func (s *Service) WithPush(p *Pusher) *Service {
 	if p != nil {
 		s.pusher = p
+	}
+	return s
+}
+
+// WithUsers lee las preferencias de quien recibe un tipo con interruptor (nv-86): apagado, el
+// aviso no se guarda ni se envía. Sin él, todo se guarda (pruebas y trabajos sin cuentas).
+func (s *Service) WithUsers(u Users) *Service {
+	if u != nil {
+		s.users = u
 	}
 	return s
 }
@@ -59,6 +70,9 @@ func HashToken(token string) string {
 // nunca cambia la respuesta de la acción que lo originó.
 func (s *Service) Emit(ctx context.Context, to bson.ObjectID, kind string, data map[string]string) {
 	now := s.now().UTC()
+	if !s.wanted(ctx, to, kind, now) {
+		return
+	}
 	if data == nil {
 		data = map[string]string{}
 	}
@@ -72,18 +86,37 @@ func (s *Service) Emit(ctx context.Context, to bson.ObjectID, kind string, data 
 	}
 }
 
+// wanted lee a la persona solo si el tipo tiene interruptor. Si no se puede leer, el aviso no
+// se guarda: mejor perder un me gusta que avisar a quien lo apagó.
+func (s *Service) wanted(ctx context.Context, to bson.ObjectID, kind string, now time.Time) bool {
+	if s.users == nil || !HasSwitch(kind) {
+		return true
+	}
+	u, err := s.users.FindByID(ctx, to)
+	if err != nil {
+		s.log.Warn("notificaciones: no se leyeron las preferencias", "evento", "aviso_fallido", "tipo", kind)
+		return false
+	}
+	return u.Status == usuarios.StatusActive && Storable(u.Preferences, kind, now)
+}
+
 // List devuelve una página del centro, del aviso más nuevo al más viejo.
 func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagination.PageResult[Item], error) {
 	me, err := self(subject)
 	if err != nil {
 		return pagination.PageResult[Item]{}, err
 	}
-	scope := s.cursor.Scope("notificaciones", me.Hex())
+	// La categoría entra al ámbito: un cursor de otra pestaña es 422.
+	scope := s.cursor.Scope("notificaciones", me.Hex(), q.Category)
 	after, err := position(s.cursor, scope, q.Cursor)
 	if err != nil {
 		return pagination.PageResult[Item]{}, err
 	}
-	rows, err := s.repo.List(ctx, me, after, q.Limit)
+	var kinds []string
+	if q.Category != "" {
+		kinds = KindsOf(q.Category)
+	}
+	rows, err := s.repo.List(ctx, me, kinds, after, q.Limit)
 	if err != nil {
 		return pagination.PageResult[Item]{}, errStore()
 	}
@@ -120,17 +153,32 @@ func position(signer *pagination.Signer, scope, raw string) (*Position, error) {
 	return &Position{CreatedAt: at, ID: id}, nil
 }
 
-// Unread cuenta los avisos sin leer.
+// Unread cuenta los avisos sin leer, en total y por categoría (nv-86).
 func (s *Service) Unread(ctx context.Context, subject string) (UnreadResponse, error) {
 	me, err := self(subject)
 	if err != nil {
 		return UnreadResponse{}, err
 	}
-	n, err := s.repo.CountUnread(ctx, me)
+	byKind, err := s.repo.UnreadByKind(ctx, me)
 	if err != nil {
 		return UnreadResponse{}, errStore()
 	}
-	return UnreadResponse{Total: n}, nil
+	return newUnread(byKind), nil
+}
+
+// newUnread suma los conteos por tipo; un tipo sin categoría solo cuenta en el total.
+func newUnread(byKind map[string]int64) UnreadResponse {
+	out := UnreadResponse{ByCategory: map[string]int64{}}
+	for _, c := range Categories() {
+		out.ByCategory[c] = 0
+	}
+	for kind, n := range byKind {
+		out.Total += n
+		if c := CategoryOf(kind); c != "" {
+			out.ByCategory[c] += n
+		}
+	}
+	return out
 }
 
 func noteID(raw string) (bson.ObjectID, error) {

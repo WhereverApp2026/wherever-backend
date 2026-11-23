@@ -42,6 +42,11 @@ const (
 	KindLike         = "me_gusta"
 	KindComment      = "comentario"
 	KindReviewUseful = "resena_util"
+	// Avisos de nv-86, a la misma persona y uno por objeto (Agrupador.Once): reseña pendiente de
+	// un check-in, cupón guardado por vencer y hora de salir a la siguiente parada del plan.
+	KindReviewPending  = "resena_pendiente"
+	KindCouponExpiring = "cupon_por_vencer"
+	KindTimeToLeave    = "hora_de_salir"
 )
 
 // Límites de la spec.
@@ -51,6 +56,9 @@ const (
 	Retention = 90 * 24 * time.Hour
 	// GroupEvery es el lapso de los avisos agrupados (nv-83): un toque más dentro de él no avisa.
 	GroupEvery = 10 * time.Minute
+	// OnceKeep es cuánto dura la reserva de un aviso único (nv-86); cubre de sobra la ventana de
+	// cada tarea (24 h, 3 días y el mismo día).
+	OnceKeep = 30 * 24 * time.Hour
 )
 
 // PlatformAndroid es la única plataforma con push por ahora (sin iOS, nv-41).

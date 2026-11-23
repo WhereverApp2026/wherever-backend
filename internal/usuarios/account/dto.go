@@ -65,6 +65,9 @@ type NotificationsInput struct {
 	Groups     *bool `json:"grupos"`
 	Reviews    *bool `json:"resenas"`
 	Promotions *bool `json:"promociones"`
+	// nv-86: me gusta, comentarios y momentos; y la hora de salir del plan.
+	Social        *bool `json:"social"`
+	PlanReminders *bool `json:"recordatorios_plan"`
 }
 
 // PreferencesRequest es el cuerpo parcial de PATCH /usuarios/yo/preferencias. Los valores de
@@ -160,7 +163,9 @@ type NotificationsResponse struct {
 	Coupons    bool `json:"cupones"`
 	Groups     bool `json:"grupos"`
 	Reviews    bool `json:"resenas"`
-	Promotions bool `json:"promociones"`
+	Promotions    bool `json:"promociones"`
+	Social        bool `json:"social"`
+	PlanReminders bool `json:"recordatorios_plan"`
 }
 
 // PreferencesResponse son los ajustes de la app.
@@ -306,12 +311,19 @@ func tastesResponse(t *usuarios.Tastes) *TastesResponse {
 func preferencesResponse(p usuarios.Preferences) PreferencesResponse {
 	out := PreferencesResponse{
 		Mobility: p.Mobility, Theme: p.Theme, Units: p.Units,
-		Notifications: NotificationsResponse(p.Notifications),
+		Notifications: notificationsResponse(p.Notifications),
 	}
 	if p.QuietHours != nil {
 		out.QuietHours = &QuietHoursResponse{From: p.QuietHours.From, To: p.QuietHours.To}
 	}
 	return out
+}
+
+func notificationsResponse(n usuarios.Notifications) NotificationsResponse {
+	return NotificationsResponse{
+		Bookings: n.Bookings, Coupons: n.Coupons, Groups: n.Groups, Reviews: n.Reviews, Promotions: n.Promotions,
+		Social: n.SocialOn(), PlanReminders: n.PlanRemindersOn(),
+	}
 }
 
 func privacyResponse(p usuarios.Privacy) PrivacyResponse {
