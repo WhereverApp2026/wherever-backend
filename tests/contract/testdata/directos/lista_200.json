@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "creada_en": "string",
+        "id": "string",
+        "no_leidos": "number",
+        "otro": {
+          "id": "string",
+          "nombre": "string"
+        },
+        "ultimo_mensaje": {
+          "autor_id": "string",
+          "creado_en": "string",
+          "eliminado": "bool",
+          "texto": "string"
+        }
+      }
+    ]
+  }
+}

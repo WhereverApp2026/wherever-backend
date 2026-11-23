@@ -248,6 +248,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(chat.NewPrivacy(chatRepo, groupRepo))
+	// Mensajes directos (nv-87): ARCO de `conversaciones` y sus mensajes.
+	convRepo := chat.NewConversationRepository(db)
+	registry.RegisterPurger(chat.NewDirectPrivacy(chatRepo, convRepo))
+	registry.RegisterExporter(chat.NewDirectPrivacy(chatRepo, convRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
@@ -314,6 +318,10 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	}
 	// Chat de grupo (nv-57): REST y push agrupado, sin canal en vivo ni Redis.
 	chatSvc := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
+	// Mensajes directos entre amigos (nv-87): moderación solo por reglas (sin IA) y avisos
+	// agrupados por conversación; sin canal en vivo ni Redis.
+	directs := chat.NewDirectService(chat.DirectDeps{Messages: chatRepo, Conversations: convRepo, Friends: friendRepo, Users: users, Plans: planSvc, PlanReader: planRepo,
+		Places: businessRepo, Moments: cards, Groups: groupRepo, Moderator: moderacion.New(nil, nil, modSvc, log), Notices: avisos, Cursor: cursor, Log: log})
 	modules := []httpapi.Module{
 		auth.NewHandler(authSvc, validator).WithActiveGuard(active),
 		insignias.NewHandler(insigniasSvc, active),
@@ -349,6 +357,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 		reacciones.NewHandler(social83, validator).WithActiveGuard(active),
 		// chat y votaciones van antes que grupos y grupos antes que planes: atienden rutas de esos prefijos (nv-37, nv-39, nv-57).
 		chat.NewHandler(chatSvc, validator).WithActiveGuard(active),
+		chat.NewDirectHandler(directs, validator).WithActiveGuard(active),
 		votaciones.NewHandler(votaciones.NewService(voteRepo, groupRepo, planRepo, planSvc, businessRepo, log).WithNotifier(notifier).WithChat(chatSvc).WithPendientes(groupRepo), validator).WithActiveGuard(active),
 		grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), validator).WithActiveGuard(active),
 		vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(redisClient), cursor), validator).WithActiveGuard(active),

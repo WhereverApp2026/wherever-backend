@@ -47,16 +47,21 @@ type Reaction struct {
 
 // Message es un documento de `mensajes`. El `_id` ordena por tiempo. Un mensaje borrado
 // conserva su lugar con `texto` y `reacciones` vacíos y `eliminado_en`.
+//
+// Un mensaje es del chat de un grupo (`grupo_id`) o de una conversación directa
+// (`conversacion_id`, nv-87); nunca de los dos. Solo los directos llevan `adjunto`.
 type Message struct {
-	ID        bson.ObjectID  `bson:"_id"`
-	GroupID   bson.ObjectID  `bson:"grupo_id"`
-	AuthorID  *bson.ObjectID `bson:"autor_id,omitempty"`
-	Kind      string         `bson:"tipo"`
-	Text      string         `bson:"texto"`
-	Reactions []Reaction     `bson:"reacciones"`
-	ClientID  string         `bson:"id_cliente,omitempty"`
-	DeletedAt *time.Time     `bson:"eliminado_en,omitempty"`
-	CreatedAt time.Time      `bson:"creado_en"`
+	ID             bson.ObjectID  `bson:"_id"`
+	GroupID        bson.ObjectID  `bson:"grupo_id,omitempty"`
+	ConversationID bson.ObjectID  `bson:"conversacion_id,omitempty"`
+	AuthorID       *bson.ObjectID `bson:"autor_id,omitempty"`
+	Kind           string         `bson:"tipo"`
+	Text           string         `bson:"texto"`
+	Attachment     *Attachment    `bson:"adjunto,omitempty"`
+	Reactions      []Reaction     `bson:"reacciones"`
+	ClientID       string         `bson:"id_cliente,omitempty"`
+	DeletedAt      *time.Time     `bson:"eliminado_en,omitempty"`
+	CreatedAt      time.Time      `bson:"creado_en"`
 }
 
 // Preview recorta el texto para `grupos.ultimo_mensaje` sin partir caracteres.

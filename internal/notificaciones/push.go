@@ -57,6 +57,8 @@ var pushText = map[string]string{
 	KindLike:         "A alguien le gustó tu publicación",
 	KindComment:      "Comentaron tu publicación",
 	KindReviewUseful: "A alguien le fue útil tu reseña",
+	// nv-87: sin texto ni autor.
+	KindDirectMessage: "Tienes mensajes nuevos de un amigo",
 }
 
 // bookingKinds van por el canal `reservas`, que el teléfono no puede apagar (nv-71, nv-73).

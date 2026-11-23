@@ -121,6 +121,9 @@ type Env struct {
 	Planes            *planes.Service
 	Votaciones        *votaciones.Service
 	Chat              *chat.Service
+	// Directos y ModeradorDirectos son los mensajes directos (nv-87) y su moderador de reglas.
+	Directos          *chat.DirectService
+	ModeradorDirectos *resenastest.Moderador
 	Moderacion        *moderacion.Service // cola y reglas (nv-43)
 	Insignias         *insignias.Service  // insignias de las personas (nv-78)
 	Contadores        *contadores.Service // contadores del perfil con caché en Redis (nv-81)
@@ -256,6 +259,10 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterExporter(favoritos.NewPrivacy(favRepo))
 	registry.RegisterExporter(votaciones.NewPrivacy(voteRepo))
 	registry.RegisterExporter(chat.NewPrivacy(chatRepo, groupRepo))
+	// Mensajes directos (nv-87): ARCO de `conversaciones` y sus mensajes.
+	convRepo := chat.NewConversationRepository(client.DB())
+	registry.RegisterPurger(chat.NewDirectPrivacy(chatRepo, convRepo))
+	registry.RegisterExporter(chat.NewDirectPrivacy(chatRepo, convRepo))
 	registry.RegisterExporter(notificaciones.NewPrivacy(notifRepo))
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
@@ -376,9 +383,12 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	require.NoError(t, err)
 
 	chats := chat.NewService(chatRepo, groupRepo, planRepo, users, cursor, log).WithNotifier(notifier)
+	moderadorDirectos := resenastest.NuevoModerador()
+	directs := chat.NewDirectService(chat.DirectDeps{Messages: chatRepo, Conversations: convRepo, Friends: friendRepo, Users: users, Plans: plans, PlanReader: planRepo,
+		Places: businessRepo, Moments: cards, Groups: groupRepo, Moderator: moderadorDirectos, Notices: avisos, Cursor: cursor, Log: log})
 	votes := votaciones.NewService(voteRepo, groupRepo, planRepo, plans, businessRepo, log).WithNotifier(notifier).WithChat(chats).WithPendientes(groupRepo)
 	return &Env{
-		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats,
+		Cfg: cfg, Mongo: client, Redis: rdb, Users: users, Service: svc, Account: acc, Cities: cities, Negocios: businesses, Planes: plans, Recomendaciones: reco, Clima: weather, OpenMeteo: openMeteo, Exports: exports, Grafo: graph, IA: modelo, Votaciones: votes, Moderacion: mods, Chat: chats, Directos: directs, ModeradorDirectos: moderadorDirectos,
 		Alta: altaSvc, Expediente: exp, Almacen: almacen, ImagenesNegocio: fotosNegocio, Panel: panels, Menu: menus, PanelTarea: panel.NewTarea(panels), Estadisticas: stats, Reservas: bookings, Pagos: pays, Stripe: stripeDoble, Cupones: coupons, Resenas: reviews, ModeradorResenas: moderadorResenas, Postales: cards, ModeradorPostales: moderadorPostales, Reacciones: social, ModeradorSocial: moderadorSocial, Avisos: avisos, ModeradorReportes: moderadorReportes, Eventos: events, ModeradorEventos: moderadorEventos, Consejos: tips,
 		Job: privacidad.NewJob(rdb, users, exports, registry, svc, log).WithTareas(expediente.NewRetencion(exp), panel.NewTarea(panels), estadisticas.NewTarea(stats), grupos.NewLocationsTask(groupRepo), chat.NewDissolvedTask(chatRepo, groupRepo), insignias.NewTarea(badges)), Mail: mail, Google: google, Log: log, Logs: logs,
 		Vectores: vectores, Semantica: sem, Sugerencias: suggestions, Personas: people, Busquedas: searches, Imagenes: images, Insignias: badges, Contadores: counters,
@@ -410,6 +420,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 			reacciones.NewHandler(social, v).WithActiveGuard(usuarios.RequireActive(users)), // antes que grupos y planes
 			chat.NewHandler(chats, v).WithActiveGuard(usuarios.RequireActive(users)),        // antes que grupos
 			votaciones.NewHandler(votes, v).WithActiveGuard(usuarios.RequireActive(users)),  // antes que grupos
+			// Mensajes directos (nv-87).
+			chat.NewDirectHandler(directs, v).WithActiveGuard(usuarios.RequireActive(users)),
 			grupos.NewHandler(grupos.NewService(groupRepo, planRepo, friendRepo, users, cursor).WithShare(businessRepo, cfg.Mail.LinkBase).WithExtras(vacaRepo, businessRepo, users).WithNotifier(notifier), v).WithActiveGuard(usuarios.RequireActive(users)), // antes que planes
 			vaca.NewHandler(vaca.NewService(vacaRepo, groupRepo, users, vaca.NewRedisLocker(rdb), cursor), v).WithActiveGuard(usuarios.RequireActive(users)),
 			favoritos.NewHandler(favoritos.NewService(favRepo, businessRepo, planRepo, cursor), v).WithActiveGuard(usuarios.RequireActive(users)),

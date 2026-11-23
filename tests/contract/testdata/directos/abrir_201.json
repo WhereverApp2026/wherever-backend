@@ -1,0 +1,13 @@
+{
+  "status": 201,
+  "body": {
+    "creada_en": "string",
+    "id": "string",
+    "no_leidos": "number",
+    "otro": {
+      "id": "string",
+      "nombre": "string"
+    },
+    "ultimo_mensaje": "null"
+  }
+}

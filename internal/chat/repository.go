@@ -37,6 +37,16 @@ func Indexes() []platformmongo.IndexSet {
 				// Límite de envíos por persona y borrado ARCO.
 				{Keys: bson.D{{Key: "autor_id", Value: 1}, {Key: "_id", Value: -1}}, Options: options.Index().SetName("ix_autor")},
 				{Keys: bson.D{{Key: "reacciones.usuario_id", Value: 1}}, Options: options.Index().SetName("ix_reaccion_usuario")},
+				// Mensajes directos (nv-87): historial por conversación y reenvío por `id_cliente`.
+				{Keys: bson.D{{Key: "conversacion_id", Value: 1}, {Key: "_id", Value: -1}}, Options: options.Index().SetName("ix_mensajes_conversacion")},
+				{
+					Keys: bson.D{{Key: "conversacion_id", Value: 1}, {Key: "id_cliente", Value: 1}},
+					Options: options.Index().SetName("ux_id_cliente_conversacion").SetUnique(true).
+						SetPartialFilterExpression(bson.D{
+							{Key: "id_cliente", Value: bson.D{{Key: "$type", Value: "string"}}},
+							{Key: "conversacion_id", Value: bson.D{{Key: "$type", Value: "objectId"}}},
+						}),
+				},
 			},
 		},
 		{
@@ -79,14 +89,32 @@ func (r *Repository) findOne(ctx context.Context, filter bson.D) (Message, error
 	return m, err
 }
 
-// FindByClientID trae el mensaje del grupo con ese `id_cliente` (reenvío).
-func (r *Repository) FindByClientID(ctx context.Context, groupID bson.ObjectID, clientID string) (Message, error) {
-	return r.findOne(ctx, bson.D{{Key: "grupo_id", Value: groupID}, {Key: "id_cliente", Value: clientID}})
+// thread es la conversación a la que pertenece un mensaje: el chat de un grupo (nv-57) o una
+// conversación directa (nv-87). Los dos viven en `mensajes`; cada uno con su campo.
+type thread struct {
+	field string
+	id    bson.ObjectID
 }
 
-// FindInGroup trae el mensaje solo si es de ese grupo.
-func (r *Repository) FindInGroup(ctx context.Context, groupID, id bson.ObjectID) (Message, error) {
-	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}, {Key: "grupo_id", Value: groupID}})
+// Campos de cada tipo de conversación en `mensajes`.
+const (
+	fieldGroup  = "grupo_id"
+	fieldDirect = "conversacion_id"
+)
+
+func groupThread(id bson.ObjectID) thread  { return thread{field: fieldGroup, id: id} }
+func directThread(id bson.ObjectID) thread { return thread{field: fieldDirect, id: id} }
+
+func (t thread) filter() bson.E { return bson.E{Key: t.field, Value: t.id} }
+
+// FindByClientID trae el mensaje de la conversación con ese `id_cliente` (reenvío).
+func (r *Repository) FindByClientID(ctx context.Context, t thread, clientID string) (Message, error) {
+	return r.findOne(ctx, bson.D{t.filter(), {Key: "id_cliente", Value: clientID}})
+}
+
+// FindIn trae el mensaje solo si es de esa conversación.
+func (r *Repository) FindIn(ctx context.Context, t thread, id bson.ObjectID) (Message, error) {
+	return r.findOne(ctx, bson.D{{Key: "_id", Value: id}, t.filter()})
 }
 
 // Page pide una página del grupo: `Before` (más viejos, del más nuevo al más viejo) o
@@ -99,8 +127,8 @@ type Page struct {
 }
 
 // List trae hasta Limit+1 mensajes (el extra dice si hay más).
-func (r *Repository) List(ctx context.Context, groupID bson.ObjectID, p Page) ([]Message, error) {
-	filter := bson.D{{Key: "grupo_id", Value: groupID}}
+func (r *Repository) List(ctx context.Context, t thread, p Page) ([]Message, error) {
+	filter := bson.D{t.filter()}
 	sort := -1
 	switch {
 	case p.After != nil:
@@ -123,11 +151,13 @@ func (r *Repository) List(ctx context.Context, groupID bson.ObjectID, p Page) ([
 	return out, nil
 }
 
-// CountSince cuenta los mensajes de authorID desde `since` (límite de envíos sin Redis).
-func (r *Repository) CountSince(ctx context.Context, authorID bson.ObjectID, since time.Time) (int64, error) {
+// CountSince cuenta los mensajes de authorID desde `since` en un tipo de conversación (el
+// campo de `thread`: grupos o directos), para el límite de envíos sin Redis.
+func (r *Repository) CountSince(ctx context.Context, field string, authorID bson.ObjectID, since time.Time) (int64, error) {
 	return r.col.CountDocuments(ctx, bson.D{
 		{Key: "autor_id", Value: authorID},
 		{Key: "_id", Value: bson.D{{Key: "$gte", Value: bson.NewObjectIDFromTimestamp(since)}}},
+		{Key: field, Value: bson.D{{Key: "$exists", Value: true}}},
 	})
 }
 
@@ -137,7 +167,7 @@ func notDeleted() bson.E {
 
 // SetReaction pone (o cambia) la reacción de userID en una sola operación; con emoji vacío
 // la quita. false = el mensaje no existe en el grupo, es del sistema o está borrado.
-func (r *Repository) SetReaction(ctx context.Context, groupID, id, userID bson.ObjectID, emoji string) (bool, error) {
+func (r *Repository) SetReaction(ctx context.Context, t thread, id, userID bson.ObjectID, emoji string) (bool, error) {
 	others := bson.D{{Key: "$filter", Value: bson.D{
 		{Key: "input", Value: bson.D{{Key: "$ifNull", Value: bson.A{"$reacciones", bson.A{}}}}},
 		{Key: "cond", Value: bson.D{{Key: "$ne", Value: bson.A{"$$this.usuario_id", userID}}}},
@@ -148,7 +178,7 @@ func (r *Repository) SetReaction(ctx context.Context, groupID, id, userID bson.O
 		value = bson.D{{Key: "$concatArrays", Value: bson.A{others, mine}}}
 	}
 	res, err := r.col.UpdateOne(ctx,
-		bson.D{{Key: "_id", Value: id}, {Key: "grupo_id", Value: groupID}, {Key: "tipo", Value: KindText}, notDeleted()},
+		bson.D{{Key: "_id", Value: id}, t.filter(), {Key: "tipo", Value: KindText}, notDeleted()},
 		mongo.Pipeline{{{Key: "$set", Value: bson.D{{Key: "reacciones", Value: value}}}}})
 	if err != nil {
 		return false, err
@@ -157,13 +187,13 @@ func (r *Repository) SetReaction(ctx context.Context, groupID, id, userID bson.O
 }
 
 func blanked(now time.Time) bson.D {
-	return bson.D{{Key: "texto", Value: ""}, {Key: "reacciones", Value: bson.A{}}, {Key: "eliminado_en", Value: now}}
+	return bson.D{{Key: "texto", Value: ""}, {Key: "reacciones", Value: bson.A{}}, {Key: "adjunto", Value: nil}, {Key: "eliminado_en", Value: now}}
 }
 
 // SoftDelete vacía el mensaje de authorID. false = no es suyo o no está en el grupo; borrar
 // uno ya borrado cuenta como hecho.
-func (r *Repository) SoftDelete(ctx context.Context, groupID, id, authorID bson.ObjectID, now time.Time) (bool, error) {
-	filter := bson.D{{Key: "_id", Value: id}, {Key: "grupo_id", Value: groupID}, {Key: "autor_id", Value: authorID}}
+func (r *Repository) SoftDelete(ctx context.Context, t thread, id, authorID bson.ObjectID, now time.Time) (bool, error) {
+	filter := bson.D{{Key: "_id", Value: id}, t.filter(), {Key: "autor_id", Value: authorID}}
 	res, err := r.col.UpdateOne(ctx, append(filter, notDeleted()), bson.D{{Key: "$set", Value: blanked(now)}})
 	if err != nil {
 		return false, err
@@ -189,14 +219,19 @@ func (r *Repository) ClaimNotice(ctx context.Context, groupID, userID bson.Objec
 	return err == nil, err
 }
 
-// ListByAuthor trae los mensajes no borrados de userID (exportación ARCO).
-func (r *Repository) ListByAuthor(ctx context.Context, userID bson.ObjectID) ([]Message, error) {
-	return r.find(ctx, bson.D{{Key: "autor_id", Value: userID}, notDeleted()})
+// ListByAuthor trae los mensajes no borrados de userID en un tipo de conversación
+// (exportación ARCO; `field` es el de `thread`).
+func (r *Repository) ListByAuthor(ctx context.Context, field string, userID bson.ObjectID) ([]Message, error) {
+	return r.find(ctx, bson.D{{Key: "autor_id", Value: userID}, notDeleted(), exists(field)})
 }
 
 // ListReactedBy trae los mensajes donde userID reaccionó (exportación ARCO).
-func (r *Repository) ListReactedBy(ctx context.Context, userID bson.ObjectID) ([]Message, error) {
-	return r.find(ctx, bson.D{{Key: "reacciones.usuario_id", Value: userID}})
+func (r *Repository) ListReactedBy(ctx context.Context, field string, userID bson.ObjectID) ([]Message, error) {
+	return r.find(ctx, bson.D{{Key: "reacciones.usuario_id", Value: userID}, exists(field)})
+}
+
+func exists(field string) bson.E {
+	return bson.E{Key: field, Value: bson.D{{Key: "$exists", Value: true}}}
 }
 
 func (r *Repository) find(ctx context.Context, filter bson.D) ([]Message, error) {

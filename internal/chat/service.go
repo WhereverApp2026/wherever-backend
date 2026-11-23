@@ -127,7 +127,7 @@ func (s *Service) List(ctx context.Context, subject, rawGroupID string, q ListQu
 	if err != nil {
 		return pagination.PageResult[View]{}, err
 	}
-	rows, err := s.repo.List(ctx, g.ID, page)
+	rows, err := s.repo.List(ctx, groupThread(g.ID), page)
 	if err != nil {
 		return pagination.PageResult[View]{}, errStore()
 	}
@@ -150,14 +150,21 @@ func (s *Service) List(ctx context.Context, subject, rawGroupID string, q ListQu
 	return pagination.NewPageResult(views, next, q.Limit), nil
 }
 
-// page arma la consulta: `despues_de` o el cursor firmado (que manda si vienen los dos).
+// page arma la consulta del chat de grupo.
 func (s *Service) page(scope, query string, q ListQuery) (Page, error) {
-	page := Page{Query: query, Limit: q.Limit}
-	if q.After != "" {
-		after, _ := bson.ObjectIDFromHex(q.After) // el DTO ya exige 24 hex
+	page, err := pageFor(s.cursor, scope, q.Cursor, q.After, q.Limit)
+	page.Query = query
+	return page, err
+}
+
+// pageFor arma la consulta: `despues_de` o el cursor firmado (que manda si vienen los dos).
+func pageFor(signer *pagination.Signer, scope, rawCursor, rawAfter string, limit int) (Page, error) {
+	page := Page{Limit: limit}
+	if rawAfter != "" {
+		after, _ := bson.ObjectIDFromHex(rawAfter) // el DTO ya exige 24 hex
 		page.After = &after
 	}
-	c, ok, err := validation.Position(s.cursor, scope, q.Cursor)
+	c, ok, err := validation.Position(signer, scope, rawCursor)
 	if err != nil || !ok {
 		return page, err
 	}
@@ -230,14 +237,14 @@ func (s *Service) Send(ctx context.Context, subject, rawGroupID string, req Send
 	if err != nil {
 		return View{}, false, err
 	}
-	if prev, err := s.repo.FindByClientID(ctx, g.ID, req.ClientID); err == nil {
+	if prev, err := s.repo.FindByClientID(ctx, groupThread(g.ID), req.ClientID); err == nil {
 		v, err := s.one(ctx, prev, me)
 		return v, false, err
 	} else if !errors.Is(err, ErrNotFound) {
 		return View{}, false, errStore()
 	}
 	now := s.now().UTC()
-	sent, err := s.repo.CountSince(ctx, me, now.Add(-SendWindow))
+	sent, err := s.repo.CountSince(ctx, fieldGroup, me, now.Add(-SendWindow))
 	if err != nil {
 		return View{}, false, errStore()
 	}
@@ -246,7 +253,7 @@ func (s *Service) Send(ctx context.Context, subject, rawGroupID string, req Send
 	}
 	m := Message{ID: bson.NewObjectID(), GroupID: g.ID, AuthorID: &me, Kind: KindText, Text: text, Reactions: []Reaction{}, ClientID: req.ClientID, CreatedAt: now}
 	if err := s.repo.Insert(ctx, &m); errors.Is(err, ErrDuplicate) {
-		prev, err := s.repo.FindByClientID(ctx, g.ID, req.ClientID)
+		prev, err := s.repo.FindByClientID(ctx, groupThread(g.ID), req.ClientID)
 		if err != nil {
 			return View{}, false, errStore()
 		}
@@ -289,12 +296,12 @@ func (s *Service) announce(ctx context.Context, g grupos.Group, m Message) {
 	}
 }
 
-func (s *Service) message(ctx context.Context, groupID bson.ObjectID, rawID string) (Message, error) {
+func (s *Service) message(ctx context.Context, t thread, rawID string) (Message, error) {
 	id, err := bson.ObjectIDFromHex(rawID)
 	if err != nil {
 		return Message{}, errMessageNotFound()
 	}
-	m, err := s.repo.FindInGroup(ctx, groupID, id)
+	m, err := s.repo.FindIn(ctx, t, id)
 	if errors.Is(err, ErrNotFound) {
 		return Message{}, errMessageNotFound()
 	}
@@ -322,14 +329,14 @@ func (s *Service) React(ctx context.Context, subject, rawGroupID, rawID string, 
 	if err != nil {
 		return View{}, errMessageNotFound()
 	}
-	ok, err := s.repo.SetReaction(ctx, g.ID, id, me, emoji)
+	ok, err := s.repo.SetReaction(ctx, groupThread(g.ID), id, me, emoji)
 	if err != nil {
 		return View{}, errStore()
 	}
 	if !ok {
 		return View{}, errMessageNotFound()
 	}
-	m, err := s.message(ctx, g.ID, rawID)
+	m, err := s.message(ctx, groupThread(g.ID), rawID)
 	if err != nil {
 		return View{}, err
 	}
@@ -346,7 +353,7 @@ func (s *Service) Delete(ctx context.Context, subject, rawGroupID, rawID string)
 	if err != nil {
 		return errMessageNotFound()
 	}
-	ok, err := s.repo.SoftDelete(ctx, g.ID, id, me, s.now().UTC())
+	ok, err := s.repo.SoftDelete(ctx, groupThread(g.ID), id, me, s.now().UTC())
 	if err != nil {
 		return errStore()
 	}

@@ -42,6 +42,8 @@ const (
 	KindLike         = "me_gusta"
 	KindComment      = "comentario"
 	KindReviewUseful = "resena_util"
+	// KindDirectMessage es el mensaje directo de un amigo (nv-87), agrupado por conversación.
+	KindDirectMessage = "mensaje_directo"
 )
 
 // Límites de la spec.

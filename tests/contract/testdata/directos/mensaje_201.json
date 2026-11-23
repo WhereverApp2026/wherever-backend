@@ -1,0 +1,16 @@
+{
+  "status": 201,
+  "body": {
+    "adjunto": {
+      "id": "string",
+      "nombre": "string",
+      "tipo": "string"
+    },
+    "autor_id": "string",
+    "creado_en": "string",
+    "eliminado": "bool",
+    "id": "string",
+    "reacciones": [],
+    "texto": "string"
+  }
+}
