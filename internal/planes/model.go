@@ -27,8 +27,10 @@ const (
 )
 
 // Visibilidad del plan (nv-68). Los planes de antes no tienen el campo y son privados.
+// `amigos` (nv-84) lo ven las amistades aceptadas del dueño.
 const (
 	VisibilityPrivate = "privado"
+	VisibilityFriends = "amigos"
 	VisibilityPublic  = "publico"
 )
 
@@ -106,6 +108,11 @@ type Plan struct {
 
 // Public dice si otras personas pueden verlo y copiarlo.
 func (p Plan) Public() bool { return p.Visibilidad == VisibilityPublic }
+
+// SharedWithFriends dice si sus amistades lo ven: `amigos` o `publico` (nv-84).
+func (p Plan) SharedWithFriends() bool {
+	return p.Visibilidad == VisibilityFriends || p.Visibilidad == VisibilityPublic
+}
 
 // normalize deja `visibilidad` explícita en la respuesta (los planes de antes no la tienen).
 func (p *Plan) normalize() {

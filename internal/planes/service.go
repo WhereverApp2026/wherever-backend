@@ -34,6 +34,8 @@ type Service struct {
 	contadores *contadores.Service
 	// perfiles da permiso sobre la pestaña de planes de otra persona (nv-81).
 	perfiles Perfiles
+	// feed arma «Planes de tus amigos» (nv-84).
+	feed friendsDeps
 }
 
 // Graph recibe al dueño de un plan que cambió para reflejarlo en Neo4j (nv-52). Es
@@ -183,7 +185,7 @@ func (s *Service) insert(ctx context.Context, p *Plan) (Plan, error) {
 
 // Get trae el plan para leerlo: del dueño, de un grupo donde quien llama está invitado o
 // confirmado (nv-37) o, si es `publico`, de cualquiera sin bloqueo con el dueño, sin notas
-// (nv-68). Ajeno, borrado o id mal formado = 404.
+// (nv-68); si es `amigos`, de sus amistades aceptadas (nv-84). Ajeno, borrado o id mal formado = 404.
 func (s *Service) Get(ctx context.Context, subject, rawID string) (Plan, error) {
 	p, err := s.getMember(ctx, subject, rawID)
 	if err == nil {
@@ -194,7 +196,7 @@ func (s *Service) Get(ctx context.Context, subject, rawID string) (Plan, error) 
 	if !errors.As(err, &appErr) || appErr.Kind != apperr.KindNotFound {
 		return Plan{}, err
 	}
-	pub, perr := s.publicPlan(ctx, subject, rawID)
+	pub, perr := s.sharedPlan(ctx, subject, rawID)
 	if perr != nil {
 		return Plan{}, perr
 	}

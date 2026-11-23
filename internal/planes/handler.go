@@ -40,6 +40,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	}), h.popular)...)
 	g := v1.Group("/planes", middleware.RequireAuth())
 	g.Get("", h.list)
+	h.friendsRoutes(g)
 	g.Get("/:id", h.get)
 	g.Post("", h.write(h.create)...)
 	g.Patch("/:id", h.write(h.patch)...)

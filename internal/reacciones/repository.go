@@ -102,6 +102,28 @@ func (r *Repository) ContarMeGustaDe(ctx context.Context, tipo string, id bson.O
 	return r.likes.CountDocuments(ctx, append(objeto(tipo, id), bson.E{Key: "usuario_id", Value: bson.D{{Key: "$in", Value: usuarios}}}))
 }
 
+// LikedPlans dice a cuáles de los planes les dio me gusta usuario («Planes de tus amigos»,
+// nv-84). Usa ux_me_gusta.
+func (r *Repository) LikedPlans(ctx context.Context, usuario bson.ObjectID, ids []bson.ObjectID) (map[bson.ObjectID]bool, error) {
+	out := map[bson.ObjectID]bool{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cur, err := r.likes.Find(ctx, bson.D{{Key: "objeto_tipo", Value: ObjetoPlan}, {Key: "objeto_id", Value: bson.D{{Key: "$in", Value: ids}}}, {Key: "usuario_id", Value: usuario}},
+		options.Find().SetProjection(bson.D{{Key: "objeto_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var rows []MeGusta
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, m := range rows {
+		out[m.ObjetoID] = true
+	}
+	return out, nil
+}
+
 // InsertarComentario guarda el comentario y, si nace publicado, suma al contador del objeto.
 func (r *Repository) InsertarComentario(ctx context.Context, c Comentario) error {
 	if _, err := r.comments.InsertOne(ctx, c); err != nil {

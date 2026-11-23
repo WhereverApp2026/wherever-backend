@@ -300,6 +300,18 @@ func (r *Repository) Feed(ctx context.Context, autores []bson.ObjectID, after *P
 	return listar[Momento](ctx, r.momentos, filter, porFecha("creado_en"), limit+1)
 }
 
+// Historias trae los momentos publicados `amigos` o `publica` de los autores desde `desde`, del
+// más nuevo al más viejo, hasta limit (ix_feed).
+func (r *Repository) Historias(ctx context.Context, autores []bson.ObjectID, desde time.Time, limit int) ([]Momento, error) {
+	filter := bson.D{
+		{Key: "autor_id", Value: bson.D{{Key: "$in", Value: autores}}},
+		{Key: "creado_en", Value: bson.D{{Key: "$gte", Value: desde}}},
+		{Key: "estado", Value: MomentoPublicado},
+		{Key: "visibilidad", Value: bson.D{{Key: "$in", Value: bson.A{VisAmigos, VisPublica}}}},
+	}
+	return listar[Momento](ctx, r.momentos, filter, porFecha("creado_en"), limit)
+}
+
 // DelNegocio pagina los momentos públicos y publicados de un negocio (ix_momentos_negocio).
 func (r *Repository) DelNegocio(ctx context.Context, negocio bson.ObjectID, destacados bool, after *Pos, limit int) ([]Momento, error) {
 	filter := bson.D{{Key: "negocio_id", Value: negocio}, {Key: "visibilidad", Value: VisPublica}, {Key: "estado", Value: MomentoPublicado}}

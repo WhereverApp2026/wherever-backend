@@ -34,12 +34,14 @@ type StopRequest struct {
 
 // CreateRequest es POST /planes.
 type CreateRequest struct {
-	Nombre      string        `json:"nombre" validate:"required,max=80"`
-	Fecha       string        `json:"fecha" validate:"required,datetime=2006-01-02"`
-	Personas    int           `json:"personas" validate:"min=1,max=20"`
-	Presupuesto int           `json:"presupuesto" validate:"min=0,max=1000000"`
-	Movilidad   string        `json:"movilidad" validate:"required,oneof=a_pie bicicleta auto transporte_publico"`
-	Origen      string        `json:"origen" validate:"omitempty,oneof=manual ia reglas"`
+	Nombre      string `json:"nombre" validate:"required,max=80"`
+	Fecha       string `json:"fecha" validate:"required,datetime=2006-01-02"`
+	Personas    int    `json:"personas" validate:"min=1,max=20"`
+	Presupuesto int    `json:"presupuesto" validate:"min=0,max=1000000"`
+	Movilidad   string `json:"movilidad" validate:"required,oneof=a_pie bicicleta auto transporte_publico"`
+	Origen      string `json:"origen" validate:"omitempty,oneof=manual ia reglas"`
+	// Visibilidad: «Visible para mis amigos» = `amigos` (nv-84); sin ella, `privado`.
+	Visibilidad string        `json:"visibilidad" validate:"omitempty,oneof=privado amigos publico"`
 	Paradas     []StopRequest `json:"paradas" validate:"required,min=1,max=6,dive"`
 }
 
@@ -50,7 +52,7 @@ type PatchRequest struct {
 	Personas    *int    `json:"personas" validate:"omitempty,min=1,max=20"`
 	Presupuesto *int    `json:"presupuesto" validate:"omitempty,min=0,max=1000000"`
 	Movilidad   *string `json:"movilidad" validate:"omitempty,oneof=a_pie bicicleta auto transporte_publico"`
-	Visibilidad *string `json:"visibilidad" validate:"omitempty,oneof=privado publico"`
+	Visibilidad *string `json:"visibilidad" validate:"omitempty,oneof=privado amigos publico"`
 }
 
 // PatchStopRequest es PATCH /planes/{id}/paradas/{parada_id}: mover, cambiar duración,
@@ -130,7 +132,7 @@ func (r CreateRequest) toPlan(owner bson.ObjectID) (Plan, error) {
 	}
 	p := Plan{
 		OwnerID: owner, Nombre: r.Nombre, Fecha: day, Personas: r.Personas, Presupuesto: r.Presupuesto,
-		Movilidad: r.Movilidad, Origen: origin, Paradas: make([]Parada, 0, len(r.Paradas)),
+		Movilidad: r.Movilidad, Origen: origin, Visibilidad: r.Visibilidad, Paradas: make([]Parada, 0, len(r.Paradas)),
 	}
 	for _, s := range r.Paradas {
 		stop, err := s.toStop("paradas")

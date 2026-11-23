@@ -472,7 +472,7 @@ func (s *Service) newSurprise(ctx context.Context, g Group, req SurpriseRequest)
 	return Surprise{Active: true, For: target, RevealAt: at}, nil
 }
 
-// MeToo apunta a quien llama al plan público de una amistad (nv-69): entra confirmado y, si
+// MeToo apunta a quien llama al plan público o de `amigos` de una amistad (nv-69, nv-84): entra confirmado y, si
 // el plan no tenía grupo, se crea con el dueño de organizador.
 func (s *Service) MeToo(ctx context.Context, subject, rawPlanID string) (View, error) {
 	me, err := self(subject)
@@ -518,6 +518,7 @@ func (s *Service) joinPlan(ctx context.Context, p planes.Plan, me bson.ObjectID)
 }
 
 // friendOfOwner: sin amistad aceptada (o con bloqueo) = 404; amistad con plan privado = 403.
+// Un plan de `amigos` (nv-84) cuenta como compartido.
 func (s *Service) friendOfOwner(ctx context.Context, p planes.Plan, me bson.ObjectID) error {
 	f, ok, err := s.friends.FindByPair(ctx, p.OwnerID, me)
 	if err != nil {
@@ -526,7 +527,7 @@ func (s *Service) friendOfOwner(ctx context.Context, p planes.Plan, me bson.Obje
 	if !ok || f.Status != amistades.StatusAccepted {
 		return errPlanNotFound()
 	}
-	if !p.Public() {
+	if !p.SharedWithFriends() {
 		return apperr.Forbidden("el plan es privado")
 	}
 	return nil

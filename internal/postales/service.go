@@ -92,6 +92,8 @@ type Service struct {
 	now       func() time.Time
 	// perfiles da permiso sobre la pestaña de momentos (nv-81).
 	perfiles Perfiles
+	// visitas marca «Verificado» en las historias (nv-84); nil = ninguna verificada.
+	visitas Visitas
 }
 
 // NewService recibe sus dependencias por constructor. Sin imágenes (sin IMAGENES_*) crear una
