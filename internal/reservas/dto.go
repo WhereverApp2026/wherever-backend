@@ -32,6 +32,31 @@ type CrearRequest struct {
 	GrupoID   string `json:"grupo_id" validate:"omitempty,objectid"`
 }
 
+// PlanRequest es el cuerpo (opcional) de POST /planes/{id}/reservas (nv-89); sin `personas`,
+// las del plan.
+type PlanRequest struct {
+	Personas int    `json:"personas" validate:"omitempty,min=1,max=20"`
+	Nota     string `json:"nota" validate:"omitempty,max=140"`
+}
+
+// PlanResultado es lo que pasó con una parada. `reserva` sale solo si la parada quedó con una
+// reserva de quien llama; la de otro integrante (`ya_reservada`) no se muestra.
+type PlanResultado struct {
+	ParadaID  string           `json:"parada_id"`
+	NegocioID string           `json:"negocio_id"`
+	Estado    string           `json:"estado"`
+	Reserva   *ReservaResponse `json:"reserva,omitempty"`
+	Motivo    string           `json:"motivo,omitempty"`
+}
+
+// PlanResponse es la respuesta de reservar todo: `anticipo_total` (centavos) suma los
+// anticipos por pagar y `requieren_pago` cuenta esas reservas (cada una se paga aparte).
+type PlanResponse struct {
+	Resultados    []PlanResultado `json:"resultados"`
+	AnticipoTotal int64           `json:"anticipo_total"`
+	RequierenPago int             `json:"requieren_pago"`
+}
+
 // CambiarRequest es el cuerpo de PATCH /reservas/{id}: solo cambia lo que trae.
 type CambiarRequest struct {
 	FechaHora *string `json:"fecha_hora" validate:"omitempty,datetime=2006-01-02T15:04:05Z07:00"`

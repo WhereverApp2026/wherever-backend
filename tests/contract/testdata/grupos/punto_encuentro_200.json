@@ -13,6 +13,7 @@
         "comparte_ubicacion": "bool",
         "desde": "string",
         "estado": "string",
+        "permiso_plan": "string",
         "persona": {
           "foto_url": "string",
           "id": "string",

@@ -259,6 +259,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	registry.RegisterExporter(usuarios.NewConsentPrivacy(consentRepo))
 	registry.RegisterExporter(moderacion.NewPrivacy(modRepo))
 	bookings := buildReservas(cfg, db, businessRepo, users, redisClient, cursor, notifier, registry, log)
+	bookings.svc.WithPlanes(planSvc)
 	// Consejo del día (nv-75): la baja del negocio borra sus consejos (panel y ARCO del alta).
 	tipsRepo := consejos.NewRepository(db)
 	tips := consejos.NewService(tipsRepo, businessRepo, log)

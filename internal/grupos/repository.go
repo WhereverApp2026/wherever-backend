@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	platformmongo "github.com/WhereverApp2026/wherever-backend/internal/platform/mongo"
 )
 
@@ -201,14 +202,26 @@ func (r *Repository) find(ctx context.Context, filter bson.D, opts *options.Find
 	return out, nil
 }
 
-// CanRead dice si userID está invitado o confirmado en el grupo del plan; lo usa
-// planes.Service para que los integrantes lean el plan (nv-37).
-func (r *Repository) CanRead(ctx context.Context, planID, userID bson.ObjectID) (bool, error) {
-	n, err := r.col.CountDocuments(ctx, bson.D{
-		{Key: "plan_id", Value: planID}, alive(),
-		elem(bson.D{{Key: "usuario_id", Value: userID}, {Key: "estado", Value: bson.D{{Key: "$in", Value: bson.A{StatusInvited, StatusConfirmed}}}}}),
-	})
-	return n > 0, err
+// PlanPermission da el permiso de userID sobre el plan en su grupo (nv-89): "" si no está
+// invitado ni confirmado; `ver` si está invitado (aún no confirma) y, confirmado, el suyo.
+// Lo usa planes.Service para que los integrantes lean (nv-37) y editen el plan. Usa ux_plan.
+func (r *Repository) PlanPermission(ctx context.Context, planID, userID bson.ObjectID) (string, error) {
+	g, err := r.findOne(ctx, bson.D{{Key: "plan_id", Value: planID}, alive()})
+	if errors.Is(err, ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	m, in := g.Member(userID)
+	switch {
+	case !in || m.Status == StatusDeclined:
+		return "", nil
+	case m.Status == StatusInvited:
+		return planes.PermissionView, nil
+	default:
+		return m.PlanPermission(), nil
+	}
 }
 
 // GoingTo da, por plan, los integrantes confirmados de su grupo vivo sin el organizador: los que
@@ -270,11 +283,14 @@ func (r *Repository) DeleteByUser(ctx context.Context, userID bson.ObjectID) err
 	return err
 }
 
-// SetCode guarda el hash del código del enlace y su vencimiento; reemplaza al anterior, que
-// deja de servir (nv-38).
-func (r *Repository) SetCode(ctx context.Context, groupID, organizer bson.ObjectID, hash string, expires, now time.Time) error {
+// SetCode guarda el hash del código del enlace, su vencimiento y el permiso que da (nv-89);
+// reemplaza al anterior, que deja de servir (nv-38).
+func (r *Repository) SetCode(ctx context.Context, groupID, organizer bson.ObjectID, hash, permission string, expires, now time.Time) error {
 	ok, err := r.updated(ctx, bson.D{{Key: "_id", Value: groupID}, {Key: "organizador_id", Value: organizer}},
-		bson.D{{Key: "$set", Value: bson.D{{Key: "codigo_hash", Value: hash}, {Key: "codigo_vence", Value: expires}, {Key: "actualizado_en", Value: now}}}})
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "codigo_hash", Value: hash}, {Key: "codigo_vence", Value: expires},
+			{Key: "codigo_permiso", Value: permission}, {Key: "actualizado_en", Value: now},
+		}}})
 	if err == nil && !ok {
 		return ErrNotFound
 	}
@@ -285,7 +301,7 @@ func (r *Repository) SetCode(ctx context.Context, groupID, organizer bson.Object
 func (r *Repository) ClearCode(ctx context.Context, groupID, organizer bson.ObjectID, now time.Time) (bool, error) {
 	return r.updated(ctx,
 		bson.D{{Key: "_id", Value: groupID}, {Key: "organizador_id", Value: organizer}, {Key: "codigo_hash", Value: bson.D{{Key: "$exists", Value: true}}}},
-		bson.D{{Key: "$unset", Value: bson.D{{Key: "codigo_hash", Value: ""}, {Key: "codigo_vence", Value: ""}}}, {Key: "$set", Value: bson.D{{Key: "actualizado_en", Value: now}}}})
+		bson.D{{Key: "$unset", Value: bson.D{{Key: "codigo_hash", Value: ""}, {Key: "codigo_vence", Value: ""}, {Key: "codigo_permiso", Value: ""}}}, {Key: "$set", Value: bson.D{{Key: "actualizado_en", Value: now}}}})
 }
 
 // FindByCode trae el grupo con ese hash de código (ux_codigo_hash).
@@ -293,10 +309,11 @@ func (r *Repository) FindByCode(ctx context.Context, hash string) (Group, error)
 	return r.findOne(ctx, bson.D{{Key: "codigo_hash", Value: hash}, alive()})
 }
 
-// Join deja a userID confirmado por el enlace: entra nuevo, pasa de invitado a confirmado o
-// vuelve después de declinar. Entrar nuevo o volver exige cupo en la misma operación
-// (ErrFull). Si ya estaba confirmado no cambia nada.
-func (r *Repository) Join(ctx context.Context, groupID, userID bson.ObjectID, now time.Time) error {
+// Join deja a userID confirmado por el enlace o por «me apunto»: entra nuevo (con
+// `permission`; "" = `ver`), pasa de invitado a confirmado o vuelve después de declinar.
+// Entrar nuevo o volver exige cupo en la misma operación (ErrFull). Si ya estaba confirmado
+// no cambia nada; subir el permiso de quien ya estaba es SetPermission.
+func (r *Repository) Join(ctx context.Context, groupID, userID bson.ObjectID, permission string, now time.Time) error {
 	g, err := r.FindByID(ctx, groupID)
 	if err != nil {
 		return err
@@ -308,13 +325,23 @@ func (r *Repository) Join(ctx context.Context, groupID, userID bson.ObjectID, no
 		ok, err := r.SetStatus(ctx, groupID, userID, m.Status, StatusConfirmed, now)
 		return joinResult(ok, err)
 	}
-	member := Member{UserID: userID, Role: RoleMember, Status: StatusConfirmed, Since: now}
+	member := Member{UserID: userID, Role: RoleMember, Status: StatusConfirmed, Since: now, Permission: permission}
 	ok, err := r.updated(ctx, bson.D{{Key: "_id", Value: groupID}, hasRoom(), {Key: "integrantes.usuario_id", Value: bson.D{{Key: "$ne", Value: userID}}}}, bson.D{
 		{Key: "$push", Value: bson.D{{Key: "integrantes", Value: member}}},
 		{Key: "$inc", Value: bson.D{{Key: "ocupados", Value: 1}}},
 		{Key: "$set", Value: bson.D{{Key: "actualizado_en", Value: now}}},
 	})
 	return joinResult(ok, err)
+}
+
+// SetPermission cambia el `permiso_plan` de un integrante (nunca del organizador) en el grupo
+// que organiza organizer. Devuelve false si el integrante no está.
+func (r *Repository) SetPermission(ctx context.Context, groupID, organizer, userID bson.ObjectID, permission string, now time.Time) (bool, error) {
+	filter := bson.D{
+		{Key: "_id", Value: groupID}, {Key: "organizador_id", Value: organizer}, alive(),
+		elem(bson.D{{Key: "usuario_id", Value: userID}, {Key: "rol", Value: RoleMember}}),
+	}
+	return r.updated(ctx, filter, bson.D{{Key: "$set", Value: bson.D{{Key: "integrantes.$.permiso_plan", Value: permission}, {Key: "actualizado_en", Value: now}}}})
 }
 
 // joinResult: sin coincidencia es falta de cupo (o una carrera con la misma persona, que el

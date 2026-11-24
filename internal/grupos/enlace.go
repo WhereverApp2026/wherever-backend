@@ -63,7 +63,8 @@ func hashCode(raw string) string {
 func errLinkNotFound() error { return apperr.NotFound("enlace no encontrado") }
 
 // Share crea (o reemplaza) el enlace del grupo de un plan propio; crea el grupo si falta.
-func (s *Service) Share(ctx context.Context, subject, rawPlanID string) (ShareResponse, error) {
+// `permiso` (nv-89, `ver` por omisión) es lo que recibe quien entra por él.
+func (s *Service) Share(ctx context.Context, subject, rawPlanID string, req ShareRequest) (ShareResponse, error) {
 	me, err := self(subject)
 	if err != nil {
 		return ShareResponse{}, err
@@ -85,10 +86,11 @@ func (s *Service) Share(ctx context.Context, subject, rawPlanID string) (ShareRe
 	}
 	now := s.now().UTC()
 	expires := now.Add(codeTTL)
-	if err := s.repo.SetCode(ctx, g.ID, me, hash, expires, now); err != nil {
+	permission := req.permission()
+	if err := s.repo.SetCode(ctx, g.ID, me, hash, permission, expires, now); err != nil {
 		return ShareResponse{}, errStore()
 	}
-	return ShareResponse{Code: raw, Link: s.share.linkBase + linkPath + raw, GroupID: g.ID.Hex(), ExpiresAt: expires}, nil
+	return ShareResponse{Code: raw, Link: s.share.linkBase + linkPath + raw, GroupID: g.ID.Hex(), ExpiresAt: expires, Permission: permission}, nil
 }
 
 // Revoke quita el enlace del grupo de un plan propio; sin enlace = 404.
@@ -167,8 +169,10 @@ func (s *Service) Preview(ctx context.Context, raw string) (PublicPlan, error) {
 	return newPublicPlan(g, p, cards), nil
 }
 
-// Join deja a quien llama confirmado en el grupo del enlace. No exige amistad (el enlace es
-// la invitación), pero sí que el organizador y quien entra no se hayan bloqueado (404).
+// Join deja a quien llama confirmado en el grupo del enlace con el permiso del enlace (nv-89):
+// un enlace de `editar` sube a quien ya estaba; uno de `ver` nunca baja a nadie. No exige
+// amistad (el enlace es la invitación), pero sí que el organizador y quien entra no se hayan
+// bloqueado (404).
 func (s *Service) Join(ctx context.Context, subject string, req JoinRequest) (View, error) {
 	me, err := self(subject)
 	if err != nil {
@@ -185,9 +189,15 @@ func (s *Service) Join(ctx context.Context, subject string, req JoinRequest) (Vi
 		if err := s.notBlocked(ctx, g.OrganizerID, me); err != nil {
 			return View{}, err
 		}
-		if err := s.repo.Join(ctx, g.ID, me, s.now().UTC()); err != nil {
+		now := s.now().UTC()
+		if err := s.repo.Join(ctx, g.ID, me, g.CodePermission, now); err != nil {
 			if err := s.joinError(ctx, g.ID, me, err); err != nil {
 				return View{}, err
+			}
+		}
+		if g.CodePermission == planes.PermissionEdit {
+			if _, err := s.repo.SetPermission(ctx, g.ID, g.OrganizerID, me, planes.PermissionEdit, now); err != nil {
+				return View{}, errStore()
 			}
 		}
 	}

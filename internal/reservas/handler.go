@@ -41,7 +41,8 @@ func (h *Handler) WithActiveGuard(guard fiber.Handler) *Handler {
 	return h
 }
 
-// Routes registra las doce rutas de nv-59 y el mensaje al cliente de nv-73. Cumple httpapi.Module.
+// Routes registra las doce rutas de nv-59, el mensaje al cliente de nv-73 y reservar todo el
+// plan de nv-89. Cumple httpapi.Module.
 func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	with := func(first fiber.Handler, fn fiber.Handler) []fiber.Handler {
 		out := []fiber.Handler{first}
@@ -60,6 +61,8 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 		crear = append([]fiber.Handler{limiter.WindowUser(politicaReservas, limiteReservas, ventanaReservas)}, crear...)
 	}
 	v1.Post("/reservas", crear...)
+	// Reservar todo (nv-89): el limitador lo cuenta el service, una reserva por parada.
+	v1.Post("/planes/:id/reservas", with(consumidor, func(c *fiber.Ctx) error { return h.reservarPlan(c, limiter) })...)
 	v1.Get("/reservas", with(consumidor, h.mias)...)
 	v1.Get("/reservas/:id", with(auth, h.detalle)...)
 	v1.Patch("/reservas/:id", with(consumidor, h.cambiar)...)
@@ -143,6 +146,31 @@ func (h *Handler) crear(c *fiber.Ctx) error {
 		status = fiber.StatusCreated
 	}
 	return sendReserva(c, status, out)
+}
+
+func (h *Handler) reservarPlan(c *fiber.Ctx, limiter *middleware.Limiter) error {
+	llave := strings.TrimSpace(c.Get("Idempotency-Key"))
+	if !uuidPattern.MatchString(llave) {
+		return apperr.BadRequest("falta la cabecera Idempotency-Key (UUID)")
+	}
+	var req PlanRequest
+	if len(c.Body()) > 0 {
+		if err := h.bind(c, &req); err != nil {
+			return err
+		}
+	}
+	cl := claims(c)
+	var cobrar func(n int) error
+	if limiter != nil && cl != nil {
+		cobrar = func(n int) error {
+			return limiter.Take(c.UserContext(), politicaReservas, cl.Subject, n, limiteReservas, ventanaReservas)
+		}
+	}
+	out, err := h.svc.ReservarPlan(c.UserContext(), cl, c.Params("id"), strings.ToLower(llave), req, cobrar)
+	if err != nil {
+		return err
+	}
+	return send(c, fiber.StatusOK, out)
 }
 
 func (h *Handler) mias(c *fiber.Ctx) error {

@@ -238,6 +238,17 @@ func findAll[T any](ctx context.Context, col *mongo.Collection, filter bson.D, o
 	return out, nil
 }
 
+// DelPlanEn trae las reservas activas de un plan, de cualquier integrante, en los negocios de
+// sus paradas y en [desde, hasta) (reservar todo, nv-89). Usa ix_agenda_negocio.
+func (r *Repository) DelPlanEn(ctx context.Context, plan bson.ObjectID, negocios []bson.ObjectID, desde, hasta time.Time) ([]Reserva, error) {
+	return findAll[Reserva](ctx, r.col, bson.D{
+		{Key: "negocio_id", Value: bson.D{{Key: "$in", Value: negocios}}},
+		{Key: "fecha_hora", Value: bson.D{{Key: "$gte", Value: desde}, {Key: "$lt", Value: hasta}}},
+		{Key: "estado", Value: bson.D{{Key: "$in", Value: activos}}},
+		{Key: "plan_id", Value: plan},
+	}, options.Find())
+}
+
 // DelPlan trae las reservas activas de la persona para un plan, con la forma del paquete sin
 // conexión de nv-68 (el código es lo que muestra el QR).
 func (r *Repository) DelPlan(ctx context.Context, usuario, plan bson.ObjectID) ([]planes.ReservaPaquete, error) {

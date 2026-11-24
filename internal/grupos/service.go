@@ -401,6 +401,30 @@ func (s *Service) Remove(ctx context.Context, subject, rawID, rawUserID string) 
 	return s.remove(ctx, g.ID, target)
 }
 
+// SetPermission cambia el permiso de un integrante sobre el plan (nv-89): solo el
+// organizador (integrante = 403); al organizador mismo = 422; quien no está = 404.
+func (s *Service) SetPermission(ctx context.Context, subject, rawID, rawUserID string, req PermissionRequest) (View, error) {
+	me, g, err := s.organizerGroup(ctx, subject, rawID)
+	if err != nil {
+		return View{}, err
+	}
+	target, err := bson.ObjectIDFromHex(rawUserID)
+	if err != nil {
+		return View{}, apperr.NotFound("integrante no encontrado")
+	}
+	if target == me {
+		return View{}, invalid("usuario_id", "el organizador siempre puede editar su plan")
+	}
+	ok, err := s.repo.SetPermission(ctx, g.ID, me, target, req.Permission, s.now().UTC())
+	if err != nil {
+		return View{}, errStore()
+	}
+	if !ok {
+		return View{}, apperr.NotFound("integrante no encontrado")
+	}
+	return s.view(ctx, g.ID, me)
+}
+
 func (s *Service) remove(ctx context.Context, groupID, userID bson.ObjectID) error {
 	ok, err := s.repo.RemoveMember(ctx, groupID, userID, s.now().UTC())
 	if err != nil {

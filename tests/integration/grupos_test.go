@@ -212,7 +212,7 @@ func TestGrupos_IntegranteLeeElPlanYNoLoEdita(t *testing.T) {
 	require.Equal(t, http.StatusOK, got.status, got.body)
 	assert.Equal(t, s.plan.ID, got.plan(t).ID)
 	edit := planCall(t, s.app, http.MethodPatch, planPath(s.plan, ""), map[string]any{"nombre": "Mío"}, fr[0].token, `"1"`)
-	assert.Equal(t, http.StatusNotFound, edit.status, "solo el dueño edita")
+	assert.Equal(t, http.StatusForbidden, edit.status, "un invitado solo ve el plan (nv-89)")
 	// Un amigo que no está en el grupo no lo ve; quien declinó tampoco.
 	assert.Equal(t, http.StatusNotFound, planCall(t, s.app, http.MethodGet, planPath(s.plan, ""), nil, fr[1].token, "").status)
 	grupoCall(t, s.app, http.MethodPatch, gruposPath+"/"+v.ID+"/integrantes/yo", map[string]string{"estado": "declinado"}, fr[0].token, http.StatusOK)

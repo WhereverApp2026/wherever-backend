@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 )
 
 // Collection guarda los grupos (J3).
@@ -40,6 +42,17 @@ type Member struct {
 	// en ninguna respuesta.
 	SharedLocation  *Coords    `bson:"ubicacion_compartida,omitempty"`
 	LocationExpires *time.Time `bson:"ubicacion_vence,omitempty"`
+	// Permission es `permiso_plan` (nv-89): `editar` deja cambiar el plan; sin el campo, `ver`.
+	Permission string `bson:"permiso_plan,omitempty"`
+}
+
+// PlanPermission es el permiso efectivo sobre el plan: el organizador siempre edita; un
+// integrante, lo que tenga guardado (`ver` por omisión).
+func (m Member) PlanPermission() string {
+	if m.Role == RoleOrganizer || m.Permission == planes.PermissionEdit {
+		return planes.PermissionEdit
+	}
+	return planes.PermissionView
 }
 
 // Coords es una posición `lat`/`lng`.
@@ -86,6 +99,9 @@ type Group struct {
 	// CodeHash es el SHA-256 del código del enlace (nv-38); el código nunca se guarda.
 	CodeHash    string     `bson:"codigo_hash,omitempty"`
 	CodeExpires *time.Time `bson:"codigo_vence,omitempty"`
+	// CodePermission es el permiso que recibe quien entra por el enlace (nv-89); sin el
+	// campo, `ver`.
+	CodePermission string `bson:"codigo_permiso,omitempty"`
 	// LastMessage es el último mensaje del chat (nv-57); solo lo ven los confirmados.
 	LastMessage *LastMessage `bson:"ultimo_mensaje,omitempty"`
 	// Name es opcional; sin él, la vista usa el nombre del plan (nv-69).

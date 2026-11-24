@@ -48,10 +48,11 @@ type noGraph struct{}
 
 func (noGraph) Touch(context.Context, bson.ObjectID) error { return nil }
 
-// Members dice si alguien que no es el dueño puede leer el plan: está invitado o confirmado
-// en su grupo (nv-37, lo cumple grupos.Repository).
+// Members da el permiso de alguien que no es el dueño sobre el plan: "" si no está invitado ni
+// confirmado en su grupo (nv-37), PermissionView o PermissionEdit (nv-89). Lo cumple
+// grupos.Repository.
 type Members interface {
-	CanRead(ctx context.Context, planID, userID bson.ObjectID) (bool, error)
+	PlanPermission(ctx context.Context, planID, userID bson.ObjectID) (string, error)
 }
 
 // Sync numera cada cambio de los planes del dueño y guarda los borrados (nv-46).
@@ -72,8 +73,8 @@ func (noSync) Deleted(context.Context, bson.ObjectID, string, bson.ObjectID, int
 
 type noMembers struct{}
 
-func (noMembers) CanRead(context.Context, bson.ObjectID, bson.ObjectID) (bool, error) {
-	return false, nil
+func (noMembers) PlanPermission(context.Context, bson.ObjectID, bson.ObjectID) (string, error) {
+	return "", nil
 }
 
 // NewService recibe el repositorio y la calculadora por constructor.
@@ -110,6 +111,10 @@ func errPlanNotFound() error { return apperr.NotFound("plan no encontrado") }
 func errStopNotFound() error { return apperr.NotFound("parada no encontrada") }
 func errStale() error {
 	return apperr.Conflict("el plan cambió en otro dispositivo; vuelve a cargarlo")
+}
+func errViewOnly() error { return apperr.Forbidden("solo puedes ver este plan") }
+func errOwnerOnly() error {
+	return apperr.Forbidden("solo el dueño puede hacer esto")
 }
 
 // errStore no lleva el texto de MongoDB: podría repetir el nombre o las notas del plan.
@@ -213,16 +218,17 @@ func (s *Service) getMember(ctx context.Context, subject, rawID string) (Plan, e
 	if !errors.Is(err, ErrNotFound) {
 		return p, storeErrorOrNil(err)
 	}
-	ok, err := s.members.CanRead(ctx, id, reader)
+	perm, err := s.members.PlanPermission(ctx, id, reader)
 	if err != nil {
 		return Plan{}, errStore()
 	}
-	if !ok {
+	if perm == "" {
 		return Plan{}, errPlanNotFound()
 	}
 	if p, err = s.repo.FindActive(ctx, id); err != nil {
 		return Plan{}, storeErrorOrNil(err)
 	}
+	p.MiPermiso = perm
 	sp, err := s.surprises.SurpriseFor(ctx, id, reader, s.now())
 	if err != nil {
 		return Plan{}, errStore()
@@ -233,8 +239,45 @@ func (s *Service) getMember(ctx context.Context, subject, rawID string) (Plan, e
 	return p, nil
 }
 
-// getOwned trae el plan del dueño; es la única entrada de las ediciones, el borrado y el
-// clonado. Ajeno (aunque sea integrante), borrado o id mal formado = 404.
+// Editable trae el plan para cambiarlo: del dueño o de un integrante con permiso `editar`
+// (nv-89). Integrante con `ver`, o con la sorpresa del grupo activa para él = 403; ajeno,
+// borrado o id mal formado = 404. Lo usa también «reservar todo» (reservas).
+func (s *Service) Editable(ctx context.Context, subject, rawID string) (Plan, error) {
+	editor, id, err := ids(subject, rawID)
+	if err != nil {
+		return Plan{}, err
+	}
+	p, err := s.repo.FindOwned(ctx, editor, id)
+	if !errors.Is(err, ErrNotFound) {
+		return p, storeErrorOrNil(err)
+	}
+	perm, err := s.members.PlanPermission(ctx, id, editor)
+	if err != nil {
+		return Plan{}, errStore()
+	}
+	switch perm {
+	case "":
+		return Plan{}, errPlanNotFound()
+	case PermissionEdit:
+	default:
+		return Plan{}, errViewOnly()
+	}
+	if p, err = s.repo.FindActive(ctx, id); err != nil {
+		return Plan{}, storeErrorOrNil(err)
+	}
+	sp, err := s.surprises.SurpriseFor(ctx, id, editor, s.now())
+	if err != nil {
+		return Plan{}, errStore()
+	}
+	if sp != nil {
+		return Plan{}, errViewOnly()
+	}
+	p.MiPermiso = perm
+	return p, nil
+}
+
+// getOwned trae el plan del dueño; es la entrada del borrado, el clonado y el paquete. Ajeno
+// (aunque sea integrante), borrado o id mal formado = 404.
 func (s *Service) getOwned(ctx context.Context, subject, rawID string) (Plan, error) {
 	ownerID, id, err := ids(subject, rawID)
 	if err != nil {
@@ -263,12 +306,21 @@ func storeErrorOrNil(err error) error {
 	return storeError(err)
 }
 
-// edit carga el plan del dueño, comprueba la versión, aplica el cambio, recalcula y guarda
-// con If-Match. Es el único camino de las ediciones.
+// edit carga el plan (del dueño o de un integrante con `editar`, nv-89), comprueba la
+// versión, aplica el cambio, recalcula y guarda con If-Match. Es el único camino de las
+// ediciones. El número de sincronización y el grafo siguen siendo del dueño.
 func (s *Service) edit(ctx context.Context, subject, rawID string, version int, change func(*Plan) error) (Plan, error) {
-	p, err := s.getOwned(ctx, subject, rawID)
+	return s.editAs(ctx, subject, rawID, version, false, change)
+}
+
+// editAs es edit; con ownerOnly un integrante recibe 403 (cambiar la visibilidad).
+func (s *Service) editAs(ctx context.Context, subject, rawID string, version int, ownerOnly bool, change func(*Plan) error) (Plan, error) {
+	p, err := s.Editable(ctx, subject, rawID)
 	if err != nil {
 		return Plan{}, err
+	}
+	if ownerOnly && p.MiPermiso != "" {
+		return Plan{}, errOwnerOnly()
 	}
 	if p.Version != version {
 		return Plan{}, errStale()
@@ -317,9 +369,9 @@ func (s *Service) ReplaceBusiness(ctx context.Context, ownerID, planID, stopID, 
 	return Plan{}, err
 }
 
-// Patch cambia nombre, fecha, personas, presupuesto o movilidad.
+// Patch cambia nombre, fecha, personas, presupuesto o movilidad; la visibilidad solo el dueño.
 func (s *Service) Patch(ctx context.Context, subject, rawID string, version int, req PatchRequest) (Plan, error) {
-	return s.edit(ctx, subject, rawID, version, req.apply)
+	return s.editAs(ctx, subject, rawID, version, req.Visibilidad != nil, req.apply)
 }
 
 // AddStop agrega una parada; el plan sigue en orden de llegada.
