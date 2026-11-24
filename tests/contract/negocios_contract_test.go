@@ -78,6 +78,17 @@ func TestContract_Negocios(t *testing.T) {
 	check(t, "negocios/lugares_ficha_200", status, body)
 	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+business.OwnerID.Hex(), nil, "")
 	check(t, "negocios/lugares_ficha_404", status, body)
+
+	// nv-90: la ficha con experiencias, año, enlace de WhatsApp y redes.
+	_, err = env.Mongo.DB().Collection(negocios.Collection).UpdateByID(context.Background(), business.ID, bson.D{{Key: "$set", Value: bson.D{
+		{Key: "experiencias", Value: []string{"cena", "romantico"}}, {Key: "anio_apertura", Value: 1998},
+		{Key: "whatsapp", Value: "+527731234567"},
+		{Key: "redes", Value: negocios.Redes{Instagram: "contrato.negocio", SitioWeb: "https://contrato.example.test"}},
+	}}})
+	require.NoError(t, err)
+	env.Negocios.InvalidarFicha(context.Background(), business.ID.Hex())
+	status, body = call(t, app, http.MethodGet, "/api/v1/lugares/"+business.ID.Hex(), nil, "")
+	check(t, "negocios/lugares_ficha_datos_200", status, body)
 }
 
 // TestContract_NegociosAlta fija el alta en borrador y la cola del administrador (nv-55).

@@ -66,6 +66,12 @@ func (r *Repository) InsertDraft(ctx context.Context, b *Business) error {
 		{Key: "creado_en", Value: b.CreatedAt},
 		{Key: "actualizado_en", Value: b.CreatedAt},
 	}
+	if len(b.Experiencias) > 0 {
+		doc = append(doc, bson.E{Key: "experiencias", Value: b.Experiencias})
+	}
+	if b.AnioApertura != 0 {
+		doc = append(doc, bson.E{Key: "anio_apertura", Value: b.AnioApertura})
+	}
 	_, err := r.col.InsertOne(ctx, doc)
 	return err
 }

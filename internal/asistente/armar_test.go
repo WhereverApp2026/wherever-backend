@@ -138,11 +138,12 @@ func TestContexto_AlergiasYDietaSiempreComoFiltroDuro(t *testing.T) {
 	assert.Equal(t, []string{"vegano"}, c.Dietas)
 	assert.Equal(t, 300, c.PresupuestoMax, "manda el monto de la frase")
 	assert.Zero(t, c.PresupuestoMin)
-	assert.Equal(t, []string{"Cafeterías", "tacos"}, c.Gustos)
+	assert.Equal(t, []string{"Cafeterías", "tacos", "amigos"}, c.Gustos, "la compañía suma su experiencia (nv-90)")
 	assert.True(t, c.ConNinos)
 	assert.Equal(t, sabadoTarde, c.Momento)
 
 	sinPerfil := contexto(19.43, -99.13, sabadoTarde, in, nil)
 	assert.Empty(t, sinPerfil.Alergenos)
-	assert.Equal(t, []string{"tacos"}, sinPerfil.Gustos)
+	assert.Equal(t, []string{"tacos", "amigos"}, sinPerfil.Gustos)
+	assert.Equal(t, []string{"tacos"}, in.PalabrasClave, "no se modifica la interpretación")
 }

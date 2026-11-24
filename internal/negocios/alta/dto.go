@@ -15,6 +15,9 @@ type CrearRequest struct {
 	Nombre      string `json:"nombre" validate:"required,min=3,max=60"`
 	Categoria   string `json:"categoria" validate:"required,max=30"`
 	Descripcion string `json:"descripcion" validate:"max=300"`
+	// Experiencias y AnioApertura (nv-90) son opcionales en el alta.
+	Experiencias []string `json:"experiencias" validate:"omitempty,max=4"`
+	AnioApertura *int     `json:"anio_apertura"`
 }
 
 // Ubicacion es el Point GeoJSON del paso 2.
@@ -23,10 +26,12 @@ type Ubicacion struct {
 	Coordinates []float64 `json:"coordinates" validate:"required,len=2"`
 }
 
-// Paso2Request es la ubicación.
+// Paso2Request es la ubicación; WhatsApp y redes (nv-90) son opcionales.
 type Paso2Request struct {
 	Direccion negocios.Direccion `json:"direccion"`
 	Ubicacion Ubicacion          `json:"ubicacion"`
+	WhatsApp  *string            `json:"whatsapp" validate:"omitempty,max=25"`
+	Redes     *negocios.Redes    `json:"redes"`
 }
 
 // Paso3Request son los horarios (hasta dos tramos por día).
@@ -132,6 +137,7 @@ type NegocioResponse struct {
 	Documentos      negocios.Documentos     `json:"documentos"`
 	CuentaDeposito  *negocios.CuentaMascara `json:"cuenta_deposito,omitempty"`
 	Verificado      bool                    `json:"verificado"`
+	DatosNegocio
 	Version         int                     `json:"version"`
 	CreadoEn        time.Time               `json:"creado_en"`
 	RequiereRefresh bool                    `json:"requiere_refresh,omitempty"`
@@ -149,17 +155,55 @@ type ColaItem struct {
 	EnviadoEn   *time.Time          `json:"enviado_en,omitempty"`
 	DiasEspera  int                 `json:"dias_espera"`
 	Version     int                 `json:"version"`
+	DatosNegocio
 	// Cambios son los campos por revisar de un negocio ya aprobado (nv-56); con sus valores nuevos.
 	Cambios *CambiosResponse `json:"cambios_pendientes,omitempty"`
 }
 
-// CambiosResponse son nombre, dirección o ubicación nuevos de un negocio aprobado (nv-56).
+// DatosNegocio son experiencias, año, WhatsApp y redes (nv-90) como los ven el dueño y el
+// administrador; vacíos no salen.
+type DatosNegocio struct {
+	Experiencias []string        `json:"experiencias,omitempty"`
+	AnioApertura int             `json:"anio_apertura,omitempty"`
+	WhatsApp     string          `json:"whatsapp,omitempty"`
+	Redes        *negocios.Redes `json:"redes,omitempty"`
+}
+
+// DatosDe arma DatosNegocio del documento.
+func DatosDe(b negocios.Business) DatosNegocio {
+	out := DatosNegocio{Experiencias: b.Experiencias, AnioApertura: b.AnioApertura, WhatsApp: b.WhatsApp}
+	if b.Redes != nil && !b.Redes.Vacia() {
+		r := *b.Redes
+		out.Redes = &r
+	}
+	return out
+}
+
+// CambiosResponse son nombre, dirección, ubicación o los datos de nv-90 nuevos de un negocio
+// aprobado (nv-56). Un WhatsApp o unas redes vacíos dicen que se quitan.
 type CambiosResponse struct {
-	Campos    []string            `json:"campos"`
-	Nombre    string              `json:"nombre,omitempty"`
-	Direccion *negocios.Direccion `json:"direccion,omitempty"`
-	Ubicacion *Ubicacion          `json:"ubicacion,omitempty"`
-	EnviadoEn time.Time           `json:"enviado_en"`
+	Campos       []string            `json:"campos"`
+	Nombre       string              `json:"nombre,omitempty"`
+	Direccion    *negocios.Direccion `json:"direccion,omitempty"`
+	Ubicacion    *Ubicacion          `json:"ubicacion,omitempty"`
+	Experiencias []string            `json:"experiencias,omitempty"`
+	AnioApertura int                 `json:"anio_apertura,omitempty"`
+	WhatsApp     *string             `json:"whatsapp,omitempty"`
+	Redes        *negocios.Redes     `json:"redes,omitempty"`
+	EnviadoEn    time.Time           `json:"enviado_en"`
+}
+
+// CambiosDe arma CambiosResponse de lo que espera revisión; nil sin cambios.
+func CambiosDe(c *negocios.CambiosPendientes) *CambiosResponse {
+	if c == nil {
+		return nil
+	}
+	out := &CambiosResponse{Campos: nonNil(c.Campos), Nombre: c.Nombre, Direccion: c.Direccion, Experiencias: c.Experiencias,
+		AnioApertura: c.AnioApertura, WhatsApp: c.WhatsApp, Redes: c.Redes, EnviadoEn: c.EnviadoEn.UTC()}
+	if c.Ubicacion != nil {
+		out.Ubicacion = &Ubicacion{Type: c.Ubicacion.Type, Coordinates: c.Ubicacion.Coordinates}
+	}
+	return out
 }
 
 // DocumentosResponse es la lista de metadatos del expediente.
@@ -180,7 +224,7 @@ func negocioResponse(b negocios.Business) NegocioResponse {
 		Horarios: nonNil(b.Schedules), Fotos: fotosResponse(b.Photos), NivelPrecio: b.PriceLevel, PrecioPromedio: b.AveragePrice,
 		Servicios: nonNil(b.Services), OpcionesDieta: nonNil(b.DietOptions), Alergenos: nonNil(b.Allergens), Accesibilidad: b.Accessibility,
 		Estado: b.State, PasoAlta: b.Step, Documentos: b.Documentos, CuentaDeposito: b.CuentaDeposito, Verificado: b.Verified,
-		Version: b.Version, CreadoEn: b.CreatedAt.UTC(),
+		Version: b.Version, CreadoEn: b.CreatedAt.UTC(), DatosNegocio: DatosDe(b),
 		Revision: RevisionResponse{EnviadoEn: b.Revision.EnviadoEn, RevisadoEn: b.Revision.RevisadoEn, MotivoRechazo: b.Revision.MotivoRechazo},
 	}
 	if b.Location.Type == "Point" {
@@ -201,19 +245,16 @@ func fotosResponse(fotos []negocios.Foto) []FotoResponse {
 
 func colaItem(b negocios.Business, now time.Time) ColaItem {
 	sent := b.Revision.EnviadoEn
-	var cambios *CambiosResponse
-	if c := b.CambiosPendientes; c != nil {
-		at := c.EnviadoEn
+	cambios := CambiosDe(b.CambiosPendientes)
+	if cambios != nil {
+		at := b.CambiosPendientes.EnviadoEn
 		sent = &at
-		cambios = &CambiosResponse{Campos: nonNil(c.Campos), Nombre: c.Nombre, Direccion: c.Direccion, EnviadoEn: c.EnviadoEn.UTC()}
-		if c.Ubicacion != nil {
-			cambios.Ubicacion = &Ubicacion{Type: c.Ubicacion.Type, Coordinates: c.Ubicacion.Coordinates}
-		}
 	}
 	dias := 0
 	if sent != nil {
 		dias = int(now.Sub(*sent).Hours() / 24)
 	}
 	return ColaItem{ID: b.ID.Hex(), Nombre: b.Name, Categoria: b.Category, Descripcion: b.Description, Fotos: len(b.Photos),
-		Documentos: b.Documentos, PasoAlta: b.Step, EnviadoEn: sent, DiasEspera: dias, Version: b.Version, Cambios: cambios}
+		Documentos: b.Documentos, PasoAlta: b.Step, EnviadoEn: sent, DiasEspera: dias, Version: b.Version, Cambios: cambios,
+		DatosNegocio: DatosDe(b)}
 }

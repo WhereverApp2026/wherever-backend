@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/ia"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/planes"
 	"github.com/WhereverApp2026/wherever-backend/internal/recomendador"
 	"github.com/WhereverApp2026/wherever-backend/internal/shared/apperr"
@@ -294,10 +296,13 @@ func contexto(lat, lng float64, inicio time.Time, in Interpretacion, g *usuarios
 		Lat: lat, Lng: lng, Momento: inicio, PresupuestoMax: in.PresupuestoMax,
 		Gustos: in.PalabrasClave, ConNinos: in.ConNinos, ConMascota: in.ConMascota,
 	}
+	if e := negocios.ExperienciaDeCompania(in.Compania); e != "" {
+		c.Gustos = append(slices.Clone(c.Gustos), e)
+	}
 	if g == nil {
 		return c
 	}
-	c.Gustos = append(append([]string{}, g.Categories...), in.PalabrasClave...)
+	c.Gustos = append(append([]string{}, g.Categories...), c.Gustos...)
 	c.Alergenos, c.AlergiaSinCatalogo = recomendador.ParseAlergias(g.Allergies)
 	c.Dietas = recomendador.DietasDe(g.Restrictions)
 	if c.PresupuestoMax == 0 {

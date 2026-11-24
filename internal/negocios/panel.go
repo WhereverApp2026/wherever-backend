@@ -44,14 +44,19 @@ type ReservasConfig struct {
 	CupoPorHora []CupoHora `bson:"cupo_por_hora,omitempty" json:"cupo_por_hora,omitempty"`
 }
 
-// CambiosPendientes guarda nombre, dirección o ubicación nuevos hasta que el administrador los
+// CambiosPendientes guarda nombre, dirección, ubicación o los datos de nv-90 nuevos hasta que el administrador los
 // aplique; el negocio sigue publicado con los de antes.
 type CambiosPendientes struct {
 	Campos    []string   `bson:"campos"`
 	Nombre    string     `bson:"nombre,omitempty"`
 	Direccion *Direccion `bson:"direccion,omitempty"`
 	Ubicacion *Location  `bson:"ubicacion,omitempty"`
-	EnviadoEn time.Time  `bson:"enviado_en"`
+	// Experiencias, AnioApertura, WhatsApp y Redes (nv-90); WhatsApp o Redes vacíos los quitan.
+	Experiencias []string  `bson:"experiencias,omitempty"`
+	AnioApertura int       `bson:"anio_apertura,omitempty"`
+	WhatsApp     *string   `bson:"whatsapp,omitempty"`
+	Redes        *Redes    `bson:"redes,omitempty"`
+	EnviadoEn    time.Time `bson:"enviado_en"`
 }
 
 // Sello es la última decisión del administrador sobre el Sello de Excelencia.

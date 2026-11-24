@@ -52,6 +52,7 @@ type Service struct {
 	futuras      negocios.ReservasFuturas
 	imagenes     Imagenes
 	ia           IA
+	texto        negocios.TextoProhibido
 	notifier     notificaciones.Notifier
 	zona         *time.Location
 	plazo        time.Duration
@@ -306,6 +307,9 @@ func (s *Service) Perfil(ctx context.Context, claims *middleware.Claims, id stri
 	if fields = append(fields, pfields...); len(fields) > 0 {
 		return PerfilResponse{}, apperr.Validation("datos inválidos", fields...)
 	}
+	if err := s.revisarRedes(ctx, req); err != nil {
+		return PerfilResponse{}, err
+	}
 	if pend != nil {
 		set = append(set, bson.E{Key: "cambios_pendientes", Value: pend})
 	}
@@ -391,16 +395,16 @@ func elegir(nuevo *[]string, actual []string) []string {
 	return nonNil(actual)
 }
 
-// pendientes junta nombre, dirección y ubicación nuevos con los que ya esperaban revisión.
+// pendientes junta nombre, dirección, ubicación y datos de nv-90 nuevos con los que ya esperaban revisión.
 func pendientes(b negocios.Business, req PerfilRequest, now time.Time) (*negocios.CambiosPendientes, []apperr.FieldError) {
-	if req.Nombre == nil && req.Direccion == nil && req.Ubicacion == nil {
+	if req.Nombre == nil && req.Direccion == nil && req.Ubicacion == nil && !traeDatos(req) {
 		return nil, nil
 	}
 	c := negocios.CambiosPendientes{}
 	if b.CambiosPendientes != nil {
 		c = *b.CambiosPendientes
 	}
-	fields := sumarPendientes(&c, b.Name, req)
+	fields := sumarPendientes(&c, b.Name, req, now)
 	if len(c.Campos) == 0 {
 		return nil, fields
 	}
@@ -408,7 +412,7 @@ func pendientes(b negocios.Business, req PerfilRequest, now time.Time) (*negocio
 	return &c, fields
 }
 
-func sumarPendientes(c *negocios.CambiosPendientes, nombre string, req PerfilRequest) []apperr.FieldError {
+func sumarPendientes(c *negocios.CambiosPendientes, nombre string, req PerfilRequest, now time.Time) []apperr.FieldError {
 	var fields []apperr.FieldError
 	marcar := func(campo string) {
 		if !slices.Contains(c.Campos, campo) {
@@ -431,7 +435,7 @@ func sumarPendientes(c *negocios.CambiosPendientes, nombre string, req PerfilReq
 		c.Ubicacion = &loc
 		marcar("ubicacion")
 	}
-	return fields
+	return append(fields, sumarDatos(c, req, now, marcar)...)
 }
 
 // Pausa pausa (solo desde `aprobado`) o reanuda (solo desde `pausado`). Pausado no sale en nada

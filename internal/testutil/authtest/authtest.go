@@ -274,11 +274,11 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	registry.RegisterPurger(expPrivacy)
 	registry.RegisterExporter(expPrivacy)
 	altaSvc := alta.NewService(businessRepo, exp, users, cursor, alta.Config{AvisoVersion: cfg.VersionApp.Aviso}, log).
-		WithImagenes(fotosNegocio).WithFichas(businesses).WithNotifier(notifier)
+		WithImagenes(fotosNegocio).WithFichas(businesses).WithNotifier(notifier).WithTexto(mods)
 	registry.RegisterExporter(images.Privacy)
 	menuRepo := menu.NewRepository(client.DB())
 	menus := menu.NewService(menuRepo, businessRepo, log).WithImagenes(fotosNegocio)
-	panels := panel.NewService(businessRepo, menuRepo, exp, businesses, log).WithNotifier(notifier).WithIA(guardia)
+	panels := panel.NewService(businessRepo, menuRepo, exp, businesses, log).WithNotifier(notifier).WithIA(guardia).WithTexto(mods)
 	if images.Service != nil {
 		panels.WithImagenes(images.Service)
 	}

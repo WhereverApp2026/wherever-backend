@@ -161,22 +161,28 @@ func alAireLibre(b negocios.Business) bool {
 	return false
 }
 
-// Gustos cuenta cuántos gustos del usuario coinciden con el giro, su nombre o una
-// etiqueta; dos o más coincidencias valen 1. Sin gustos, neutro.
+// Gustos cuenta cuántos gustos del usuario coinciden con el giro, su nombre, una etiqueta o
+// una experiencia del negocio (nv-90: la compañía llega como gusto, p. ej. «romantico» o
+// «familia»); dos o más coincidencias valen 1. Que el negocio ofrezca la comida de la hora
+// pedida (desayuno, comida o cena) suma una más. Sin gustos, neutro.
 func (p Puntaje) Gustos(b negocios.Business) float64 {
 	if len(p.c.Gustos) == 0 {
 		return neutro
 	}
-	terms := make([]string, 0, len(b.Tags)+2)
+	terms := make([]string, 0, len(b.Tags)+len(b.Experiencias)+2)
 	terms = append(terms, text.Normalize(b.Category), text.Normalize(negocios.CategoryName(b.Category)))
 	for _, tag := range b.Tags {
 		terms = append(terms, text.Normalize(tag))
 	}
+	terms = append(terms, b.Experiencias...)
 	hits := 0
 	for _, g := range p.c.Gustos {
 		if slices.Contains(terms, text.Normalize(g)) {
 			hits++
 		}
+	}
+	if comida := negocios.ExperienciaDeHora(p.c.Momento); comida != "" && slices.Contains(b.Experiencias, comida) {
+		hits++
 	}
 	return clamp01(float64(hits) / 2)
 }
