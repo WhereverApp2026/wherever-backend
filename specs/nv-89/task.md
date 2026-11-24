@@ -1,12 +1,12 @@
 # task.md — NV-89 Reservar todo el plan y permisos al compartir
 
 ## Fase 0 — Preparación
-- [ ] T00 Decisiones del revisor tomadas; rama contra `main`.
+- [x] T00 Decisiones del revisor tomadas como las propone la spec (pendiente su visto bueno en el PR); rama contra `main`.
 
 ## Fase 1 — Implementación
-- [ ] T01 Reservar todo con éxito parcial e idempotencia por parada.
-- [ ] T02 Permiso `ver`/`editar` en el enlace y por integrante.
-- [ ] T03 Edición del plan por integrantes con `editar`.
+- [x] T01 Reservar todo con éxito parcial e idempotencia por parada.
+- [x] T02 Permiso `ver`/`editar` en el enlace y por integrante.
+- [x] T03 Edición del plan por integrantes con `editar`.
 
 ## Fase 2 — Cierre
-- [ ] T04 Pruebas en las suites que apliquen; `docs/endpoints.md`; `Memoria.md`; evidencia en `gates.md`.
+- [x] T04 Pruebas en las suites que apliquen; `docs/endpoints.md`; `Memoria.md`; evidencia en `gates.md`.

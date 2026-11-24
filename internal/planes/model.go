@@ -34,6 +34,12 @@ const (
 	VisibilityPublic  = "publico"
 )
 
+// Permisos de un integrante sobre el plan del grupo (nv-89). El dueño siempre edita.
+const (
+	PermissionView = "ver"
+	PermissionEdit = "editar"
+)
+
 // GeoPoint es un punto GeoJSON `[lng, lat]`.
 type GeoPoint struct {
 	Type        string    `bson:"type"`
@@ -100,7 +106,9 @@ type Plan struct {
 	Zona *GeoPoint `bson:"zona,omitempty" json:"-"`
 	// SyncSeq es el número del último cambio en la sincronización del dueño (nv-46).
 	// Sorpresa sale solo a la persona sorprendida del grupo (nv-69); nunca se guarda.
-	Sorpresa      *Sorpresa `bson:"-" json:"sorpresa,omitempty"`
+	Sorpresa *Sorpresa `bson:"-" json:"sorpresa,omitempty"`
+	// MiPermiso sale solo a los integrantes del grupo (`ver` o `editar`, nv-89); nunca se guarda.
+	MiPermiso     string    `bson:"-" json:"mi_permiso,omitempty"`
 	SyncSeq       int64     `bson:"sync_seq" json:"-"`
 	CreadoEn      time.Time `bson:"creado_en" json:"creado_en"`
 	ActualizadoEn time.Time `bson:"actualizado_en" json:"actualizado_en"`

@@ -57,9 +57,11 @@ type Service struct {
 	anticipos Anticipos
 	refunder  Refunder
 	notifier  notificaciones.Notifier
-	loc       *time.Location
-	log       *slog.Logger
-	now       func() time.Time
+	// planes da el plan editable para reservar todo (nv-89); nil = 503.
+	planes Planes
+	loc    *time.Location
+	log    *slog.Logger
+	now    func() time.Time
 }
 
 // NewService recibe sus dependencias por constructor; el candado y la idempotencia son Redis.
@@ -276,6 +278,12 @@ func (s *Service) repetida(ctx context.Context, me bson.ObjectID, prev string) (
 }
 
 func (s *Service) crear(ctx context.Context, me bson.ObjectID, req CrearRequest) (Reserva, error) {
+	return s.crearReserva(ctx, me, req, false)
+}
+
+// crearReserva aparta el cupo. Con unica (reservar todo, nv-89), dentro del candado también
+// revisa que la parada del plan no tenga ya una reserva activa en ese horario (errYaReservada).
+func (s *Service) crearReserva(ctx context.Context, me bson.ObjectID, req CrearRequest, unica bool) (Reserva, error) {
 	negocioID, _ := parseID(req.NegocioID)
 	b, err := s.visible(ctx, negocioID)
 	if err != nil {
@@ -309,8 +317,11 @@ func (s *Service) crear(ctx context.Context, me bson.ObjectID, req CrearRequest)
 		r.Anticipo.Tipo = ""
 	}
 	cupo := CupoTurno(cfg, hora, cfg.DuracionTurnoMin, s.loc)
-	err = s.conCupo(ctx, b.ID, hora, cfg.DuracionTurnoMin, nil, func(ocupadas int) error {
-		if cupo-ocupadas < req.Personas {
+	err = s.conHorario(ctx, b.ID, hora, cfg.DuracionTurnoMin, func(rs []Reserva) error {
+		if unica && MismaParada(rs, r, s.now()) {
+			return errYaReservada
+		}
+		if cupo-ocupadas(rs, nil, s.now()) < req.Personas {
 			return errOcupado()
 		}
 		return s.insertar(ctx, &r)
@@ -370,6 +381,25 @@ func (s *Service) validarHora(b negocios.Business, cfg negocios.ReservasConfig, 
 // conCupo cuenta las personas del horario dentro del candado y corre fn. `excepto` no cuenta
 // (la propia reserva al cambiarla). Un bloqueo del negocio deja el horario en 0.
 func (s *Service) conCupo(ctx context.Context, negocio bson.ObjectID, hora time.Time, turnoMin int, excepto *bson.ObjectID, fn func(ocupadas int) error) error {
+	return s.conHorario(ctx, negocio, hora, turnoMin, func(rs []Reserva) error {
+		return fn(ocupadas(rs, excepto, s.now()))
+	})
+}
+
+// ocupadas suma las personas de las reservas que ocupan cupo, sin contar `excepto`.
+func ocupadas(rs []Reserva, excepto *bson.ObjectID, now time.Time) int {
+	n := 0
+	for _, r := range rs {
+		if r.Ocupa(now) && (excepto == nil || r.ID != *excepto) {
+			n += r.Personas
+		}
+	}
+	return n
+}
+
+// conHorario toma el candado del horario, revisa los bloqueos del negocio y corre fn con las
+// reservas activas de ese horario.
+func (s *Service) conHorario(ctx context.Context, negocio bson.ObjectID, hora time.Time, turnoMin int, fn func(rs []Reserva) error) error {
 	release, err := s.locker.Lock(ctx, negocio.Hex()+":"+strconv.FormatInt(hora.Unix(), 10))
 	if errors.Is(err, ErrLockBusy) {
 		return errOcupado()
@@ -389,14 +419,7 @@ func (s *Service) conCupo(ctx context.Context, negocio bson.ObjectID, hora time.
 	if err != nil {
 		return errStore()
 	}
-	now := s.now()
-	ocupadas := 0
-	for _, r := range rs {
-		if r.Ocupa(now) && (excepto == nil || r.ID != *excepto) {
-			ocupadas += r.Personas
-		}
-	}
-	return fn(ocupadas)
+	return fn(rs)
 }
 
 // insertar genera el código; si choca con ux_codigo, otro (hasta 5 intentos).

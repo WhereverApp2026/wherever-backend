@@ -1,0 +1,10 @@
+{
+  "status": 201,
+  "body": {
+    "codigo": "string",
+    "enlace": "string",
+    "grupo_id": "string",
+    "permiso": "string",
+    "vence_en": "string"
+  }
+}

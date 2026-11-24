@@ -75,6 +75,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Patch("/:id/integrantes/yo", append(h.write(), h.respond)...)
 	g.Delete("/:id/integrantes/yo", append(h.write(), h.leave)...)
 	g.Delete("/:id/integrantes/:usuario_id", append(h.write(), h.remove)...)
+	g.Patch("/:id/integrantes/:usuario_id", append(h.write(), h.setPermission)...)
 	h.extraRoutes(v1, g, limiter)
 }
 
@@ -273,6 +274,15 @@ func (h *Handler) leave(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+func (h *Handler) setPermission(c *fiber.Ctx) error {
+	var req PermissionRequest
+	if err := h.bind(c, &req); err != nil {
+		return err
+	}
+	v, err := h.svc.SetPermission(c.UserContext(), subject(c), c.Params("id"), c.Params("usuario_id"), req)
+	return send(c, fiber.StatusOK, v, err)
+}
+
 func (h *Handler) remove(c *fiber.Ctx) error {
 	if err := h.svc.Remove(c.UserContext(), subject(c), c.Params("id"), c.Params("usuario_id")); err != nil {
 		return err
@@ -297,8 +307,15 @@ func limited(limiter *middleware.Limiter, policy func(*middleware.Limiter) fiber
 	return []fiber.Handler{policy(limiter)}
 }
 
+// share acepta el cuerpo vacío (enlace de `ver`, como antes de nv-89).
 func (h *Handler) share(c *fiber.Ctx) error {
-	out, err := h.svc.Share(c.UserContext(), subject(c), c.Params("id"))
+	var req ShareRequest
+	if len(c.Body()) > 0 {
+		if err := h.bind(c, &req); err != nil {
+			return err
+		}
+	}
+	out, err := h.svc.Share(c.UserContext(), subject(c), c.Params("id"), req)
 	if err != nil {
 		return err
 	}

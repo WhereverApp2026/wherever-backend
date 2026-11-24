@@ -284,7 +284,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	}
 	registry.RegisterExporter(panel.NewPrivacy(businessRepo, menuRepo))
 	bookingRepo := reservas.NewRepository(client.DB())
-	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log).WithNotifier(notifier)
+	bookings := reservas.NewService(bookingRepo, businessRepo, users, reservas.NewRedis(rdb), cursor, log).WithNotifier(notifier).WithPlanes(plans)
 	bookingPrivacy := reservas.NewPrivacy(bookingRepo).WithNegocios(businessRepo)
 	registry.RegisterPurger(bookingPrivacy)
 	registry.RegisterExporter(bookingPrivacy)

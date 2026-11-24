@@ -181,7 +181,7 @@ func (s *Service) clonePublic(ctx context.Context, subject, rawID string, req Cl
 // Alternatives da hasta 3 negocios parecidos a la parada (mismo giro, precio ±1) o, con
 // `q`, que coinciden por nombre, abiertos durante toda la estancia y fuera del plan. Sin IA.
 func (s *Service) Alternatives(ctx context.Context, subject, rawID, rawStopID string, q AlternativesQuery) (AlternativesResponse, error) {
-	p, err := s.getOwned(ctx, subject, rawID)
+	p, err := s.Editable(ctx, subject, rawID)
 	if err != nil {
 		return AlternativesResponse{}, err
 	}

@@ -51,6 +51,8 @@ type MemberView struct {
 	Since  time.Time        `json:"desde"`
 	// SharesLocation dice si su ubicación está vigente; la ubicación nunca sale (nv-69).
 	SharesLocation bool `json:"comparte_ubicacion"`
+	// Permission es `ver` o `editar` sobre el plan; el organizador siempre `editar` (nv-89).
+	Permission string `json:"permiso_plan"`
 }
 
 // Seats es el cupo del grupo.
@@ -140,7 +142,10 @@ func newView(g Group, me bson.ObjectID, people map[bson.ObjectID]usuarios.User, 
 }
 
 func memberView(m Member, people map[bson.ObjectID]usuarios.User, now time.Time) MemberView {
-	out := MemberView{UserID: m.UserID.Hex(), Role: m.Role, Status: m.Status, Since: m.Since, SharesLocation: m.Visible(now)}
+	out := MemberView{
+		UserID: m.UserID.Hex(), Role: m.Role, Status: m.Status, Since: m.Since, SharesLocation: m.Visible(now),
+		Permission: m.PlanPermission(),
+	}
 	if u, ok := people[m.UserID]; ok {
 		out.Person = &personas.Person{ID: u.ID.Hex(), Name: u.Name, Username: u.Username, PhotoURL: u.PhotoURL}
 	}
@@ -160,6 +165,23 @@ type CodeRequest struct {
 // JoinRequest es el cuerpo de POST /grupos/unirse.
 type JoinRequest = CodeRequest
 
+// ShareRequest es el cuerpo opcional de POST /planes/{id}/compartir (nv-89).
+type ShareRequest struct {
+	Permission string `json:"permiso" validate:"omitempty,oneof=ver editar"`
+}
+
+func (r ShareRequest) permission() string {
+	if r.Permission == planes.PermissionEdit {
+		return planes.PermissionEdit
+	}
+	return planes.PermissionView
+}
+
+// PermissionRequest es el cuerpo de PATCH /grupos/{id}/integrantes/{usuario_id} (nv-89).
+type PermissionRequest struct {
+	Permission string `json:"permiso_plan" validate:"required,oneof=ver editar"`
+}
+
 // ShareResponse es la respuesta de POST /planes/{id}/compartir. El código solo se muestra
 // aquí: en la base queda su hash.
 type ShareResponse struct {
@@ -167,6 +189,8 @@ type ShareResponse struct {
 	Link      string    `json:"enlace"`
 	GroupID   string    `json:"grupo_id"`
 	ExpiresAt time.Time `json:"vence_en"`
+	// Permission es lo que recibe quien entra por el enlace (nv-89).
+	Permission string `json:"permiso"`
 }
 
 // PublicStop es una parada de la vista pública; `lugar` falta si el negocio ya no está

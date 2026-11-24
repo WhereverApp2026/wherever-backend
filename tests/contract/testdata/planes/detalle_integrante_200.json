@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "actualizado_en": "string",
+    "comentarios_total": "number",
+    "costo_por_persona": "number",
+    "costo_total": "number",
+    "creado_en": "string",
+    "fecha": "string",
+    "id": "string",
+    "me_gusta_total": "number",
+    "mi_permiso": "string",
+    "movilidad": "string",
+    "nombre": "string",
+    "origen": "string",
+    "paradas": [
+      {
+        "id": "string",
+        "llega": "string",
+        "minutos": "number",
+        "negocio_id": "string",
+        "precio": "number"
+      }
+    ],
+    "personas": "number",
+    "presupuesto": "number",
+    "traslados": [],
+    "veces_clonado": "number",
+    "version": "number",
+    "visibilidad": "string"
+  }
+}

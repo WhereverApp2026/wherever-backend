@@ -83,6 +83,19 @@ func (l *Limiter) WindowUser(policy string, limit int, window time.Duration) fib
 	}
 }
 
+// Take cuenta n usos de una vez en la ventana `rate:{politica}:{sujeto}` (nv-89: reservar todo
+// cuenta una reserva por parada). Pasarse = 429; como en WindowUser, la cuenta no se deshace.
+func (l *Limiter) Take(ctx context.Context, policy, subject string, n, limit int, window time.Duration) error {
+	if n <= 0 {
+		return nil
+	}
+	count, resetIn := l.hitN(ctx, "rate:"+policy+":"+subject, int64(n), window)
+	if count > int64(limit) {
+		return apperr.RateLimited(retryAfterSeconds(resetIn))
+	}
+	return nil
+}
+
 // Concurrent limita las escrituras simultáneas (POST/PUT/PATCH/DELETE) por sujeto.
 func (l *Limiter) Concurrent(policy string, limit int) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -100,17 +113,21 @@ func (l *Limiter) Concurrent(policy string, limit int) fiber.Handler {
 }
 
 func (l *Limiter) hit(ctx context.Context, key string, window time.Duration) (int64, time.Duration) {
+	return l.hitN(ctx, key, 1, window)
+}
+
+func (l *Limiter) hitN(ctx context.Context, key string, n int64, window time.Duration) (int64, time.Duration) {
 	if !l.redisAvailable() {
-		return l.memory.hit(key, window)
+		return l.memory.hit(key, n, window)
 	}
 	// Sin MULTI/EXEC: Upstash los cobra (nv-11). Si se corta a medias, el siguiente ExpireNX pone el TTL.
 	pipe := l.redis.Pipeline()
-	incr := pipe.Incr(ctx, key)
+	incr := pipe.IncrBy(ctx, key, n)
 	pipe.ExpireNX(ctx, key, window)
 	ttl := pipe.PTTL(ctx, key)
 	if _, err := pipe.Exec(ctx); err != nil {
 		l.markDegraded(err)
-		return l.memory.hit(key, window)
+		return l.memory.hit(key, n, window)
 	}
 	l.markHealthy()
 	return incr.Val(), ttl.Val()
@@ -190,7 +207,7 @@ func (m *memoryStore) reset() {
 	m.active = map[string]int64{}
 }
 
-func (m *memoryStore) hit(key string, window time.Duration) (int64, time.Duration) {
+func (m *memoryStore) hit(key string, n int64, window time.Duration) (int64, time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := time.Now()
@@ -201,7 +218,7 @@ func (m *memoryStore) hit(key string, window time.Duration) (int64, time.Duratio
 	if !ok || !now.Before(entry.resetAt) {
 		entry = memoryEntry{resetAt: now.Add(window)}
 	}
-	entry.count++
+	entry.count += n
 	m.windows[key] = entry
 	return entry.count, entry.resetAt.Sub(now)
 }

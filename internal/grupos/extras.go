@@ -503,13 +503,14 @@ func (s *Service) MeToo(ctx context.Context, subject, rawPlanID string) (View, e
 	return s.joinPlan(ctx, p, me)
 }
 
-// joinPlan trae o crea el grupo del plan (el dueño de organizador) y deja a me confirmado.
+// joinPlan trae o crea el grupo del plan (el dueño de organizador) y deja a me confirmado;
+// quien entra nuevo por «me apunto» solo ve el plan (nv-89).
 func (s *Service) joinPlan(ctx context.Context, p planes.Plan, me bson.ObjectID) (View, error) {
 	g, err := s.groupForPlan(ctx, p.OwnerID, p.ID)
 	if err != nil {
 		return View{}, errStore()
 	}
-	if err := s.repo.Join(ctx, g.ID, me, s.now().UTC()); err != nil {
+	if err := s.repo.Join(ctx, g.ID, me, planes.PermissionView, s.now().UTC()); err != nil {
 		if err := s.joinError(ctx, g.ID, me, err); err != nil {
 			return View{}, err
 		}

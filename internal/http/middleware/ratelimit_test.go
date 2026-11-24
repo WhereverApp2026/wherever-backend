@@ -81,3 +81,15 @@ func TestRateLimit_ConcurrentWritesOverLimitIs429(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, <-done)
 	assert.Equal(t, http.StatusOK, get(t, app, "/x").StatusCode, "GET no cuenta como escritura")
 }
+
+func TestRateLimit_TakeCuentaVariasDeUnaVez(t *testing.T) {
+	limiter := middleware.NewLimiter(testutil.DeadRedis(t), discardLogger())
+	ctx := t.Context()
+	require.NoError(t, limiter.Take(ctx, "reservas", "u1", 0, 10, time.Hour), "cero no gasta")
+	require.NoError(t, limiter.Take(ctx, "reservas", "u1", 6, 10, time.Hour))
+	require.NoError(t, limiter.Take(ctx, "reservas", "u1", 4, 10, time.Hour), "justo el límite")
+	err := limiter.Take(ctx, "reservas", "u1", 1, 10, time.Hour)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "demasiadas_peticiones")
+	assert.NoError(t, limiter.Take(ctx, "reservas", "u2", 10, 10, time.Hour), "otra persona tiene su propia cuenta")
+}
