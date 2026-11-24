@@ -101,6 +101,20 @@ func TestPuntaje_Gustos(t *testing.T) {
 	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Gustos(b))
 }
 
+// nv-90: la experiencia del negocio cuenta como gusto (compañía) y la comida de la hora suma.
+func TestPuntaje_GustosConExperiencias(t *testing.T) {
+	b := negocioBase()
+	b.Category = "restaurante"
+	c := ctxBase() // 12:00 en México: comida
+	c.Gustos = []string{"romantico"}
+	assert.Equal(t, 0.0, NewPuntaje(c).Gustos(b), "sin experiencias, igual que antes")
+	b.Experiencias = []string{"romantico"}
+	assert.Equal(t, 0.5, NewPuntaje(c).Gustos(b))
+	b.Experiencias = []string{"romantico", "comida"}
+	assert.Equal(t, 1.0, NewPuntaje(c).Gustos(b), "compañía + comida de la hora")
+	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Gustos(b), "sin gustos sigue neutro")
+}
+
 func TestPuntaje_AfinidadNeutraSinSemantica(t *testing.T) {
 	b := negocioBase()
 	assert.Equal(t, neutro, NewPuntaje(ctxBase()).Afinidad(b.ID), "sin búsqueda semántica")

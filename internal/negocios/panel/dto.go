@@ -11,8 +11,8 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
 )
 
-// PerfilRequest cambia solo los campos que vienen. `nombre`, `direccion` y `ubicacion` quedan
-// en `cambios_pendientes` hasta que el administrador los aplique.
+// PerfilRequest cambia solo los campos que vienen. `nombre`, `direccion`, `ubicacion` y los
+// datos de nv-90 quedan en `cambios_pendientes` hasta que el administrador los aplique.
 type PerfilRequest struct {
 	Nombre         *string                 `json:"nombre" validate:"omitempty,min=3,max=60"`
 	Descripcion    *string                 `json:"descripcion" validate:"omitempty,max=300"`
@@ -27,6 +27,11 @@ type PerfilRequest struct {
 	Alergenos      *[]string               `json:"alergenos"`
 	Accesibilidad  *negocios.Accesibilidad `json:"accesibilidad"`
 	Telefono       *string                 `json:"telefono" validate:"omitempty,max=20"`
+	// Datos de nv-90: van a revisión como nombre y dirección. WhatsApp o redes vacíos los quitan.
+	Experiencias *[]string       `json:"experiencias" validate:"omitempty,max=4"`
+	AnioApertura *int            `json:"anio_apertura"`
+	WhatsApp     *string         `json:"whatsapp" validate:"omitempty,max=25"`
+	Redes        *negocios.Redes `json:"redes"`
 }
 
 // PausaRequest pausa o reanuda. `hasta` es opcional (máximo 90 días).
@@ -130,6 +135,7 @@ type PerfilResponse struct {
 	SelloExcelencia   bool                     `json:"sello_excelencia"`
 	Version           int                      `json:"version"`
 	ActualizadoEn     time.Time                `json:"actualizado_en"`
+	alta.DatosNegocio
 }
 
 // ReservasConfigResponse es la configuración guardada con la versión nueva del negocio.
@@ -213,16 +219,10 @@ func perfilResponse(b negocios.Business) PerfilResponse {
 		Horarios: nonNil(b.Schedules), NivelPrecio: b.PriceLevel, PrecioPromedio: b.AveragePrice, Servicios: nonNil(b.Services),
 		OpcionesDieta: nonNil(b.DietOptions), Alergenos: nonNil(b.Allergens), Accesibilidad: b.Accessibility, Estado: b.State,
 		Pausado: pausaResponse(b.Paused), ReservasConfig: b.ReservasConfig, SelloExcelencia: b.ExcellenceSeal, Version: b.Version,
-		ActualizadoEn: b.UpdatedAt.UTC(),
+		ActualizadoEn: b.UpdatedAt.UTC(), DatosNegocio: alta.DatosDe(b), CambiosPendientes: alta.CambiosDe(b.CambiosPendientes),
 	}
 	if b.Location.Type == "Point" {
 		out.Ubicacion = &alta.Ubicacion{Type: b.Location.Type, Coordinates: b.Location.Coordinates}
-	}
-	if c := b.CambiosPendientes; c != nil {
-		out.CambiosPendientes = &alta.CambiosResponse{Campos: nonNil(c.Campos), Nombre: c.Nombre, Direccion: c.Direccion, EnviadoEn: c.EnviadoEn.UTC()}
-		if c.Ubicacion != nil {
-			out.CambiosPendientes.Ubicacion = &alta.Ubicacion{Type: c.Ubicacion.Type, Coordinates: c.Ubicacion.Coordinates}
-		}
 	}
 	return out
 }

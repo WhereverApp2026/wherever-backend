@@ -63,6 +63,7 @@ type Service struct {
 	fichas   Fichas
 	notifier notificaciones.Notifier
 	deposito Deposito
+	texto    negocios.TextoProhibido
 	cursor   *pagination.Signer
 	cfg      Config
 	log      *slog.Logger
@@ -224,6 +225,9 @@ func (s *Service) Crear(ctx context.Context, claims *middleware.Claims, req Crea
 	now := s.now().UTC().Truncate(time.Millisecond)
 	b := negocios.Business{ID: bson.NewObjectID(), OwnerID: owner, Name: strings.TrimSpace(req.Nombre), Category: req.Categoria,
 		Description: strings.TrimSpace(req.Descripcion), QRCheckin: qr, CreatedAt: now}
+	if fields := datosCrear(&b, req, now); len(fields) > 0 {
+		return NegocioResponse{}, apperr.Validation("datos inválidos", fields...)
+	}
 	b.Slug = slugDe(b.Name, b.ID)
 	b.NormalizedName = text.Normalize(b.Name)
 	if err := s.repo.InsertDraft(ctx, &b); err != nil {
@@ -311,6 +315,9 @@ func (s *Service) GuardarPaso(ctx context.Context, claims *middleware.Claims, id
 	if len(fields) > 0 {
 		return NegocioResponse{}, apperr.Validation("datos inválidos", fields...)
 	}
+	if err := s.revisarPaso(ctx, p); err != nil {
+		return NegocioResponse{}, err
+	}
 	set = append(set, bson.E{Key: "paso_alta", Value: max(b.Step, p.Numero)})
 	nb, err := s.repo.ApplyIf(ctx, bson.D{
 		{Key: "_id", Value: b.ID}, {Key: "propietario_id", Value: b.OwnerID}, {Key: "version", Value: version},
@@ -331,7 +338,8 @@ func (p Paso) datos() (bson.D, []apperr.FieldError, bool) {
 	case p.Numero == 2 && p.Dos != nil:
 		loc := negocios.Location{Type: p.Dos.Ubicacion.Type, Coordinates: p.Dos.Ubicacion.Coordinates}
 		fields := append(negocios.ValidateLocation(loc), negocios.ValidateAddress(p.Dos.Direccion)...)
-		return bson.D{{Key: "ubicacion", Value: loc}, {Key: "direccion", Value: p.Dos.Direccion}}, fields, true
+		contacto, cfields := contactoPaso2(p.Dos)
+		return append(bson.D{{Key: "ubicacion", Value: loc}, {Key: "direccion", Value: p.Dos.Direccion}}, contacto...), append(fields, cfields...), true
 	case p.Numero == 3 && p.Tres != nil:
 		return bson.D{{Key: "horarios", Value: p.Tres.Horarios}, {Key: "horario_min", Value: negocios.DeriveScheduleMin(p.Tres.Horarios)}},
 			negocios.ValidateSchedules(p.Tres.Horarios), true
@@ -543,7 +551,7 @@ func (s *Service) despuesDeDecidir(ctx context.Context, b negocios.Business, res
 	s.notifier.Emit(ctx, b.OwnerID, KindRevisado, map[string]string{"negocio_id": b.ID.Hex(), "resultado": resultado})
 }
 
-// decidirCambios aplica o descarta nombre, dirección o ubicación de un negocio aprobado
+// decidirCambios aplica o descarta nombre, dirección, ubicación o datos de nv-90 de un negocio aprobado
 // (nv-56). El negocio nunca se despublica; descartar exige motivo y avisa al dueño.
 func (s *Service) decidirCambios(ctx context.Context, b negocios.Business, version int, decision, motivo string) (NegocioResponse, error) {
 	c := b.CambiosPendientes
@@ -560,6 +568,7 @@ func (s *Service) decidirCambios(ctx context.Context, b negocios.Business, versi
 		if c.Ubicacion != nil {
 			set = append(set, bson.E{Key: "ubicacion", Value: *c.Ubicacion})
 		}
+		set = setDatosCambios(set, c)
 	}
 	nb, err := s.repo.ChangeIf(ctx, bson.D{{Key: "_id", Value: b.ID}, {Key: "version", Value: version},
 		{Key: "cambios_pendientes", Value: bson.D{{Key: "$exists", Value: true}}}}, set, "cambios_pendientes")

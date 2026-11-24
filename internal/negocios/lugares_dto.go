@@ -108,6 +108,11 @@ type PlaceDetail struct {
 	Verified            bool          `json:"verificado"`
 	ExcellenceSeal      bool          `json:"sello_excelencia"`
 	OpenNow             bool          `json:"abierto_ahora"`
+	// Datos de nv-90: solo salen si el dueño los capturó. El WhatsApp sale solo como enlace.
+	Experiencias []string `json:"experiencias,omitempty"`
+	AnioApertura int      `json:"anio_apertura,omitempty"`
+	WhatsAppURL  string   `json:"whatsapp_url,omitempty"`
+	Redes        *Redes   `json:"redes,omitempty"`
 }
 
 // MapPin es un negocio suelto en el mapa.
@@ -201,5 +206,17 @@ func toDetail(b Business, now time.Time) PlaceDetail {
 		Verified:            b.Verified,
 		ExcellenceSeal:      b.ExcellenceSeal,
 		OpenNow:             OpenAt(b.ScheduleMin, now),
+		Experiencias:        b.Experiencias,
+		AnioApertura:        b.AnioApertura,
+		WhatsAppURL:         WhatsAppURL(b.WhatsApp),
+		Redes:               redesPublicas(b.Redes),
 	}
+}
+
+func redesPublicas(r *Redes) *Redes {
+	if r == nil || r.Vacia() {
+		return nil
+	}
+	out := *r
+	return &out
 }

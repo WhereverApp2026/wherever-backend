@@ -270,6 +270,9 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
 	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
+	// Instagram y sitio web del negocio pasan por las palabras bloqueadas (nv-90).
+	business.svc.WithTexto(modSvc)
+	merchant.panel.WithTexto(modSvc)
 	cards := buildPostales(postales.Deps{Repo: postales.NewRepository(db), Amigos: friendRepo, Planes: planRepo, Grupos: groupRepo,
 		Negocios: businessRepo, Autores: users, Cursor: cursor, Log: log}, images, modSvc, notifier, registry, log)
 	// Historias (nv-84): «Verificado» = check-in válido del mismo negocio y día.

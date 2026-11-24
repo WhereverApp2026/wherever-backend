@@ -37,8 +37,17 @@ El alta de negocio de la maqueta pide datos que hoy no se guardan: en `43_NegReg
 ## Límites
 - Sin varias redes por negocio (una de Instagram y un sitio); sin verificar que el WhatsApp sea del negocio.
 
+## Drift al ejecutar (2026-11-23)
+- **Paso 1 opcional:** `experiencias` y `anio_apertura` son opcionales en `POST /negocios` y no entran en los faltantes del envío a revisión; las altas viejas y las de la semilla no los tienen.
+- **«Mismo criterio que `descripcion`»:** `descripcion` se aplica al momento (nv-56), no espera revisión. Se siguió la decisión (1) del revisor: los cuatro datos van a `cambios_pendientes` con el negocio publicado, como `nombre` y `direccion`; el administrador los ve en la cola (`estado=cambios_pendientes`) y en la fila de `en_revision`.
+- **Quitar:** `whatsapp: ""` o `redes: {}` en el paso 2 o en el perfil quitan el dato (en el perfil, al aprobarse).
+- **Palabras bloqueadas:** `moderacion.Service.Prohibido` usa solo la regla local de palabras de `moderacion_reglas` (sin llamar al modelo); si no se pueden leer las reglas, 503. Dominios no permitidos: lista fija de acortadores (`bit.ly`, `tinyurl.com`, `t.co`, `goo.gl`…) y sus subdominios; además se rechaza una URL con usuario (`https://a@b`).
+- **Recomendador:** sin factor nuevo (los pesos de nv-23 no cambian). `experiencias` entra al factor `gustos`: la compañía llega como gusto (`recomendaciones` ya sumaba `romantico`/`familia`/`amigos`; el asistente ahora suma `ExperienciaDeCompania`) y la comida de la hora pedida (desayuno 6–11, comida 12–17, cena 18–23) suma una coincidencia. Sin gustos sigue neutro; un negocio sin `experiencias` puntúa igual que antes. Probado en Unit (`TestPuntaje_GustosConExperiencias`), no en Integration.
+- **Índices:** ninguno; `experiencia=` se suma al `$geoNear`/filtros existentes. Sin variables nuevas.
+- **Tests:** Unit `internal/negocios/datos_test.go`, `internal/negocios/alta/datos_test.go`, `internal/negocios/panel/datos_test.go`, `internal/recomendador/puntaje_test.go`; Integration `tests/integration/negocios_datos_test.go`; Security `tests/security/negocios_datos_security_test.go`; Contract `negocios/lugares_ficha_datos_200`.
+
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
+- **Estado:** 🚧 Borrador (2026-11-21), ejecutada el 2026-11-23 con evidencia en `checklists/gates.md`; falta la firma del revisor.
 - **Revisores:** Osmar Reséndiz (pendiente de aprobar)
 - **Fecha:** —
 - **Decisiones para el revisor:** (1) los cuatro campos pasan por revisión cuando el negocio ya está publicado; (2) WhatsApp público solo como enlace `wa.me`; (3) `experiencias` como señal del recomendador.

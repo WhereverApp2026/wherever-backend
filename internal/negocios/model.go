@@ -151,6 +151,11 @@ type Business struct {
 	Location            Location           `bson:"ubicacion"`
 	Address             Direccion          `bson:"direccion"`
 	Phone               string             `bson:"telefono,omitempty"`
+	// Experiencias, AnioApertura, WhatsApp y Redes son de nv-90; vacíos no se guardan.
+	Experiencias []string `bson:"experiencias,omitempty"`
+	AnioApertura int      `bson:"anio_apertura,omitempty"`
+	WhatsApp     string   `bson:"whatsapp,omitempty"`
+	Redes        *Redes   `bson:"redes,omitempty"`
 	Schedules           []Horario          `bson:"horarios"`
 	ScheduleMin         []VentanaMin       `bson:"horario_min"`
 	Photos              []Foto             `bson:"fotos"`

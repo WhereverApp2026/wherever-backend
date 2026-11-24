@@ -45,6 +45,8 @@ type ExploreFilters struct {
 	Seal       bool   `query:"con_sello"`
 	Coupon     bool   `query:"con_cupon"`
 	Friends    bool   `query:"de_amigos"`
+	// Experiencia filtra por tipo de experiencia (nv-90).
+	Experience string `query:"experiencia" validate:"omitempty,oneof=desayuno comida cena paseo romantico familia amigos"`
 }
 
 // CardCoupon es el mejor cupón vigente del lugar en la tarjeta.
@@ -280,11 +282,14 @@ func (s *Service) matchConditions(ctx context.Context, f ExploreFilters, v *view
 	return match, nil
 }
 
-// flagConditions son precio máximo, Sello y cupón.
+// flagConditions son precio máximo, experiencia, Sello y cupón.
 func flagConditions(f ExploreFilters) bson.A {
 	var match bson.A
 	if f.MaxPrice > 0 {
 		match = append(match, bson.D{{Key: "nivel_precio", Value: bson.D{{Key: "$lte", Value: f.MaxPrice}}}})
+	}
+	if f.Experience != "" {
+		match = append(match, bson.D{{Key: "experiencias", Value: f.Experience}})
 	}
 	if f.Seal {
 		match = append(match, bson.D{{Key: "sello_excelencia", Value: true}})
@@ -318,7 +323,7 @@ func (s *Service) friendPlaces(ctx context.Context, v *viewer) ([]bson.ObjectID,
 // consulta, porque el resultado depende de sus amigos.
 func filtersScope(f ExploreFilters, v *viewer) []string {
 	parts := []string{f.Category, f.Categories, strconv.Itoa(f.MaxPrice), f.Prices,
-		strconv.FormatBool(f.OpenNow), strconv.FormatBool(f.Seal), strconv.FormatBool(f.Coupon), strconv.FormatBool(f.Friends)}
+		strconv.FormatBool(f.OpenNow), strconv.FormatBool(f.Seal), strconv.FormatBool(f.Coupon), strconv.FormatBool(f.Friends), f.Experience}
 	if f.Friends && v != nil {
 		parts = append(parts, v.ID.Hex())
 	}

@@ -70,6 +70,16 @@ func (s *Service) Reglas(ctx context.Context) (Reglas, error) {
 	return d.reglas(), nil
 }
 
+// Prohibido dice si el texto trae una palabra bloqueada de las reglas vigentes (nv-90: redes
+// del negocio). No llama al modelo: solo la regla local.
+func (s *Service) Prohibido(ctx context.Context, texto string) (bool, error) {
+	r, err := s.Reglas(ctx)
+	if err != nil {
+		return false, err
+	}
+	return r.Locales(texto)[FiltroPalabras] > 0, nil
+}
+
 // Encolar guarda lo que quedó en cuarentena para que lo revise un administrador. Si el recurso
 // ya espera revisión devuelve el elemento existente.
 func (s *Service) Encolar(ctx context.Context, e Entrada) (Item, error) {
