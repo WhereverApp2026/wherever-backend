@@ -23,6 +23,7 @@
           "id": "string",
           "titulo": "string"
         },
+        "es_favorito": "bool",
         "foto_portada": "string",
         "id": "string",
         "nivel_precio": "number",

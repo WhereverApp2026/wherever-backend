@@ -74,13 +74,15 @@ type PlaceItem struct {
 }
 
 // ExploreItem es la tarjeta de GET /lugares (nv-85): el lugar más Sello, afluencia de la hora,
-// mejor cupón y, con sesión, amigos que fueron. Las demás listas siguen con PlaceItem.
+// mejor cupón y, con sesión, amigos que fueron y si es favorito (nv-92). Las demás listas siguen con PlaceItem.
 type ExploreItem struct {
 	PlaceItem
 	ExcellenceSeal bool         `json:"sello_excelencia"`
 	CrowdNow       *string      `json:"afluencia_ahora"`
 	Coupon         *CardCoupon  `json:"cupon"`
 	FriendsWent    *FriendsWent `json:"amigos_fueron,omitempty"`
+	// IsFavorite solo va con sesión (nv-92).
+	IsFavorite *bool `json:"es_favorito,omitempty"`
 }
 
 // PlaceDetail es la ficha pública de GET /lugares/{id}. No lleva dueño, QR de check-in,

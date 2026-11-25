@@ -97,7 +97,7 @@ func (s *Service) WithClock(now func() time.Time) *Service {
 }
 
 // List resuelve GET /lugares para subject ("" = sin sesión). Todos los filtros van dentro de
-// MongoDB antes del límite; con sesión la tarjeta lleva los amigos que fueron (nv-85).
+// MongoDB antes del límite; con sesión la tarjeta lleva los amigos que fueron (nv-85) y `es_favorito` (nv-92).
 func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagination.PageResult[ExploreItem], error) {
 	v, err := s.loadViewer(ctx, subject, q.ExploreFilters, true)
 	if err != nil {
@@ -125,6 +125,9 @@ func (s *Service) List(ctx context.Context, subject string, q ListQuery) (pagina
 		items = append(items, toExploreItem(row, now))
 	}
 	if err := s.decorate(ctx, rows, items, v); err != nil {
+		return pagination.PageResult[ExploreItem]{}, apperr.Unavailable("servicio no disponible")
+	}
+	if err := s.markFavorites(ctx, rows, items, v); err != nil {
 		return pagination.PageResult[ExploreItem]{}, apperr.Unavailable("servicio no disponible")
 	}
 	return pagination.NewPageResult(items, next, params.Limit), nil

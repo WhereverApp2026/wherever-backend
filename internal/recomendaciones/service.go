@@ -34,6 +34,8 @@ type Service struct {
 	pesos  recomendador.Pesos
 	log    *slog.Logger
 	now    func() time.Time
+	// favorites da `es_favorito` a las tarjetas (nv-92); nil = sin el campo.
+	favorites negocios.Favorites
 }
 
 // NewService valida los pesos al arrancar: con pesos inválidos la API no levanta.
@@ -42,6 +44,12 @@ func NewService(repo *Repository, users Users, places Places, pesos recomendador
 		return nil, errors.Join(recomendador.ErrPesos, err)
 	}
 	return &Service{repo: repo, users: users, places: places, pesos: pesos, log: log, now: time.Now}, nil
+}
+
+// WithFavorites conecta los favoritos para `es_favorito` (nv-92).
+func (s *Service) WithFavorites(f negocios.Favorites) *Service {
+	s.favorites = f
+	return s
 }
 
 // WithClock fija el reloj (pruebas).
@@ -84,7 +92,7 @@ func (s *Service) Recommend(ctx context.Context, subject string, q Query) (Respo
 	if err != nil {
 		return Response{}, err
 	}
-	return s.recommend(ctx, Contexto(user, q, s.now(), excluded), q)
+	return s.recommend(ctx, Contexto(user, q, s.now(), excluded), q, &uid)
 }
 
 // ForHome arma las recomendaciones de Inicio (nv-25). La sesión es opcional: sin ella, o
@@ -97,7 +105,11 @@ func (s *Service) ForHome(ctx context.Context, subject string, q Query, adverso 
 	}
 	c := Contexto(user, q, s.now(), excluded)
 	c.ClimaAdverso = adverso
-	return s.recommend(ctx, c, q)
+	var viewer *bson.ObjectID
+	if !user.ID.IsZero() {
+		viewer = &user.ID
+	}
+	return s.recommend(ctx, c, q, viewer)
 }
 
 // homeUser lee al usuario de la sesión si la hay y está activo.
@@ -126,16 +138,28 @@ func (s *Service) homeUser(ctx context.Context, subject string) (usuarios.User, 
 	return user, excluded, nil
 }
 
-func (s *Service) recommend(ctx context.Context, c recomendador.Contexto, q Query) (Response, error) {
+// recommend arma las tarjetas; con viewer, una sola consulta da `es_favorito` (nv-92).
+func (s *Service) recommend(ctx context.Context, c recomendador.Contexto, q Query, viewer *bson.ObjectID) (Response, error) {
 	recs, err := recomendador.Recomendar(ctx, s.places, s.pesos, c, q.Limit)
 	if err != nil {
 		// Sin el texto de MongoDB: podría repetir la ubicación o las alergias.
 		s.log.ErrorContext(ctx, "recomendaciones: consulta fallida", slog.String("evento", "recomendaciones_error"))
 		return Response{}, apperr.Unavailable("servicio no disponible")
 	}
+	ids := make([]bson.ObjectID, 0, len(recs))
+	for _, r := range recs {
+		ids = append(ids, r.Negocio.ID)
+	}
+	marks, err := negocios.LoadMarks(ctx, s.favorites, viewer, ids)
+	if err != nil {
+		s.log.ErrorContext(ctx, "recomendaciones: favoritos fallidos", slog.String("evento", "recomendaciones_error"))
+		return Response{}, apperr.Unavailable("servicio no disponible")
+	}
 	out := Response{Items: make([]Card, 0, len(recs)), Company: q.Company, Moment: c.Momento}
 	for _, r := range recs {
-		out.Items = append(out.Items, toCard(r, c.Momento))
+		card := toCard(r, c.Momento)
+		card.IsFavorite = marks.Of(r.Negocio.ID)
+		out.Items = append(out.Items, card)
 	}
 	return out, nil
 }

@@ -30,6 +30,8 @@ type Card struct {
 	Score   float64  `json:"puntaje"`
 	Reasons []string `json:"razones"`
 	Why     string   `json:"por_que"`
+	// IsFavorite solo va con sesión de una cuenta activa (nv-92).
+	IsFavorite *bool `json:"es_favorito,omitempty"`
 }
 
 // Response es la respuesta de GET /recomendaciones.

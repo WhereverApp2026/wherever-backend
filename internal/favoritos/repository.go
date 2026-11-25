@@ -151,6 +151,24 @@ func (r *Repository) IDs(ctx context.Context, userID bson.ObjectID, kind string)
 	return out, nil
 }
 
+// MarkedPlaces trae, de places, los negocios que userID guardó: una consulta sobre el prefijo de
+// ux_favorito por página de tarjetas (nv-92).
+func (r *Repository) MarkedPlaces(ctx context.Context, userID bson.ObjectID, places []bson.ObjectID) ([]bson.ObjectID, error) {
+	if len(places) == 0 {
+		return []bson.ObjectID{}, nil
+	}
+	filter := append(byType(userID, TypeBusiness), bson.E{Key: "objetivo_id", Value: bson.D{{Key: "$in", Value: places}}})
+	rows, err := r.find(ctx, filter, options.Find().SetProjection(bson.D{{Key: "objetivo_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]bson.ObjectID, 0, len(rows))
+	for _, f := range rows {
+		out = append(out, f.TargetID)
+	}
+	return out, nil
+}
+
 // ListByUser trae todos los favoritos de userID (exportación ARCO).
 func (r *Repository) ListByUser(ctx context.Context, userID bson.ObjectID) ([]Favorite, error) {
 	return r.find(ctx, bson.D{{Key: "usuario_id", Value: userID}}, options.Find().SetSort(bson.D{{Key: "creado_en", Value: 1}}))

@@ -33,6 +33,8 @@ type Service struct {
 	cache *cache.Cache
 	// explore da cupones y amigos a Explorar (nv-85); nil = sin ellos.
 	explore *exploreDeps
+	// favorites da `es_favorito` a la tarjeta de Explorar (nv-92); nil = sin el campo.
+	favorites Favorites
 }
 
 // Vida en la caché (nv-18). Las fichas se invalidan al importar; las categorías también.
