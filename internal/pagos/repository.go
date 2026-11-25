@@ -36,6 +36,10 @@ func Indexes() []platformmongo.IndexSet {
 			{Keys: bson.D{{Key: "reserva_id", Value: 1}, {Key: "creado_en", Value: -1}}, Options: options.Index().SetName("ix_pago_reserva")},
 			{Keys: bson.D{{Key: "estado", Value: 1}, {Key: "fecha_reserva", Value: 1}}, Options: options.Index().SetName("ix_conciliacion")},
 			{Keys: bson.D{{Key: "usuario_id", Value: 1}}, Options: options.Index().SetName("ix_pago_usuario")},
+			{
+				Keys:    bson.D{{Key: "negocio_id", Value: 1}, {Key: "creado_en", Value: -1}, {Key: "_id", Value: -1}},
+				Options: options.Index().SetName("ix_pago_negocio"),
+			},
 			ttl("ttl_conservar_hasta"),
 		}},
 		{Collection: LiquidacionesCollection, Models: []mongo.IndexModel{
@@ -137,6 +141,68 @@ func (r *Repository) PorLiquidar(ctx context.Context, desde, hasta time.Time, ne
 		filter = append(filter, bson.E{Key: "negocio_id", Value: *negocio})
 	}
 	return findAll[Pago](ctx, r.col, filter, options.Find())
+}
+
+// FiltroCobros es la consulta de la lista de cobros: el negocio, el rango [Desde, Hasta) de
+// `creado_en` (nil = abierto) y el estado ("" = todos).
+type FiltroCobros struct {
+	Negocio bson.ObjectID
+	Desde   *time.Time
+	Hasta   *time.Time
+	Estado  string
+}
+
+// Posicion es el último cobro entregado (cursor).
+type Posicion struct {
+	CreadoEn time.Time
+	ID       bson.ObjectID
+}
+
+// filtro arma la consulta con `estado`: un valor, un operador o "" (sin filtro de estado).
+func (f FiltroCobros) filtro(estado any) bson.D {
+	filter := bson.D{{Key: "negocio_id", Value: f.Negocio}}
+	rango := bson.D{}
+	if f.Desde != nil {
+		rango = append(rango, bson.E{Key: "$gte", Value: *f.Desde})
+	}
+	if f.Hasta != nil {
+		rango = append(rango, bson.E{Key: "$lt", Value: *f.Hasta})
+	}
+	if len(rango) > 0 {
+		filter = append(filter, bson.E{Key: "creado_en", Value: rango})
+	}
+	if e, ok := estado.(string); !ok || e != "" {
+		filter = append(filter, bson.E{Key: "estado", Value: estado})
+	}
+	return filter
+}
+
+// Cobros son los pagos del filtro del más nuevo al más viejo, después de `despues` (cursor).
+func (r *Repository) Cobros(ctx context.Context, f FiltroCobros, despues *Posicion, limit int) ([]Pago, error) {
+	filter := f.filtro(f.Estado)
+	if despues != nil {
+		filter = append(filter, bson.E{Key: "$or", Value: bson.A{
+			bson.D{{Key: "creado_en", Value: bson.D{{Key: "$lt", Value: despues.CreadoEn}}}},
+			bson.D{{Key: "creado_en", Value: despues.CreadoEn}, {Key: "_id", Value: bson.D{{Key: "$lt", Value: despues.ID}}}},
+		}})
+	}
+	sort := bson.D{{Key: "creado_en", Value: -1}, {Key: "_id", Value: -1}}
+	return findAll[Pago](ctx, r.col, filter, options.Find().SetSort(sort).SetLimit(int64(limit+1)))
+}
+
+// CobradosDe son los pagos cobrados del filtro (solo montos), para los totales del rango.
+func (r *Repository) CobradosDe(ctx context.Context, f FiltroCobros) ([]Pago, error) {
+	estados := bson.A{}
+	for _, e := range Cobrados {
+		if f.Estado == "" || f.Estado == e {
+			estados = append(estados, e)
+		}
+	}
+	if len(estados) == 0 {
+		return nil, nil
+	}
+	proj := bson.D{{Key: "monto_centavos", Value: 1}, {Key: "comision_centavos", Value: 1}, {Key: "reembolsos.monto_centavos", Value: 1}}
+	return findAll[Pago](ctx, r.col, f.filtro(bson.D{{Key: "$in", Value: estados}}), options.Find().SetProjection(proj))
 }
 
 // MarcarLiquidados deja la semana en los pagos del corte.

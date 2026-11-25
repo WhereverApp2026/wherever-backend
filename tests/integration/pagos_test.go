@@ -353,3 +353,98 @@ func assertKind(t *testing.T, err error, kind apperr.Kind) {
 	require.True(t, errors.As(err, &ae), "%v", err)
 	assert.Equal(t, kind, ae.Kind)
 }
+
+// insertarCobro guarda un pago del negocio creado en `creado` (nv-93).
+func insertarCobro(t *testing.T, env *authtest.Env, negocio bson.ObjectID, estado string, creado time.Time, reembolso int64) pagos.Pago {
+	t.Helper()
+	p := pagos.Pago{
+		ID: bson.NewObjectID(), ReservaID: bson.NewObjectID(), UsuarioID: bson.NewObjectID(), NegocioID: negocio, Concepto: pagos.ConceptoAnticipo,
+		PaymentIntentID: "pi_lista_" + bson.NewObjectID().Hex(), MontoCentavos: 10000, ComisionCentavos: 1000, Moneda: pagos.Moneda,
+		Estado: estado, Tarjeta: &pagos.Tarjeta{Marca: "visa", Ultimos4: "4242"}, IdempotencyKey: "lista:" + bson.NewObjectID().Hex(),
+		FechaReserva: creado.Add(48 * time.Hour), Reembolsos: []pagos.Reembolso{}, EventosProcesados: []string{},
+		ConservarHasta: pagos.ConservarHasta(creado), CreadoEn: creado, ActualizadoEn: creado,
+	}
+	if reembolso > 0 {
+		p.Reembolsos = []pagos.Reembolso{{RefundID: "re_lista", MontoCentavos: reembolso, Fecha: creado}}
+	}
+	require.NoError(t, pagos.NewRepository(env.Mongo.DB()).Insert(context.Background(), &p))
+	return p
+}
+
+func TestPagos_CobrosDelNegocio(t *testing.T) {
+	env := authEnv(t)
+	duena := env.CreateUser(t, "duena-lista-cobros@wherever.test")
+	b := pagostest.Negocio(t, env.Mongo.DB(), duena.ID, 100, reservastest.Config{})
+	otro := pagostest.Negocio(t, env.Mongo.DB(), env.CreateUser(t, "otra-lista-cobros@wherever.test").ID, 100, reservastest.Config{})
+	loc := negocios.MexicoCity()
+	dia := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, loc).UTC() }
+
+	viejo := insertarCobro(t, env, b.ID, pagos.EstadoAprobado, dia(3), 0)
+	parcial := insertarCobro(t, env, b.ID, pagos.EstadoReembolsadoParcial, dia(10), 5000)
+	rechazado := insertarCobro(t, env, b.ID, pagos.EstadoRechazado, dia(10), 0) // mismo instante: desempata el _id
+	nuevo := insertarCobro(t, env, b.ID, pagos.EstadoAprobado, dia(20), 0)
+	insertarCobro(t, env, otro.ID, pagos.EstadoAprobado, dia(15), 0)
+
+	token := merchantToken(t, duena.ID, "jti-duena-lista-cobros")
+	ruta := "/api/v1/negocios/" + b.ID.Hex() + "/cobros"
+	pagina := func(query string) map[string]any {
+		t.Helper()
+		resp := sendJSON(t, env.App(), http.MethodGet, ruta+query, nil, token)
+		requireStatus(t, resp, http.StatusOK)
+		assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+		return decode(t, resp)
+	}
+	ids := func(page map[string]any) []string {
+		var out []string
+		for _, it := range list(t, page["items"]) {
+			out = append(out, str(t, obj(t, it)["pago_id"]))
+		}
+		return out
+	}
+
+	// Paginación: del más nuevo al más viejo, sin repetir ni saltar, y los totales del rango en cada página.
+	p1 := pagina("?limite=2")
+	segundo := max(parcial.ID.Hex(), rechazado.ID.Hex())
+	tercero := min(parcial.ID.Hex(), rechazado.ID.Hex())
+	assert.Equal(t, []string{nuevo.ID.Hex(), segundo}, ids(p1))
+	next := str(t, p1["siguiente_cursor"])
+	require.NotEmpty(t, next)
+	p2 := pagina("?limite=2&cursor=" + next)
+	assert.Equal(t, []string{tercero, viejo.ID.Hex()}, ids(p2))
+	assert.Empty(t, p2["siguiente_cursor"])
+	totales := obj(t, p1["totales"])
+	assert.Equal(t, totales, obj(t, p2["totales"]))
+	assert.Equal(t, float64(3), totales["pagos"], "el rechazado no cuenta")
+	assert.Equal(t, float64(30000), totales["anticipo"])
+	assert.Equal(t, float64(5000), totales["reembolsos"])
+	assert.Equal(t, float64(2500), totales["comision"])
+	assert.Equal(t, float64(22500), totales["neto"])
+
+	// La fila: desglose, tarjeta y fechas, sin datos de quien pagó.
+	fila := obj(t, list(t, p1["items"])[0])
+	assertSnakeCase(t, fila)
+	assert.Equal(t, nuevo.ReservaID.Hex(), fila["reserva_id"])
+	assert.Equal(t, map[string]any{"marca": "visa", "ultimos4": "4242"}, fila["tarjeta"])
+	assert.Equal(t, float64(9000), fila["neto"])
+	assert.Equal(t, dia(20).Format(time.RFC3339), fila["fecha_cobro"])
+	assert.NotContains(t, fila, "usuario_id")
+	assert.NotContains(t, fila, "payment_intent_id")
+
+	// Filtros: estado y rango de fechas (ambos días incluidos).
+	assert.Equal(t, []string{rechazado.ID.Hex()}, ids(pagina("?estado=rechazado")))
+	assert.Equal(t, float64(0), obj(t, pagina("?estado=rechazado")["totales"])["pagos"])
+	rango := pagina("?desde=2026-11-10&hasta=2026-11-20")
+	assert.ElementsMatch(t, []string{nuevo.ID.Hex(), parcial.ID.Hex(), rechazado.ID.Hex()}, ids(rango))
+	assert.Equal(t, float64(2), obj(t, rango["totales"])["pagos"])
+	assert.Equal(t, []string{viejo.ID.Hex()}, ids(pagina("?hasta=2026-11-09")))
+
+	// El cursor de otros filtros, hasta < desde y un estado desconocido = 422.
+	for _, q := range []string{"?estado=aprobado&cursor=" + next, "?desde=2026-11-10&hasta=2026-11-09", "?estado=pagado", "?desde=10-11-2026"} {
+		resp := sendJSON(t, env.App(), http.MethodGet, ruta+q, nil, token)
+		requireStatus(t, resp, http.StatusUnprocessableEntity)
+	}
+
+	// Negocio de otro dueño = 404.
+	resp := sendJSON(t, env.App(), http.MethodGet, "/api/v1/negocios/"+otro.ID.Hex()+"/cobros", nil, token)
+	requireStatus(t, resp, http.StatusNotFound)
+}

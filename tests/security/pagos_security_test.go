@@ -34,6 +34,7 @@ func rutasPagos(negocio, id string) []rutaReserva {
 		{http.MethodPost, "/api/v1/negocios/" + negocio + "/cobros/conectar", nil, true},
 		{http.MethodGet, "/api/v1/negocios/" + negocio + "/saldo", nil, true},
 		{http.MethodGet, "/api/v1/negocios/" + negocio + "/liquidaciones", nil, true},
+		{http.MethodGet, "/api/v1/negocios/" + negocio + "/cobros", nil, true},
 	}
 }
 
