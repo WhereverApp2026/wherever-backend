@@ -32,16 +32,20 @@ type Rendered struct {
 type templateData struct {
 	Name string
 	Link string
+	Code string
 }
 
 // Render arma asunto, texto y HTML. El HTML usa html/template: el nombre y el enlace salen
-// escapados aunque traigan `<script>` o comillas.
+// escapados aunque traigan `<script>` o comillas. Un correo con código (nv-91) no lleva enlace.
 func Render(msg Message, link string) (Rendered, error) {
 	subject, ok := subjects[msg.Kind]
 	if !ok {
 		return Rendered{}, errUnknownKind
 	}
 	data := templateData{Name: msg.Name, Link: link}
+	if msg.Kind.SendsCode() {
+		data = templateData{Name: msg.Name, Code: msg.Token}
+	}
 	var text, html bytes.Buffer
 	if err := textTemplates.ExecuteTemplate(&text, string(msg.Kind)+".txt.tmpl", data); err != nil {
 		return Rendered{}, err

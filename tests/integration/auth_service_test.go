@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/auth"
 	"github.com/WhereverApp2026/wherever-backend/internal/http/middleware"
@@ -213,20 +214,35 @@ func TestAuthService_ChangePasswordClosesOtherSessions(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAuthService_LinkIsSingleUse(t *testing.T) {
+// nv-91: el código se guarda como HMAC, se usa una vez y con el correo ya verificado da 200.
+func TestAuthService_VerificationCodeIsSingleUse(t *testing.T) {
 	env := authEnv(t)
 	user := env.CreateUser(t, ana)
+	claims := parseClaims(t, env, mustLogin(t, env, ana).AccessToken)
 	require.NoError(t, env.Service.SendVerification(context.Background(), user))
 	msg, ok := env.Mail.Last(ana, mailer.KindVerifyEmail)
 	require.True(t, ok)
 
-	require.NoError(t, env.Service.VerifyEmail(context.Background(), msg.Token))
-	err := env.Service.VerifyEmail(context.Background(), msg.Token)
+	var doc auth.OneTimeToken
+	require.NoError(t, env.Mongo.DB().Collection(auth.TokensCollection).FindOne(context.Background(),
+		bson.D{{Key: "usuario_id", Value: user.ID}, {Key: "tipo", Value: string(mailer.KindVerifyEmail)}}).Decode(&doc))
+	assert.NotContains(t, doc.TokenHash, msg.Token, "el código nunca se guarda en claro")
+	assert.WithinDuration(t, time.Now().Add(auth.CodeTTL), doc.ExpiresAt, time.Minute)
 
-	assert.Equal(t, apperr.KindBadRequest, kindOf(t, err))
+	assert.Equal(t, apperr.KindBadRequest, kindOf(t, env.Service.VerifyEmail(context.Background(), claims, otherCode(msg.Token))))
+	require.NoError(t, env.Service.VerifyEmail(context.Background(), claims, msg.Token))
+	assert.NoError(t, env.Service.VerifyEmail(context.Background(), claims, msg.Token), "ya verificado: idempotente")
 	stored, err := env.Users.FindByID(context.Background(), user.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.EmailVerified)
+}
+
+// otherCode devuelve un código de 6 dígitos distinto del dado.
+func otherCode(code string) string {
+	if code == "000000" {
+		return "111111"
+	}
+	return "000000"
 }
 
 func TestAuthService_ExpiredLinkIs400(t *testing.T) {

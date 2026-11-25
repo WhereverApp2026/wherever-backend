@@ -8,7 +8,6 @@ import (
 
 // Rutas de las páginas que abren los enlaces (spec nv-06 §Contratos).
 var linkPaths = map[Kind]string{ // #nosec G101 -- rutas de páginas, no credenciales
-	KindVerifyEmail:   "/verificar",
 	KindPasswordReset: "/restablecer",
 	KindExport:        "/exportacion",
 }

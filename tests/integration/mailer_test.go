@@ -28,7 +28,10 @@ import (
 
 const linkBase = "http://localhost:8080"
 
-var tokenInLink = regexp.MustCompile(`#token=([A-Za-z0-9_\-]+)`)
+var (
+	tokenInLink = regexp.MustCompile(`#token=([A-Za-z0-9_\-]+)`)
+	codeInMail  = regexp.MustCompile(`(?m)^([0-9]{6})\s*$`)
+)
 
 // smtpTo arma el adaptador real hacia host:port sin TLS (Mailpit, solo fuera de producción).
 func smtpTo(host string, port int, log *slog.Logger) *mailer.SMTP {
@@ -89,18 +92,28 @@ func linkToken(t *testing.T, msg testutil.MailpitMessage) string {
 	return m[1]
 }
 
+// mailCode lee el código de 6 dígitos de la verificación (nv-91).
+func mailCode(t *testing.T, msg testutil.MailpitMessage) string {
+	t.Helper()
+	m := codeInMail.FindStringSubmatch(msg.Text)
+	require.Len(t, m, 2, "el correo trae el código de 6 dígitos")
+	return m[1]
+}
+
+// nv-91: el correo de verificación lleva un código para escribir en la app, sin enlace.
 func TestMailer_RegisterSendsVerification(t *testing.T) {
 	env := mailpitEnv(t)
 	app := env.App()
-	registerHTTP(t, app, lu)
+	access := registerHTTP(t, app, lu)
 
 	msg := waitMail(t, lu, 1)[0]
 
 	assert.Equal(t, "Confirma tu correo en Wherever", msg.Subject)
 	assert.Contains(t, msg.Text, "Hola, Lú:")
-	assert.Contains(t, msg.Text, linkBase+"/verificar#token=")
-	assert.NotContains(t, msg.Text, "?token=", "el token nunca va en la consulta")
-	verify := sendJSON(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": linkToken(t, msg)}, "")
+	assert.Contains(t, msg.Text, "15 minutos")
+	assert.NotContains(t, msg.Text, "token=", "la verificación ya no lleva enlace")
+	assert.NotContains(t, msg.Text, linkBase)
+	verify := sendJSON(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"codigo": mailCode(t, msg)}, access)
 	assert.Equal(t, http.StatusOK, verify.StatusCode)
 }
 
@@ -143,7 +156,7 @@ func TestMailer_ChangeEmailVerifiesTheNewAddress(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	msg := waitMail(t, "nueva@wherever.test", 1)[0]
-	assert.Contains(t, msg.Text, "/verificar#token=")
+	assert.NotEmpty(t, mailCode(t, msg))
 }
 
 func exportFor(t *testing.T, env *authtest.Env, email string) bson.ObjectID {

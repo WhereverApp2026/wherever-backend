@@ -3,9 +3,11 @@ package integration
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -135,13 +137,92 @@ func TestAuth_VerifyEmail(t *testing.T) {
 	msg, ok := env.Mail.Last(ana, mailer.KindVerifyEmail)
 	require.True(t, ok)
 
-	resp := sendJSON(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": msg.Token}, "")
+	resp := verifyCode(t, app, msg.Token, access)
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, true, decode(t, resp)["correo_verificado"])
 	stored, err := env.Users.FindByID(context.Background(), user.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.EmailVerified)
+	assert.Equal(t, http.StatusOK, verifyCode(t, app, otherCode(msg.Token), access).StatusCode, "ya verificado: 200")
+}
+
+func verifyCode(t *testing.T, app *fiber.App, code, access string) *http.Response {
+	t.Helper()
+	return sendJSON(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"codigo": code}, access)
+}
+
+// sendCode pide un código nuevo saltando la espera de 60 s y lo devuelve.
+func sendCode(t *testing.T, env *authtest.Env, app *fiber.App, userID bson.ObjectID, access string) string {
+	t.Helper()
+	env.AgeLinks(t, userID)
+	require.Equal(t, http.StatusAccepted, sendJSON(t, app, http.MethodPost, "/api/v1/auth/reenviar-verificacion", nil, access).StatusCode)
+	msg, ok := env.Mail.Last(ana, mailer.KindVerifyEmail)
+	require.True(t, ok)
+	return msg.Token
+}
+
+// nv-91: código incorrecto o vencido = 400 y el correo sigue sin verificar.
+func TestAuth_VerifyEmail_BadOrExpiredCode(t *testing.T) {
+	env := authEnv(t)
+	user := env.CreateUser(t, ana)
+	app := env.App()
+	access, _ := loginHTTP(t, app, ana)
+
+	assert.Equal(t, http.StatusBadRequest, verifyCode(t, app, "123456", access).StatusCode, "sin código pedido")
+	code := sendCode(t, env, app, user.ID, access)
+	assert.Equal(t, http.StatusBadRequest, verifyCode(t, app, otherCode(code), access).StatusCode)
+	env.ExpireLinks(t, user.ID)
+	assert.Equal(t, http.StatusBadRequest, verifyCode(t, app, code, access).StatusCode, "vencido")
+
+	old := sendCode(t, env, app, user.ID, access)
+	fresh := sendCode(t, env, app, user.ID, access)
+	if old != fresh {
+		assert.Equal(t, http.StatusBadRequest, verifyCode(t, app, old, access).StatusCode, "el reenvío invalida el anterior")
+	}
+	stored, err := env.Users.FindByID(context.Background(), user.ID)
+	require.NoError(t, err)
+	assert.False(t, stored.EmailVerified)
+	assert.Equal(t, http.StatusOK, verifyCode(t, app, fresh, access).StatusCode)
+}
+
+// nv-91: 5 intentos fallidos bloquean el código (423 aunque luego llegue el correcto); otro
+// código vuelve a servir.
+func TestAuth_VerifyEmail_TooManyAttempts(t *testing.T) {
+	env := authEnv(t)
+	user := env.CreateUser(t, ana)
+	app := env.App()
+	access, _ := loginHTTP(t, app, ana)
+	code := sendCode(t, env, app, user.ID, access)
+
+	for i := range auth.MaxCodeAttempts {
+		assert.Equal(t, http.StatusBadRequest, verifyCode(t, app, otherCode(code), access).StatusCode, "intento %d", i+1)
+	}
+	env.ClearRateLimits(t)
+	assert.Equal(t, http.StatusLocked, verifyCode(t, app, code, access).StatusCode)
+
+	fresh := sendCode(t, env, app, user.ID, access)
+	assert.Equal(t, http.StatusOK, verifyCode(t, app, fresh, access).StatusCode)
+}
+
+// nv-91: 10 códigos en 24 h; el siguiente reenvío = 429 con la espera hasta que salga el más viejo.
+func TestAuth_ResendVerification_DailyCap(t *testing.T) {
+	env := authEnv(t)
+	user := env.CreateUser(t, ana)
+	app := env.App()
+	access, _ := loginHTTP(t, app, ana)
+	for range auth.MaxCodesPerDay {
+		sendCode(t, env, app, user.ID, access)
+	}
+	env.ClearRateLimits(t)
+	env.AgeLinks(t, user.ID)
+
+	resp := sendJSON(t, app, http.MethodPost, "/api/v1/auth/reenviar-verificacion", nil, access)
+
+	require.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+	retry, err := strconv.Atoi(resp.Header.Get("Retry-After"))
+	require.NoError(t, err)
+	assert.Greater(t, retry, 23*3600)
 }
 
 // MongoDB borra lo vencido con los índices TTL; aquí se comprueba que existan con

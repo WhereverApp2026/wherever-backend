@@ -50,9 +50,10 @@ type ResetRequest struct {
 	Device      *DeviceInput `json:"dispositivo" validate:"omitempty"`
 }
 
-// VerifyEmailRequest es el cuerpo de POST /auth/verificar-correo.
+// VerifyEmailRequest es el cuerpo de POST /auth/verificar-correo: el código de 6 dígitos del
+// correo (nv-91).
 type VerifyEmailRequest struct {
-	Token string `json:"token" validate:"required,max=128"`
+	Code string `json:"codigo" validate:"required,len=6,number"`
 }
 
 // ChangePasswordRequest es el cuerpo de PUT /auth/password.

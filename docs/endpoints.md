@@ -1,4 +1,4 @@
-# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47, nv-55, nv-56, nv-58, nv-59, nv-60, nv-74, nv-75, nv-83, nv-84, nv-85)
+# Endpoints — vivo (nv-01, nv-04, nv-05, nv-20, nv-24, nv-25, nv-30, nv-37, nv-38, nv-39, nv-40, nv-46, nv-47, nv-55, nv-56, nv-58, nv-59, nv-60, nv-74, nv-75, nv-83, nv-84, nv-85, nv-91)
 
 > Fuente de contratos. Las specs solo enlazan, no duplican. Constitución §6.
 > Las filas de módulos de negocio se agregan con su spec (`nv-04+`), copiadas de `Wherever_Endpoints_CRUD.xlsx` (hojas A1–A7, J1–J9).
@@ -26,8 +26,8 @@
 | DELETE | `/api/v1/auth/sesiones/{id}` → cierra una sesión propia; ajena o inexistente = 404 | JWT, dueño | global | 204/401/404 | nv-04 (J1) |
 | POST | `/api/v1/auth/recuperar` → `{correo}`; enlace de 1 h; siempre 202 exista o no el correo; no reenvía antes de 60 s | no | 10/min por IP | 202/400/422/429 | nv-04 (J1) |
 | POST | `/api/v1/auth/restablecer` → `{token, password_nuevo, dispositivo?}` → tokens; enlace de un solo uso; cierra las otras sesiones | token del enlace | 10/min por IP | 200/400/422/429 | nv-04 (J1) |
-| POST | `/api/v1/auth/verificar-correo` → `{token}` → `{correo_verificado: true}`; enlace de 24 h, un solo uso | token del enlace | 10/min por IP | 200/400/422/429 | nv-04 (J1) |
-| POST | `/api/v1/auth/reenviar-verificacion` → reenvía el enlace (máx. 1 cada 60 s, `Retry-After`) | JWT | global | 202/401/429 | nv-04 (J1) |
+| POST | `/api/v1/auth/verificar-correo` → `{codigo}` (6 dígitos) → `{correo_verificado: true}`; código de 15 min, un solo uso; 5 intentos y después 423 (pide otro); ya verificado = 200 | JWT | 10/min por IP | 200/400/401/403/422/423/429 | nv-04 (J1), nv-91 |
+| POST | `/api/v1/auth/reenviar-verificacion` → manda un código nuevo e invalida el anterior (1 cada 60 s y 10 por día por usuario, `Retry-After`) | JWT | 10/min por IP | 202/401/403/429 | nv-04 (J1), nv-91 |
 | PUT | `/api/v1/auth/password` → `{password_actual, password_nuevo}`; cierra las otras sesiones | JWT | global | 204/400/401/422 | nv-04 (J1) |
 | POST | `/api/v1/usuarios` → `{nombre, fecha_nacimiento (AAAA-MM-DD), correo, password, acepta_terminos, version_terminos, promociones_correo, dispositivo?}` → 201 con tokens; 18+ por fecha UTC, rol `consumidor`, 50 puntos, manda verificación | no | registro 5/h por IP | 201/400/409/422/429 | nv-05 (A1) |
 | GET | `/api/v1/usuarios/correo-disponible` con `?correo=` → `{disponible}` (usa `ux_correo`) | no | 20/min por IP | 200/400/422/429 | nv-05 (A1) |

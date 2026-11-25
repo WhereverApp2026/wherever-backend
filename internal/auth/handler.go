@@ -162,7 +162,7 @@ func (h *Handler) verifyEmail(c *fiber.Ctx) error {
 	if err := h.bind(c, &req); err != nil {
 		return err
 	}
-	if err := h.svc.VerifyEmail(c.UserContext(), req.Token); err != nil {
+	if err := h.svc.VerifyEmail(c.UserContext(), claims(c), req.Code); err != nil {
 		return err
 	}
 	return c.JSON(VerifyEmailResponse{EmailVerified: true})

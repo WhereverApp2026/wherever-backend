@@ -62,6 +62,8 @@ type OneTimeToken struct {
 	ExpiresAt time.Time     `bson:"expira_en"`
 	UsedAt    *time.Time    `bson:"usado_en,omitempty"`
 	CreatedAt time.Time     `bson:"creado_en"`
+	// Attempts cuenta los intentos de un código de verificación (nv-91); los enlaces no lo usan.
+	Attempts int `bson:"intentos,omitempty"`
 }
 
 // Repository accede a `sesiones` y `tokens_un_uso`.
@@ -232,6 +234,51 @@ func (r *Repository) LastTokenAt(ctx context.Context, userID bson.ObjectID, kind
 		return time.Time{}, false, err
 	}
 	return t.CreatedAt, true, nil
+}
+
+// TokenAtRank devuelve cuándo se creó el token de ese tipo que ocupa el lugar `rank` del más
+// nuevo al más viejo (0 = el último); ok=false si hay menos. Lo usa el tope diario de códigos.
+func (r *Repository) TokenAtRank(ctx context.Context, userID bson.ObjectID, kind string, rank int64) (time.Time, bool, error) {
+	var t OneTimeToken
+	err := r.tokens.FindOne(ctx,
+		bson.D{{Key: "usuario_id", Value: userID}, {Key: "tipo", Value: kind}},
+		options.FindOne().SetSort(bson.D{{Key: "creado_en", Value: -1}}).SetSkip(rank),
+	).Decode(&t)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	return t.CreatedAt, true, nil
+}
+
+// SpendCodeAttempt suma un intento al código vivo más nuevo del usuario y lo devuelve ya con
+// el intento contado. Es atómico: dos peticiones a la vez no se saltan el tope (nv-91).
+func (r *Repository) SpendCodeAttempt(ctx context.Context, userID bson.ObjectID, kind string, now time.Time) (OneTimeToken, error) {
+	var t OneTimeToken
+	err := r.tokens.FindOneAndUpdate(ctx,
+		bson.D{
+			{Key: "usuario_id", Value: userID},
+			{Key: "tipo", Value: kind},
+			{Key: "usado_en", Value: nil},
+			{Key: "expira_en", Value: bson.D{{Key: "$gt", Value: now}}},
+		},
+		bson.D{{Key: "$inc", Value: bson.D{{Key: "intentos", Value: 1}}}},
+		options.FindOneAndUpdate().SetSort(bson.D{{Key: "creado_en", Value: -1}}).SetReturnDocument(options.After),
+	).Decode(&t)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return OneTimeToken{}, errNoDocument
+	}
+	return t, err
+}
+
+// UseToken marca como usado el token con ese id si nadie lo usó antes.
+func (r *Repository) UseToken(ctx context.Context, id bson.ObjectID, now time.Time) error {
+	_, err := r.tokens.UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: id}, {Key: "usado_en", Value: nil}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "usado_en", Value: now}}}})
+	return err
 }
 
 // InvalidateTokens deja sin efecto los enlaces sin usar de ese tipo (los marca como usados).
