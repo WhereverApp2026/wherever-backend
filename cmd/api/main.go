@@ -45,6 +45,7 @@ import (
 	"github.com/WhereverApp2026/wherever-backend/internal/moderacion"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/alta"
+	"github.com/WhereverApp2026/wherever-backend/internal/negocios/expediente"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/menu"
 	"github.com/WhereverApp2026/wherever-backend/internal/negocios/panel"
 	"github.com/WhereverApp2026/wherever-backend/internal/notificaciones"
@@ -221,7 +222,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// Explorar (nv-85): «De amigos» y amigos que fueron salen de check-ins; el mejor cupón, de cupones.
 	businessSvc.WithExplore(friendRepo, resenas.NewRepository(db), cupones.NewRepository(db))
 	consentRepo := usuarios.NewConsentRepository(db)
-	images, imagePrivacy, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
+	images, imagePrivacy, privado, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("imagenes: %w", err)
 	}
@@ -267,7 +268,7 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	// Estadísticas del negocio (nv-74): la baja borra sus días; no entran en ARCO (sin usuario_id).
 	stats := estadisticas.NewService(estadisticas.NewRepository(db), businessRepo, log)
 	bookings.observadores = append(bookings.observadores, estadisticas.NewObservador(stats))
-	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, notifier, registry, bookings, log)
+	business := buildAlta(cfg, db, businessRepo, businessSvc, users, cursor, images, privado, notifier, registry, bookings, log)
 	reviews := buildResenas(db, businessRepo, businessSvc, users, cursor, images, modSvc, registry, log)
 	merchant := buildPanel(db, businessRepo, businessSvc, business, images, notifier, registry, bookings, reviews, log)
 	// Instagram y sitio web del negocio pasan por las palabras bloqueadas (nv-90).
@@ -422,21 +423,23 @@ func buildAuth(cfg config.Config, users *usuarios.Repository, repo *auth.Reposit
 
 // buildImagenes arma la subida de fotos (nv-45) con S3 y Rekognition por el rol de la
 // instancia. Sin IMAGENES_BUCKET e IMAGENES_URL (solo fuera de prod) no hay service: las rutas
-// responden 503 y ARCO igual borra las filas.
-func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, mods *moderacion.Service, log *slog.Logger) (*imagenes.Service, *imagenes.Privacy, error) {
+// responden 503 y ARCO igual borra las filas. El mismo adaptador de S3 es el almacén del
+// expediente (nv-44, prefijo `privado/`, que CloudFront nunca sirve); sin bucket es nil y el
+// expediente responde 503.
+func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, mods *moderacion.Service, log *slog.Logger) (*imagenes.Service, *imagenes.Privacy, expediente.Almacen, error) {
 	repo := imagenes.NewRepository(db)
 	if !cfg.Enabled() {
-		log.Warn("sin IMAGENES_BUCKET e IMAGENES_URL: /api/v1/imagenes responde 503")
-		return nil, imagenes.NewPrivacy(repo, nil, ""), nil
+		log.Warn("sin IMAGENES_BUCKET e IMAGENES_URL: /api/v1/imagenes y el expediente responden 503")
+		return nil, imagenes.NewPrivacy(repo, nil, ""), nil, nil
 	}
 	ctx := context.Background()
 	almacen, err := imagenes.NewS3(ctx, imagenes.S3Config{Bucket: cfg.Bucket, Region: cfg.Region})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	rek, err := moderacion.NewRekognition(ctx, moderacion.RekognitionConfig{Region: cfg.Region})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	// Solo imágenes: el texto (reseñas, postales) lo cablea su spec con la ia.Guardia.
 	// Los umbrales salen de moderacion_reglas en cada evaluación (nv-43); lo dudoso va a la cola
@@ -444,11 +447,11 @@ func buildImagenes(cfg config.Imagenes, db *mongodriver.Database, mods *moderaci
 	mod := moderacion.New(rek, nil, mods, log)
 	svc, err := imagenes.NewService(repo, almacen, mod, imagenes.Config{URLPublica: cfg.URL}, log)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	svc.WithCola(mods)
 	mods.WithDestino(imagenes.TipoCola, svc.Destino())
-	return svc, imagenes.NewPrivacy(repo, almacen, cfg.URL), nil
+	return svc, imagenes.NewPrivacy(repo, almacen, cfg.URL), almacen, nil
 }
 
 // buildBusinesses arma el service de negocios con el cursor firmado (nv-17), que también usa

@@ -121,7 +121,8 @@
       ],
       "Resource": [
         "arn:aws:s3:::wherever-dev-imagenes-816101201001/cuarentena/*",
-        "arn:aws:s3:::wherever-dev-imagenes-816101201001/i/*"
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001/i/*",
+        "arn:aws:s3:::wherever-dev-imagenes-816101201001/privado/*"
       ]
     },
     {

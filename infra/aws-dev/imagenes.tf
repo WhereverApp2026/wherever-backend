@@ -1,11 +1,13 @@
 # Imágenes (spec nv-44): bucket privado que solo CloudFront lee, por control de acceso de origen.
 # Prefijos: `cuarentena/` (subidas sin moderar; nunca sale por CloudFront y se borra a las 24 h)
-# e `i/` (publicadas, nombres inmutables). nv-45 sube, modera y publica.
+# e `i/` (publicadas, nombres inmutables). nv-45 sube, modera y publica. `privado/` guarda el
+# expediente de los negocios (nv-44: INE, fiscales; cifrado por la API): CloudFront nunca lo sirve.
 
 locals {
   imagenes_bucket      = "${local.name}-imagenes-${data.aws_caller_identity.current.account_id}"
   imagenes_cuarentena  = "cuarentena/"
   imagenes_publicadas  = "i/"
+  imagenes_privado     = "privado/"
   imagenes_cache_1_ano = 31536000
 }
 
@@ -111,8 +113,9 @@ resource "aws_s3_bucket_policy" "imagenes" {
   depends_on = [aws_s3_bucket_public_access_block.imagenes]
 }
 
-# --- Rol de la instancia: escribir en cuarentena, leer para moderar, publicar y borrar. Sin
-# s3:ListBucket: la API conoce cada clave y un objeto inexistente da 403, no 404. ---
+# --- Rol de la instancia: escribir en cuarentena, leer para moderar, publicar y borrar; y el
+# expediente cifrado en privado. Sin s3:ListBucket: la API conoce cada clave y un objeto
+# inexistente da 403, no 404. ---
 
 data "aws_iam_policy_document" "imagenes_instancia" {
   statement {
@@ -121,6 +124,7 @@ data "aws_iam_policy_document" "imagenes_instancia" {
     resources = [
       "${aws_s3_bucket.imagenes.arn}/${local.imagenes_cuarentena}*",
       "${aws_s3_bucket.imagenes.arn}/${local.imagenes_publicadas}*",
+      "${aws_s3_bucket.imagenes.arn}/${local.imagenes_privado}*",
     ]
   }
 }
