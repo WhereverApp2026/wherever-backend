@@ -1052,3 +1052,10 @@
 - Decisión D-1: restablecer la contraseña sigue con enlace. Porqué: es pública y abre sesión; un código de 6 dígitos sin sesión daría la cuenta completa al adivinarlo.
 - A evitar: un código de 6 dígitos puede aparecer por azar en un log (ids, duraciones): no lo uses como cadena en `NotContains` sobre logs.
 - Pendiente: la app móvil cambia «Revisa tu correo» por el campo de 6 dígitos y «Reenviar código». Los enlaces de verificación ya enviados dejan de servir al desplegar.
+
+## NV-92 — Corazón de favorito en las tarjetas (2026-11-25)
+- Estado: rama `nv-92-es-favorito`. `es_favorito` en las tarjetas de `GET /lugares`, `GET /recomendaciones` y `GET /inicio`. Sin rutas, índices ni variables nuevas (285 rutas). Spec en Borrador con evidencia.
+- Decisión D-2: sin sesión el campo se omite (`*bool` con `omitempty`), como `amigos_fueron`; con sesión siempre `true`/`false`. `GET /inicio` con la cuenta no activa sigue como sin sesión (nv-25).
+- Decisión D-1: fuera `GET /lugares/mapa` (pines, no tarjetas; la ruta más llamada) y `GET /planes/populares` (planes, no lugares, y respuesta pública con `Cache-Control: public`).
+- Decisión: una consulta por respuesta, `favoritos.Repository.MarkedPlaces` con `$in` sobre los ids de la página (prefijo de `ux_favorito`). negocios no importa favoritos (favoritos ya importa negocios): interfaz `negocios.Favorites` + `Marks`, conectada con `WithFavorites` en negocios y recomendaciones (`main.go`, `authtest`).
+- A evitar: un campo nuevo en `PlaceItem` aparecería en búsquedas, recientes, grupos y planes; las tarjetas con corazón son `ExploreItem` y `recomendaciones.Card`.

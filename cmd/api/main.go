@@ -221,6 +221,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	planSvc.WithFriendsFeed(friendRepo, users, groupRepo, reacciones.NewRepository(db))
 	// Explorar (nv-85): «De amigos» y amigos que fueron salen de check-ins; el mejor cupón, de cupones.
 	businessSvc.WithExplore(friendRepo, resenas.NewRepository(db), cupones.NewRepository(db))
+	// Corazón de las tarjetas (nv-92): una consulta a favoritos por página.
+	businessSvc.WithFavorites(favRepo)
 	consentRepo := usuarios.NewConsentRepository(db)
 	images, imagePrivacy, privado, err := buildImagenes(cfg.Imagenes, db, modSvc, log)
 	if err != nil {
@@ -298,6 +300,8 @@ func buildModules(cfg config.Config, log *slog.Logger, mongoClient *mongo.Client
 	if err != nil {
 		return nil, nil, err
 	}
+	// `es_favorito` en las tarjetas de Inicio y Para ti (nv-92).
+	recoSvc.WithFavorites(favRepo)
 
 	// Clima de Open-Meteo (nv-25): sin llave, caché en memoria por instancia, sin Redis.
 	weather := clima.NewServicio(clima.NewOpenMeteo(clima.OpenMeteoURL), log)

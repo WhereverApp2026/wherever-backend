@@ -304,6 +304,8 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	reviewRepo := resenas.NewRepository(client.DB())
 	// Explorar (nv-85): «De amigos», amigos que fueron y mejor cupón.
 	businesses.WithExplore(friendRepo, reviewRepo, couponRepo)
+	// Corazón de las tarjetas (nv-92).
+	businesses.WithFavorites(favRepo)
 	moderadorResenas := resenastest.NuevoModerador()
 	reviews := resenas.NewService(reviewRepo, businessRepo, businesses, users, cursor, log).
 		WithModeracion(moderadorResenas, mods).WithFotos(resenastest.Fotos{P: fotosNegocio}).WithIA(guardia)
@@ -361,6 +363,7 @@ func build(t testing.TB, client *platformmongo.Client, rdb *goredis.Client, cfg 
 	acc.WithConsents(consentRepo, account.Versions{Terms: cfg.VersionApp.Terminos, Notice: cfg.VersionApp.Aviso}).WithRetiroDatosNegocio(expPrivacy).WithModeracion(moderacion.New(nil, nil, mods, log)).WithConciliador(badges)
 	reco, err := recomendaciones.NewService(recoRepo, users, businessRepo, pesos, log)
 	require.NoError(t, err)
+	reco.WithFavorites(favRepo)
 	openMeteo := climatest.Nuevo(t)
 	weather := clima.NewServicio(clima.NewOpenMeteo(openMeteo.URL), log)
 	friends, err := amistades.NewService(friendRepo, users, log)
