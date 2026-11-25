@@ -1,5 +1,6 @@
 // Package mailer envía los correos de la API (spec nv-06): adaptador SMTP genérico, cola en
 // segundo plano con reintentos, plantillas en español y enlaces con el token en el fragmento.
+// La verificación de correo manda un código de 6 dígitos en lugar de enlace (nv-91).
 // El buzón en memoria (pruebas) y el Log (dev y staging sin servidor) cumplen la misma interfaz.
 package mailer
 
@@ -15,8 +16,11 @@ const (
 	KindExport        Kind = "descargar_exportacion" // D-2 (nv-05): enlace de descarga de "mis datos"
 )
 
-// Message es un correo con el token del enlace. El adaptador arma el enlace y el cuerpo;
-// Name es el nombre de pila para el saludo.
+// SendsCode dice si el correo lleva un código para escribir en la app en lugar de enlace.
+func (k Kind) SendsCode() bool { return k == KindVerifyEmail }
+
+// Message es un correo con el token del enlace, o con el código si Kind.SendsCode. El adaptador
+// arma el enlace y el cuerpo; Name es el nombre de pila para el saludo.
 type Message struct {
 	To    string
 	Name  string

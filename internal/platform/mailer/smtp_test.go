@@ -19,7 +19,6 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestRender_ThreeTemplatesInSpanish(t *testing.T) {
 	for kind, want := range map[Kind]string{
-		KindVerifyEmail:   "Confirma tu correo",
 		KindPasswordReset: "contraseña",
 		KindExport:        "copia de tus datos",
 	} {
@@ -30,6 +29,22 @@ func TestRender_ThreeTemplatesInSpanish(t *testing.T) {
 		assert.Contains(t, r.HTML, `href="https://wherever.test/x#token=abc"`)
 		assert.NotEmpty(t, r.Subject)
 	}
+}
+
+// nv-91: la verificación muestra el código y ningún enlace.
+func TestRender_VerifyEmailShowsTheCodeWithoutLink(t *testing.T) {
+	r, err := Render(Message{Kind: KindVerifyEmail, Name: "Ana", Token: "042917"}, "https://wherever.test/x#token=abc")
+	require.NoError(t, err)
+	assert.Equal(t, "Confirma tu correo en Wherever", r.Subject)
+	for _, body := range []string{r.Text, r.HTML} {
+		assert.Contains(t, body, "042917")
+		assert.Contains(t, body, "15 minutos")
+		assert.NotContains(t, body, "#token=")
+		assert.NotContains(t, body, "href")
+	}
+	assert.True(t, KindVerifyEmail.SendsCode())
+	assert.False(t, KindPasswordReset.SendsCode())
+	assert.False(t, KindExport.SendsCode())
 }
 
 func TestRender_WithoutNameAndWithHTMLInTheName(t *testing.T) {
@@ -45,7 +60,7 @@ func TestRender_WithoutNameAndWithHTMLInTheName(t *testing.T) {
 
 func TestLinks_TokenGoesInTheFragment(t *testing.T) {
 	links := NewLinks("https://wherever.test/app/")
-	for kind, path := range map[Kind]string{KindVerifyEmail: "/verificar", KindPasswordReset: "/restablecer", KindExport: "/exportacion"} {
+	for kind, path := range map[Kind]string{KindPasswordReset: "/restablecer", KindExport: "/exportacion"} {
 		u, err := links.URL(kind, "abc-_123")
 		require.NoError(t, err)
 		assert.Equal(t, "https://wherever.test/app"+path+"#token=abc-_123", u)
@@ -53,6 +68,8 @@ func TestLinks_TokenGoesInTheFragment(t *testing.T) {
 	}
 	_, err := links.URL("otro", "x")
 	assert.Error(t, err)
+	_, err = links.URL(KindVerifyEmail, "x")
+	assert.Error(t, err, "la verificación ya no lleva enlace (nv-91)")
 }
 
 func TestBuildMIME_RejectsHeaderInjection(t *testing.T) {

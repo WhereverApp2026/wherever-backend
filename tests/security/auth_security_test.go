@@ -6,17 +6,18 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/config"
 	"github.com/WhereverApp2026/wherever-backend/internal/platform/mailer"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil"
 	"github.com/WhereverApp2026/wherever-backend/internal/testutil/authtest"
+	"github.com/WhereverApp2026/wherever-backend/internal/usuarios"
 )
 
 // Pruebas de seguridad del módulo auth (spec nv-04 "Security/Auth 8").
@@ -128,21 +129,32 @@ func TestAuthSecurity_NoTokensOrPasswordsInLogs(t *testing.T) {
 	}
 }
 
-func TestAuthSecurity_LinkWorksOnlyOnce(t *testing.T) {
+// nv-91: el código exige la sesión de su dueño y una cuenta activa; el de otra persona no sirve.
+func TestAuthSecurity_VerificationCodeNeedsItsOwnActiveSession(t *testing.T) {
+	const attacker = "atacante-codigo@wherever.test"
 	env := authEnv(t)
-	user := env.CreateUser(t, victim)
+	owner := env.CreateUser(t, victim)
+	env.CreateUser(t, attacker)
 	app := env.App()
-	require.NoError(t, env.Service.SendVerification(t.Context(), user))
-	link, ok := env.Mail.Last(victim, mailer.KindVerifyEmail)
+	ownerAccess, _ := tokens(t, login(t, app, victim, authtest.Password))
+	attackerAccess, _ := tokens(t, login(t, app, attacker, authtest.Password))
+	require.NoError(t, env.Service.SendVerification(t.Context(), owner))
+	sent, ok := env.Mail.Last(victim, mailer.KindVerifyEmail)
 	require.True(t, ok)
+	body := map[string]string{"codigo": sent.Token}
 
-	first := send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": link.Token}, "")
-	second := send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": link.Token}, "")
-	forged := send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": strings.Repeat("A", 43)}, "")
+	assert.Equal(t, http.StatusUnauthorized, send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", body, "").status)
+	assert.Equal(t, http.StatusUnauthorized, send(t, app, http.MethodPost, "/api/v1/auth/reenviar-verificacion", nil, "").status)
+	assert.Equal(t, http.StatusBadRequest, send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", body, attackerAccess).status,
+		"el código de otra persona no verifica mi correo")
+	stored, err := env.Users.FindByID(t.Context(), owner.ID)
+	require.NoError(t, err)
+	assert.False(t, stored.EmailVerified)
 
-	assert.Equal(t, http.StatusOK, first.status)
-	assert.Equal(t, http.StatusBadRequest, second.status)
-	assert.Equal(t, http.StatusBadRequest, forged.status)
+	_, err = env.Users.Update(t.Context(), owner.ID, bson.D{{Key: "estado", Value: usuarios.StatusPendingDeletion}})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, send(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", body, ownerAccess).status)
+	assert.Equal(t, http.StatusForbidden, send(t, app, http.MethodPost, "/api/v1/auth/reenviar-verificacion", nil, ownerAccess).status)
 }
 
 func TestAuthSecurity_AuthRoutesHaveSecurityHeaders(t *testing.T) {

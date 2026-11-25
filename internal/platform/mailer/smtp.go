@@ -71,9 +71,12 @@ func (s *SMTP) Send(ctx context.Context, msg Message) error {
 }
 
 func (s *SMTP) send(ctx context.Context, msg Message) error {
-	link, err := s.links.URL(msg.Kind, msg.Token)
-	if err != nil {
-		return err
+	var link string
+	if !msg.Kind.SendsCode() {
+		var err error
+		if link, err = s.links.URL(msg.Kind, msg.Token); err != nil {
+			return err
+		}
 	}
 	rendered, err := Render(msg, link)
 	if err != nil {

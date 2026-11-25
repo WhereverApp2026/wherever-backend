@@ -483,13 +483,13 @@
     },
     "/api/v1/auth/verificar-correo": {
       "post": {
-        "summary": "Confirma el correo con el enlace (24 h, un solo uso)",
+        "summary": "Confirma el correo con el código de 6 dígitos (15 min, un solo uso, 5 intentos)",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TokenEnlaceRequest"
+                "$ref": "#/components/schemas/CodigoVerificacionRequest"
               }
             }
           }
@@ -513,18 +513,32 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
             "$ref": "#/components/responses/Error"
           },
           "429": {
             "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
       }
     },
     "/api/v1/auth/reenviar-verificacion": {
       "post": {
-        "summary": "Reenvía la verificación (máx. 1 cada 60 s)",
+        "summary": "Manda un código nuevo e invalida el anterior (1 cada 60 s y 10 por día)",
         "security": [
           {
             "bearer": []
@@ -535,6 +549,9 @@
             "description": "Aceptado, sin cuerpo"
           },
           "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
             "$ref": "#/components/responses/Error"
           },
           "429": {
@@ -1716,18 +1733,6 @@
           }
         }
       },
-      "TokenEnlaceRequest": {
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "properties": {
-          "token": {
-            "type": "string",
-            "maxLength": 128
-          }
-        }
-      },
       "PasswordRequest": {
         "type": "object",
         "required": [
@@ -2371,6 +2376,18 @@
           },
           "mantenimiento": {
             "type": "boolean"
+          }
+        }
+      },
+      "CodigoVerificacionRequest": {
+        "type": "object",
+        "required": [
+          "codigo"
+        ],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
           }
         }
       }

@@ -38,7 +38,8 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	g.Delete("/sesiones/:id", with(h.revokeSession)...)
 	g.Post("/recuperar", perIP("auth_recuperar"), h.recoverPassword)
 	g.Post("/restablecer", perIP("auth_restablecer"), h.resetPassword)
-	g.Post("/verificar-correo", perIP("auth_verificar"), h.verifyEmail)
-	g.Post("/reenviar-verificacion", with(h.resendVerification)...)
+	// nv-91: el código solo identifica al usuario junto con su sesión; el límite por IP va antes.
+	g.Post("/verificar-correo", append([]fiber.Handler{perIP("auth_verificar")}, with(h.verifyEmail)...)...)
+	g.Post("/reenviar-verificacion", append([]fiber.Handler{perIP("auth_reenviar")}, with(h.resendVerification)...)...)
 	g.Put("/password", with(h.changePassword)...)
 }

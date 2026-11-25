@@ -59,10 +59,14 @@ func TestContract_Auth(t *testing.T) {
 	check(t, "auth/reenviar_verificacion_429", status, body)
 	verify, ok := env.Mail.Last(email, mailer.KindVerifyEmail)
 	require.True(t, ok)
-	status, body = call(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": verify.Token}, "")
-	check(t, "auth/verificar_correo_200", status, body)
-	status, body = call(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"token": verify.Token}, "")
+	wrong := "000000"
+	if verify.Token == wrong {
+		wrong = "111111"
+	}
+	status, body = call(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"codigo": wrong}, access)
 	check(t, "auth/verificar_correo_400", status, body)
+	status, body = call(t, app, http.MethodPost, "/api/v1/auth/verificar-correo", map[string]string{"codigo": verify.Token}, access)
+	check(t, "auth/verificar_correo_200", status, body)
 
 	status, body = call(t, app, http.MethodPut, "/api/v1/auth/password",
 		map[string]string{"password_actual": authtest.Password, "password_nuevo": "NuevaClave9"}, access)
