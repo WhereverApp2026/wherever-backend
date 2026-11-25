@@ -43,16 +43,16 @@ func (f fotosPublicadas) Publicada(ctx context.Context, owner bson.ObjectID, id 
 	return url, err
 }
 
-// buildAlta arma el alta y registra su ARCO. Sin DATA_KEYS el expediente responde 503 (nunca
-// guarda en claro). Las fotos usan las imágenes publicadas de nv-45 (sin IMAGENES_* responden
-// 503); el almacén del bucket privado sigue pendiente: la subida de documentos responde 503.
+// buildAlta arma el alta y registra su ARCO. Sin DATA_KEYS o sin bucket (`privado`) el
+// expediente responde 503 (nunca guarda en claro). Las fotos usan las imágenes publicadas de
+// nv-45 (sin IMAGENES_* responden 503).
 func buildAlta(cfg config.Config, db *mongodriver.Database, repo *negocios.Repository, fichas *negocios.Service, users *usuarios.Repository,
-	cursor *pagination.Signer, images *imagenes.Service, notifier notificaciones.Notifier, registry *privacidad.Registry, res reservasParts, log *slog.Logger) altaParts {
+	cursor *pagination.Signer, images *imagenes.Service, privado expediente.Almacen, notifier notificaciones.Notifier, registry *privacidad.Registry, res reservasParts, log *slog.Logger) altaParts {
 	llavero := fieldCipher(cfg.DataKeys, log)
 	if llavero == nil {
 		log.Warn("sin DATA_KEYS: el expediente de negocios (INE, fiscales, CLABE) responde 503", "evento", "expediente_apagado")
 	}
-	exp := expediente.NewService(expediente.NewRepository(db), llavero, nil, log)
+	exp := expediente.NewService(expediente.NewRepository(db), llavero, privado, log)
 	privacy := expediente.NewPrivacy(exp)
 	registry.RegisterPurger(alta.NewPrivacy(repo, fichas).WithObservadores(res.observadores))
 	registry.RegisterPurger(privacy)

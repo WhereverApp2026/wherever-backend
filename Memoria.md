@@ -901,6 +901,10 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### Expediente del alta conectado al bucket (2026-11-25)
+- Estado: `POST /negocios/{id}/documentos` daba siempre 503 «el expediente no está disponible»: `buildAlta` pasaba el almacén como `nil` (DATA_KEYS sí estaba). Ahora `buildImagenes` entrega su adaptador de S3 y el expediente cifrado va a `privado/negocios/` del bucket de imágenes; sin bucket sigue en 503. El rol de la instancia y el boundary suman `privado/*`; CloudFront solo sirve `i/*`.
+- A evitar: un rol nuevo en `imagenes.tf` sin subir el boundary (`iam/wherever-dev-boundary.json`, se pega a mano en la consola): sin los dos, S3 responde AccessDenied y el expediente da 503.
+
 ### NV-90 — Datos del negocio de la maqueta (2026-11-23)
 - Estado: `negocios` ganó `experiencias` (1–4 de `desayuno`, `comida`, `cena`, `paseo`, `romantico`, `familia`, `amigos`), `anio_apertura`, `whatsapp` (+52 y 10 dígitos, normalizado) y `redes{instagram, sitio_web}`. Se capturan opcionales en `POST /negocios` (experiencias, año) y en el paso 2 (WhatsApp, redes); con el negocio publicado, `PATCH /negocios/{id}` los manda a `cambios_pendientes`. La ficha agrega `experiencias`, `anio_apertura`, `whatsapp_url` (`wa.me`) y `redes`, solo si existen; `GET /lugares` acepta `experiencia=`. 285 rutas (sin rutas nuevas). **Sin índices ni variables nuevas.**
 - Decisión: el número de WhatsApp nunca sale en la ficha, solo el enlace; el dueño y el administrador sí lo ven. `sitio_web` solo `https`, sin usuario en la URL ni acortadores; Instagram y sitio pasan por las palabras bloqueadas (`moderacion.Service.Prohibido`, solo la regla local, 503 si no hay reglas).
