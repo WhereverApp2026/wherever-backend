@@ -901,6 +901,9 @@
 - Decisión: WAF solo en la API (imágenes son GET de archivos); sin registro completo (cuesta por GB), basta métricas y muestras. Límite del WAF arriba del global de la API: una red escolar comparte IP.
 - A evitar: un `#trivy:ignore` debe ir justo encima del recurso (un comentario en medio lo anula). `trivy config` sobre el directorio local lee los `.tfplan` sueltos y no los `.tf`: escanear una copia con solo lo de Git.
 
+### NV-80 — Regla del Sello: se queda la de nv-56 (2026-11-25)
+- Decisión: el revisor mantiene la regla de nv-56 (20 reseñas en 90 días, sin vencimiento, 60 días aprobado, cero rechazos). nv-80 queda Descartada sin código; la maqueta es la que se ajusta.
+
 ### Expediente del alta conectado al bucket (2026-11-25)
 - Estado: `POST /negocios/{id}/documentos` daba siempre 503 «el expediente no está disponible»: `buildAlta` pasaba el almacén como `nil` (DATA_KEYS sí estaba). Ahora `buildImagenes` entrega su adaptador de S3 y el expediente cifrado va a `privado/negocios/` del bucket de imágenes; sin bucket sigue en 503. El rol de la instancia y el boundary suman `privado/*`; CloudFront solo sirve `i/*`.
 - A evitar: un rol nuevo en `imagenes.tf` sin subir el boundary (`iam/wherever-dev-boundary.json`, se pega a mano en la consola): sin los dos, S3 responde AccessDenied y el expediente da 503.

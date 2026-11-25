@@ -39,8 +39,8 @@ La maqueta (`34_Sello`, `51_NegResenas`, `52_NegResp`) dice que el Sello se gana
 - Sin Sello automático ni niveles de Sello; la decisión sigue siendo del administrador.
 
 ## Aprobación y Control de Cambios
-- **Estado:** 🚧 Borrador (2026-11-21), sin ejecutar.
-- **Revisores:** Osmar Reséndiz (pendiente de aprobar)
-- **Fecha:** —
-- **Decisiones para el revisor:** (1) cambiar la regla de nv-56 por la de la maqueta (o, al revés, ajustar la maqueta); (2) ventana de 12 meses para el promedio y las 50 reseñas; (3) vigencia de 6 meses y renovación manual; (4) se conservan los criterios de 60 días aprobado y cero rechazos de moderación.
-- **Detalle:** `specs/nv-80/checklists/gates.md` al ejecutar.
+- **Estado:** ⛔ Descartada (2026-11-25), sin código: se queda la regla vigente de nv-56.
+- **Revisores:** Osmar Reséndiz (decidió el 2026-11-25)
+- **Fecha:** 2026-11-25
+- **Decisión del revisor:** (1) no se cambia la regla: el Sello sigue con los criterios de nv-56 (20 reseñas en 90 días, sin vencimiento); lo que se ajusta es la maqueta. (2) y (3) no aplican: sin ventana de 12 meses ni vigencia de 6 meses. (4) siguen los 60 días aprobado y cero rechazos de moderación de nv-56.
+- **Detalle:** sin ejecución; `checklists/gates.md` no se llena.
