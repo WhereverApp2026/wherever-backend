@@ -80,7 +80,7 @@ var expected = map[string][]string{
 	reservas.Collection:                 {"_id_", "ux_codigo", "ix_mis_reservas", "ix_agenda_negocio", "ix_bloqueos", "ix_recordatorios"},
 	reservas.BloqueosCollection:         {"_id_", "ix_bloqueo_negocio"},
 	reservas.MensajesCollection:         {"_id_", "ix_mensajes_reserva", "ix_mensajes_usuario", "ttl_mensajes_reserva"},
-	pagos.Collection:                    {"_id_", "ux_payment_intent", "ux_idempotency", "ix_pago_reserva", "ix_conciliacion", "ix_pago_usuario", "ttl_conservar_hasta"},
+	pagos.Collection:                    {"_id_", "ux_payment_intent", "ux_idempotency", "ix_pago_reserva", "ix_conciliacion", "ix_pago_usuario", "ix_pago_negocio", "ttl_conservar_hasta"},
 	pagos.LiquidacionesCollection:       {"_id_", "ux_liquidacion", "ix_liquidacion_estado", "ttl_liquidacion_conservar"},
 	errores.Collection:                  {"_id_", "ux_huella", "ix_errores_modulo", "ttl_errores"},
 	cupones.Collection:                  {"_id_", "ix_cupones_cerca", "ix_cupones_negocio", "ix_vencimiento"},

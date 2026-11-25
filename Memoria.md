@@ -1059,3 +1059,10 @@
 - Decisión D-1: fuera `GET /lugares/mapa` (pines, no tarjetas; la ruta más llamada) y `GET /planes/populares` (planes, no lugares, y respuesta pública con `Cache-Control: public`).
 - Decisión: una consulta por respuesta, `favoritos.Repository.MarkedPlaces` con `$in` sobre los ids de la página (prefijo de `ux_favorito`). negocios no importa favoritos (favoritos ya importa negocios): interfaz `negocios.Favorites` + `Marks`, conectada con `WithFavorites` en negocios y recomendaciones (`main.go`, `authtest`).
 - A evitar: un campo nuevo en `PlaceItem` aparecería en búsquedas, recientes, grupos y planes; las tarjetas con corazón son `ExploreItem` y `recomendaciones.Card`.
+
+## NV-93 — Lista de cobros del negocio (2026-11-25)
+- Estado: rama `nv-93-cobros-negocio`. `GET /negocios/{id}/cobros` lista los pagos del negocio (cursor firmado, `desde`/`hasta`/`estado`) con el desglose de `DesgloseDe`, marca y últimos 4 de la tarjeta, semana de liquidación y `totales` del rango. Spec en Borrador con evidencia.
+- Decisión: orden por `creado_en` y `_id` (desempate); el cursor firma el negocio y los filtros. Índice nuevo `ix_pago_negocio` (`negocio_id`, `creado_en` -1, `_id` -1): crearlo en Atlas con `scripts/indexes`, o `/ready` da 503.
+- Decisión: los filtros de fecha van sobre la fecha del cobro (`creado_en`), en días de la Ciudad de México y ambos incluidos; los totales suman solo `aprobado`, `reembolsado_parcial` y `reembolsado`, en todo el rango (una consulta con proyección de montos).
+- Decisión D-1: sin nombre ni id de quien pagó ni ids de Stripe; el panel cruza con la reserva por `reserva_id`.
+- A evitar: en `docs/endpoints.md` no escribas `` `desde`/`hasta` ``: `check_endpoints.sh` toma `` `/` `` como una ruta.

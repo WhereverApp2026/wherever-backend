@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "anticipo": "number",
+        "comision": "number",
+        "estado": "string",
+        "fecha_cobro": "string",
+        "fecha_reserva": "string",
+        "liquidacion_semana": "string",
+        "neto": "number",
+        "pago_id": "string",
+        "reembolsos": "number",
+        "reserva_id": "string",
+        "tarjeta": {
+          "marca": "string",
+          "ultimos4": "string"
+        }
+      }
+    ],
+    "limite": "number",
+    "siguiente_cursor": "string",
+    "totales": {
+      "anticipo": "number",
+      "comision": "number",
+      "neto": "number",
+      "pagos": "number",
+      "reembolsos": "number"
+    }
+  }
+}

@@ -66,6 +66,7 @@ func (h *Handler) Routes(v1 fiber.Router, limiter *middleware.Limiter) {
 	v1.Post("/negocios/:id/cobros/conectar", with(dueno, h.conectar)...)
 	v1.Get("/negocios/:id/saldo", with(dueno, h.saldo)...)
 	v1.Get("/negocios/:id/liquidaciones", with(dueno, h.liquidaciones)...)
+	v1.Get("/negocios/:id/cobros", with(dueno, h.cobros)...)
 }
 
 func claims(c *fiber.Ctx) *middleware.Claims {
@@ -147,6 +148,21 @@ func (h *Handler) liquidaciones(c *fiber.Ctx) error {
 		return err
 	}
 	out, err := h.svc.Liquidaciones(c.UserContext(), claims(c), c.Params("id"), q)
+	if err != nil {
+		return err
+	}
+	return send(c, out)
+}
+
+func (h *Handler) cobros(c *fiber.Ctx) error {
+	q := NewCobrosQuery()
+	if err := c.QueryParser(&q); err != nil {
+		return apperr.BadRequest("parámetros inválidos")
+	}
+	if err := h.validator.Struct(q); err != nil {
+		return err
+	}
+	out, err := h.svc.Cobros(c.UserContext(), claims(c), c.Params("id"), q)
 	if err != nil {
 		return err
 	}
