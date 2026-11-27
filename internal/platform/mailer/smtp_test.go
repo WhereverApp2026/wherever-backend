@@ -19,8 +19,7 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestRender_ThreeTemplatesInSpanish(t *testing.T) {
 	for kind, want := range map[Kind]string{
-		KindPasswordReset: "contraseña",
-		KindExport:        "copia de tus datos",
+		KindExport: "copia de tus datos",
 	} {
 		r, err := Render(Message{Kind: kind, Name: "Ana"}, "https://wherever.test/x#token=abc")
 		require.NoError(t, err, kind)
@@ -43,8 +42,22 @@ func TestRender_VerifyEmailShowsTheCodeWithoutLink(t *testing.T) {
 		assert.NotContains(t, body, "href")
 	}
 	assert.True(t, KindVerifyEmail.SendsCode())
-	assert.False(t, KindPasswordReset.SendsCode())
+	assert.True(t, KindPasswordReset.SendsCode())
 	assert.False(t, KindExport.SendsCode())
+}
+
+// nv-94: restablecer la contraseña también manda un código y ningún enlace.
+func TestRender_PasswordResetShowsTheCodeWithoutLink(t *testing.T) {
+	r, err := Render(Message{Kind: KindPasswordReset, Name: "Ana", Token: "305118"}, "https://wherever.test/x#token=abc")
+	require.NoError(t, err)
+	assert.Equal(t, "Cambia tu contraseña de Wherever", r.Subject)
+	for _, body := range []string{r.Text, r.HTML} {
+		assert.Contains(t, body, "305118")
+		assert.Contains(t, body, "15 minutos")
+		assert.Contains(t, body, "contraseña")
+		assert.NotContains(t, body, "#token=")
+		assert.NotContains(t, body, "href")
+	}
 }
 
 func TestRender_WithoutNameAndWithHTMLInTheName(t *testing.T) {
@@ -60,7 +73,7 @@ func TestRender_WithoutNameAndWithHTMLInTheName(t *testing.T) {
 
 func TestLinks_TokenGoesInTheFragment(t *testing.T) {
 	links := NewLinks("https://wherever.test/app/")
-	for kind, path := range map[Kind]string{KindPasswordReset: "/restablecer", KindExport: "/exportacion"} {
+	for kind, path := range map[Kind]string{KindExport: "/exportacion"} {
 		u, err := links.URL(kind, "abc-_123")
 		require.NoError(t, err)
 		assert.Equal(t, "https://wherever.test/app"+path+"#token=abc-_123", u)

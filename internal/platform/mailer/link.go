@@ -8,8 +8,7 @@ import (
 
 // Rutas de las páginas que abren los enlaces (spec nv-06 §Contratos).
 var linkPaths = map[Kind]string{ // #nosec G101 -- rutas de páginas, no credenciales
-	KindPasswordReset: "/restablecer",
-	KindExport:        "/exportacion",
+	KindExport: "/exportacion",
 }
 
 var errUnknownKind = errors.New("tipo de correo desconocido")

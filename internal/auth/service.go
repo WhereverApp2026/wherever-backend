@@ -23,7 +23,6 @@ import (
 const (
 	MaxLoginFailures = 5
 	LockoutWindow    = 15 * time.Minute
-	PasswordResetTTL = time.Hour
 	ExportLinkTTL    = 24 * time.Hour
 	ResendCooldown   = 60 * time.Second
 
@@ -312,8 +311,9 @@ func (s *Service) RevokeSession(ctx context.Context, claims *middleware.Claims, 
 	return s.revokeAccess(ctx, now, revoked)
 }
 
-// RequestPasswordReset manda el enlace (1 h). Responde igual exista o no el correo y no
-// reenvía antes de 60 s; por eso nunca devuelve un error que distinga los casos.
+// RequestPasswordReset manda un código de 6 dígitos (nv-94). Responde igual exista o no el
+// correo, no reenvía antes de 60 s ni más de 5 códigos en 24 h; por eso nunca devuelve un
+// error que distinga los casos.
 func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
 	user, err := s.users.FindByEmail(ctx, email)
 	if errors.Is(err, usuarios.ErrNotFound) {
@@ -325,33 +325,34 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 	if !user.CanSignIn() {
 		return nil
 	}
-	if wait, err := s.cooldown(ctx, user.ID, mailer.KindPasswordReset); err != nil || wait > 0 {
+	if wait, err := s.codeWait(ctx, user.ID, mailer.KindPasswordReset); err != nil || wait > 0 {
 		return err
 	}
-	return s.sendLink(ctx, user, mailer.KindPasswordReset, PasswordResetTTL)
+	return s.sendCode(ctx, user, mailer.KindPasswordReset)
 }
 
 // ResetInput son los datos de POST /auth/restablecer ya validados.
 type ResetInput struct {
-	Token       string
+	Email       string
+	Code        string
 	NewPassword string
 	Device      Device
 	IP          string
 }
 
-// ResetPassword usa el enlace una sola vez, cambia la contraseña, cierra las demás sesiones
-// y deja una sesión nueva abierta.
+// ResetPassword usa el código una sola vez, cambia la contraseña, cierra las demás sesiones
+// y deja una sesión nueva abierta. Un correo que no existe o no puede entrar da el mismo 400
+// que un código incorrecto, para no revelar qué correos tienen cuenta.
 func (s *Service) ResetPassword(ctx context.Context, in ResetInput) (TokenResponse, error) {
 	now := time.Now().UTC()
-	link, err := s.repo.ConsumeToken(ctx, HashOpaque(in.Token), string(mailer.KindPasswordReset), now)
-	if errors.Is(err, errNoDocument) {
-		return TokenResponse{}, apperr.BadRequest("el enlace venció o ya se usó")
+	user, err := s.users.FindByEmail(ctx, in.Email)
+	if errors.Is(err, usuarios.ErrNotFound) || (err == nil && !user.CanSignIn()) {
+		return TokenResponse{}, apperr.BadRequest(invalidCodeMessage)
 	}
 	if err != nil {
 		return TokenResponse{}, dbError(err)
 	}
-	user, err := s.activeUser(ctx, link.UserID)
-	if err != nil {
+	if err := s.checkCode(ctx, user.ID, mailer.KindPasswordReset, in.Code, now); err != nil {
 		return TokenResponse{}, err
 	}
 	if err := s.setPassword(ctx, user.ID, in.NewPassword); err != nil {
@@ -388,8 +389,19 @@ func (s *Service) VerifyEmail(ctx context.Context, claims *middleware.Claims, co
 	if user.EmailVerified {
 		return nil
 	}
-	now := time.Now().UTC()
-	pending, err := s.repo.SpendCodeAttempt(ctx, user.ID, string(mailer.KindVerifyEmail), now)
+	if err := s.checkCode(ctx, user.ID, mailer.KindVerifyEmail, code, time.Now().UTC()); err != nil {
+		return err
+	}
+	if err := s.users.MarkEmailVerified(ctx, user.ID); err != nil {
+		return dbError(err)
+	}
+	return nil
+}
+
+// checkCode gasta un intento del código vigente de ese tipo y, si coincide, lo marca como
+// usado. Cada intento se cuenta antes de comparar; del sexto en adelante queda bloqueado (423).
+func (s *Service) checkCode(ctx context.Context, userID bson.ObjectID, kind mailer.Kind, code string, now time.Time) error {
+	pending, err := s.repo.SpendCodeAttempt(ctx, userID, string(kind), now)
 	if errors.Is(err, errNoDocument) {
 		return apperr.BadRequest(invalidCodeMessage)
 	}
@@ -402,10 +414,11 @@ func (s *Service) VerifyEmail(ctx context.Context, claims *middleware.Claims, co
 	if !s.codes.Matches(pending.ID, code, pending.TokenHash) {
 		return apperr.BadRequest(invalidCodeMessage)
 	}
-	if err := s.repo.UseToken(ctx, pending.ID, now); err != nil {
-		return dbError(err)
+	err = s.repo.UseToken(ctx, pending.ID, now)
+	if errors.Is(err, errNoDocument) {
+		return apperr.BadRequest(invalidCodeMessage)
 	}
-	if err := s.users.MarkEmailVerified(ctx, user.ID); err != nil {
+	if err != nil {
 		return dbError(err)
 	}
 	return nil
@@ -424,31 +437,36 @@ func (s *Service) ResendVerification(ctx context.Context, claims *middleware.Cla
 	if user.EmailVerified {
 		return nil
 	}
-	wait, err := s.cooldown(ctx, user.ID, mailer.KindVerifyEmail)
+	wait, err := s.codeWait(ctx, user.ID, mailer.KindVerifyEmail)
 	if err != nil {
 		return err
-	}
-	if wait == 0 {
-		wait, err = s.dailyCodeWait(ctx, user.ID)
-		if err != nil {
-			return err
-		}
 	}
 	if wait > 0 {
 		return apperr.RateLimited(int(math.Ceil(wait.Seconds())))
 	}
-	return s.sendCode(ctx, user)
+	return s.sendCode(ctx, user, mailer.KindVerifyEmail)
 }
 
 // SendVerification manda el código de verificación. Lo usan el registro y el cambio de correo
 // (nv-05); no cuentan contra el tope diario del reenvío.
 func (s *Service) SendVerification(ctx context.Context, user usuarios.User) error {
-	return s.sendCode(ctx, user)
+	return s.sendCode(ctx, user, mailer.KindVerifyEmail)
 }
 
-// dailyCodeWait dice cuánto falta para pedir otro código si ya hubo 10 en 24 h.
-func (s *Service) dailyCodeWait(ctx context.Context, userID bson.ObjectID) (time.Duration, error) {
-	oldest, ok, err := s.repo.TokenAtRank(ctx, userID, string(mailer.KindVerifyEmail), MaxCodesPerDay-1)
+// codeWait dice cuánto falta para mandar otro código de ese tipo: 60 s entre códigos y como
+// máximo 10 en 24 h (0 = ya se puede).
+func (s *Service) codeWait(ctx context.Context, userID bson.ObjectID, kind mailer.Kind) (time.Duration, error) {
+	wait, err := s.cooldown(ctx, userID, kind)
+	if err != nil || wait > 0 {
+		return wait, err
+	}
+	return s.dailyCodeWait(ctx, userID, kind)
+}
+
+// dailyCodeWait dice cuánto falta para pedir otro código si ya se llegó al tope de 24 h
+// (10 de verificación, 5 de restablecer).
+func (s *Service) dailyCodeWait(ctx context.Context, userID bson.ObjectID, kind mailer.Kind) (time.Duration, error) {
+	oldest, ok, err := s.repo.TokenAtRank(ctx, userID, string(kind), codesPerDay(string(kind))-1)
 	if err != nil {
 		return 0, dbError(err)
 	}
@@ -459,10 +477,9 @@ func (s *Service) dailyCodeWait(ctx context.Context, userID bson.ObjectID) (time
 }
 
 // sendCode deja sin efecto los códigos anteriores, guarda el HMAC del nuevo y lo encola. Como
-// en sendLink, un fallo del correo solo se registra (nv-06).
-func (s *Service) sendCode(ctx context.Context, user usuarios.User) error {
+// en los enlaces, un fallo del correo solo se registra (nv-06).
+func (s *Service) sendCode(ctx context.Context, user usuarios.User, kind mailer.Kind) error {
 	now := time.Now().UTC()
-	kind := mailer.KindVerifyEmail
 	if err := s.repo.InvalidateTokens(ctx, user.ID, string(kind), now); err != nil {
 		return dbError(err)
 	}
@@ -586,19 +603,6 @@ func (s *Service) cooldown(ctx context.Context, userID bson.ObjectID, kind maile
 		return 0, nil
 	}
 	return max(0, ResendCooldown-time.Since(last)), nil
-}
-
-// sendLink guarda el hash del enlace y lo encola. Un fallo del correo no cambia la
-// respuesta (nv-06): con la cola nunca hay error; si el mailer devuelve uno, solo se registra.
-func (s *Service) sendLink(ctx context.Context, user usuarios.User, kind mailer.Kind, ttl time.Duration) error {
-	raw, err := s.issueLink(ctx, user, kind, ttl)
-	if err != nil {
-		return err
-	}
-	if err := s.mail.Send(ctx, mailer.Message{To: user.Email, Name: user.Name, Kind: kind, Token: raw}); err != nil {
-		s.log.WarnContext(ctx, "no se pudo encolar el correo", "tipo", string(kind))
-	}
-	return nil
 }
 
 // issueLink crea el token de un solo uso y guarda solo su hash; devuelve el token en claro.

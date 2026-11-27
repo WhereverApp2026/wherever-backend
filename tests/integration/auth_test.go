@@ -109,19 +109,51 @@ func TestAuth_RecoverThenReset(t *testing.T) {
 	assert.Equal(t, http.StatusAccepted, sendJSON(t, app, http.MethodPost, "/api/v1/auth/recuperar", map[string]string{"correo": ana}, "").StatusCode)
 	msg, ok := env.Mail.Last(ana, mailer.KindPasswordReset)
 	require.True(t, ok)
+	require.Len(t, msg.Token, auth.CodeLength, "nv-94: el correo trae un código de 6 dígitos")
+	body := func(email, code, password string) map[string]any {
+		return map[string]any{"correo": email, "codigo": code, "password_nuevo": password}
+	}
 
-	weak := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", map[string]any{"token": msg.Token, "password_nuevo": "corta"}, "")
-	assert.Equal(t, http.StatusUnprocessableEntity, weak.StatusCode, "la política se valida antes de gastar el enlace")
-	reset := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer",
-		map[string]any{"token": msg.Token, "password_nuevo": "NuevaClave9", "dispositivo": deviceJSON}, "")
+	weak := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", body(ana, msg.Token, "corta"), "")
+	assert.Equal(t, http.StatusUnprocessableEntity, weak.StatusCode, "la política se valida antes de gastar un intento")
+	wrong := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", body(ana, otherCode(msg.Token), "NuevaClave9"), "")
+	unknown := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", body("nadie@correo.com", msg.Token, "NuevaClave9"), "")
+	assert.Equal(t, http.StatusBadRequest, wrong.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, unknown.StatusCode, "un correo sin cuenta responde igual que un código incorrecto")
+
+	withDevice := body(ana, msg.Token, "NuevaClave9")
+	withDevice["dispositivo"] = deviceJSON
+	reset := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", withDevice, "")
 	resetBody := readAll(t, reset)
 	require.Equal(t, http.StatusOK, reset.StatusCode, resetBody)
 	assert.Contains(t, resetBody, `"access_token"`)
 
 	assert.Equal(t, http.StatusUnauthorized, sendJSON(t, app, http.MethodGet, "/api/v1/auth/sesiones", nil, oldAccess).StatusCode)
 	assert.Equal(t, http.StatusBadRequest,
-		sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", map[string]any{"token": msg.Token, "password_nuevo": "OtraClave99"}, "").StatusCode)
+		sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", body(ana, msg.Token, "OtraClave99"), "").StatusCode, "el código es de un solo uso")
 	assert.Equal(t, http.StatusOK, sendJSON(t, app, http.MethodPost, "/api/v1/auth/login", loginBody(ana, "NuevaClave9"), "").StatusCode)
+}
+
+// nv-94: del sexto intento en adelante el código de restablecer queda bloqueado (423), aunque
+// después llegue el correcto.
+func TestAuth_ResetCodeLocksAfterFiveAttempts(t *testing.T) {
+	env := authEnv(t)
+	env.CreateUser(t, ana)
+	app := env.App()
+	require.NoError(t, env.Service.RequestPasswordReset(context.Background(), ana))
+	msg, ok := env.Mail.Last(ana, mailer.KindPasswordReset)
+	require.True(t, ok)
+	try := func(code string) int {
+		return sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer",
+			map[string]any{"correo": ana, "codigo": code, "password_nuevo": "NuevaClave9"}, "").StatusCode
+	}
+
+	for range auth.MaxCodeAttempts {
+		assert.Equal(t, http.StatusBadRequest, try(otherCode(msg.Token)))
+	}
+	assert.Equal(t, http.StatusLocked, try(msg.Token))
+	assert.Equal(t, http.StatusUnauthorized, sendJSON(t, app, http.MethodPost, "/api/v1/auth/login", loginBody(ana, "NuevaClave9"), "").StatusCode,
+		"la contraseña no cambió")
 }
 
 func TestAuth_VerifyEmail(t *testing.T) {

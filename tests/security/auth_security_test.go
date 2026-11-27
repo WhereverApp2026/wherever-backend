@@ -114,15 +114,15 @@ func TestAuthSecurity_NoTokensOrPasswordsInLogs(t *testing.T) {
 	_, rotated := tokens(t, send(t, app, http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": refresh}, ""))
 	send(t, app, http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": refresh}, "") // reutilización
 	send(t, app, http.MethodPost, "/api/v1/auth/recuperar", map[string]string{"correo": victim}, "")
-	link, ok := env.Mail.Last(victim, mailer.KindPasswordReset)
+	reset, ok := env.Mail.Last(victim, mailer.KindPasswordReset)
 	require.True(t, ok)
-	send(t, app, http.MethodPost, "/api/v1/auth/restablecer", map[string]any{"token": link.Token, "password_nuevo": "NuevaClave9"}, "")
+	send(t, app, http.MethodPost, "/api/v1/auth/restablecer", map[string]any{"correo": victim, "codigo": reset.Token, "password_nuevo": "NuevaClave9"}, "")
 	send(t, app, http.MethodPost, "/api/v1/auth/logout", nil, access)
 
 	logs := env.Logs.String()
 	require.NotEmpty(t, logs)
 	for name, secret := range map[string]string{
-		"access": access, "refresh": refresh, "refresh rotado": rotated, "enlace": link.Token,
+		"access": access, "refresh": refresh, "refresh rotado": rotated, "código": reset.Token,
 		"contraseña": authtest.Password, "contraseña mala": "Incorrecta1", "contraseña nueva": "NuevaClave9",
 	} {
 		assert.NotContains(t, logs, secret, name)

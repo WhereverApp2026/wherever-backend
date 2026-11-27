@@ -36,3 +36,9 @@ func TestCodeHasher_NeverStoresTheCode(t *testing.T) {
 	assert.False(t, other.Matches(id, "123456", hash), "sin la llave no se puede comprobar")
 	assert.NotEqual(t, HashOpaque("123456"), hash, "no es un SHA-256 simple")
 }
+
+// nv-94: restablecer tiene un tope diario más bajo que la verificación.
+func TestCodesPerDay(t *testing.T) {
+	assert.Equal(t, int64(MaxResetCodesPerDay), codesPerDay("recuperar_password"))
+	assert.Equal(t, int64(MaxCodesPerDay), codesPerDay("verificar_correo"))
+}

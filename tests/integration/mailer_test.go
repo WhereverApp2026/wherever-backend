@@ -125,8 +125,9 @@ func TestMailer_RecoverForExistingEmail(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, sendJSON(t, app, http.MethodPost, "/api/v1/auth/recuperar", map[string]string{"correo": ana}, "").StatusCode)
 
 	msg := waitMail(t, ana, 1)[0]
-	assert.Contains(t, msg.Text, linkBase+"/restablecer#token=")
-	reset := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer", map[string]any{"token": linkToken(t, msg), "password_nuevo": "NuevaClave9"}, "")
+	assert.NotContains(t, msg.Text, linkBase, "nv-94: restablecer manda un código, no un enlace")
+	reset := sendJSON(t, app, http.MethodPost, "/api/v1/auth/restablecer",
+		map[string]any{"correo": ana, "codigo": mailCode(t, msg), "password_nuevo": "NuevaClave9"}, "")
 	assert.Equal(t, http.StatusOK, reset.StatusCode)
 }
 

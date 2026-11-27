@@ -418,7 +418,7 @@
     },
     "/api/v1/auth/recuperar": {
       "post": {
-        "summary": "Manda el enlace de recuperación (1 h); siempre 202",
+        "summary": "Manda un código de 6 dígitos (15 min) para restablecer la contraseña; siempre 202",
         "requestBody": {
           "required": true,
           "content": {
@@ -447,7 +447,7 @@
     },
     "/api/v1/auth/restablecer": {
       "post": {
-        "summary": "Cambia la contraseña con el enlace (un solo uso) y abre sesión",
+        "summary": "Cambia la contraseña con el correo y el código (un solo uso, 5 intentos) y abre sesión",
         "requestBody": {
           "required": true,
           "content": {
@@ -470,6 +470,9 @@
             }
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
             "$ref": "#/components/responses/Error"
           },
           "422": {
@@ -1714,13 +1717,19 @@
       "RestablecerRequest": {
         "type": "object",
         "required": [
-          "token",
+          "correo",
+          "codigo",
           "password_nuevo"
         ],
         "properties": {
-          "token": {
+          "correo": {
             "type": "string",
-            "maxLength": 128
+            "format": "email",
+            "maxLength": 254
+          },
+          "codigo": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
           },
           "password_nuevo": {
             "type": "string",

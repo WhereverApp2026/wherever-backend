@@ -77,7 +77,7 @@ func TestContract_Auth(t *testing.T) {
 	reset, ok := env.Mail.Last(email, mailer.KindPasswordReset)
 	require.True(t, ok)
 	status, body = call(t, app, http.MethodPost, "/api/v1/auth/restablecer",
-		map[string]any{"token": reset.Token, "password_nuevo": "OtraClave99", "dispositivo": device}, "")
+		map[string]any{"correo": email, "codigo": reset.Token, "password_nuevo": "OtraClave99", "dispositivo": device}, "")
 	check(t, "auth/restablecer_200", status, body)
 	access = str(t, obj(t, body)["access_token"])
 
