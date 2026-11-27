@@ -52,12 +52,12 @@ func FuzzLinkToken(f *testing.F) {
 	}
 	links := NewLinks("https://app.wherever.test")
 	f.Fuzz(func(t *testing.T, token string) {
-		raw, err := links.URL(KindPasswordReset, token)
+		raw, err := links.URL(KindExport, token)
 		require.NoError(t, err)
 		u, err := url.Parse(raw)
 		require.NoError(t, err)
 		assert.Equal(t, "app.wherever.test", u.Host)
-		assert.Equal(t, "/restablecer", u.Path)
+		assert.Equal(t, "/exportacion", u.Path)
 		assert.Empty(t, u.RawQuery, "el token nunca va en la consulta")
 		_, value, found := strings.Cut(raw, "#token=")
 		require.True(t, found)

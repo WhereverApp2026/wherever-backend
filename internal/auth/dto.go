@@ -42,10 +42,12 @@ type RecoverRequest struct {
 	Email string `json:"correo" validate:"required,email,max=254"`
 }
 
-// ResetRequest es el cuerpo de POST /auth/restablecer. `dispositivo` es opcional: la
-// sesión que se abre al restablecer lo registra si llega.
+// ResetRequest es el cuerpo de POST /auth/restablecer: el correo y el código de 6 dígitos que
+// llegó a ese correo (nv-94). `dispositivo` es opcional: la sesión que se abre al restablecer
+// lo registra si llega.
 type ResetRequest struct {
-	Token       string       `json:"token" validate:"required,max=128"`
+	Email       string       `json:"correo" validate:"required,email,max=254"`
+	Code        string       `json:"codigo" validate:"required,len=6,number"`
 	NewPassword string       `json:"password_nuevo" validate:"required,password"`
 	Device      *DeviceInput `json:"dispositivo" validate:"omitempty"`
 }

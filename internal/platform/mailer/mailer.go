@@ -17,7 +17,7 @@ const (
 )
 
 // SendsCode dice si el correo lleva un código para escribir en la app en lugar de enlace.
-func (k Kind) SendsCode() bool { return k == KindVerifyEmail }
+func (k Kind) SendsCode() bool { return k == KindVerifyEmail || k == KindPasswordReset }
 
 // Message es un correo con el token del enlace, o con el código si Kind.SendsCode. El adaptador
 // arma el enlace y el cuerpo; Name es el nombre de pila para el saludo.

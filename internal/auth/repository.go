@@ -275,10 +275,16 @@ func (r *Repository) SpendCodeAttempt(ctx context.Context, userID bson.ObjectID,
 
 // UseToken marca como usado el token con ese id si nadie lo usó antes.
 func (r *Repository) UseToken(ctx context.Context, id bson.ObjectID, now time.Time) error {
-	_, err := r.tokens.UpdateOne(ctx,
+	res, err := r.tokens.UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: id}, {Key: "usado_en", Value: nil}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "usado_en", Value: now}}}})
-	return err
+	if err != nil {
+		return err
+	}
+	if res.ModifiedCount == 0 {
+		return errNoDocument // otra petición lo usó primero
+	}
+	return nil
 }
 
 // InvalidateTokens deja sin efecto los enlaces sin usar de ese tipo (los marca como usados).

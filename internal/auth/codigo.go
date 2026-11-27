@@ -12,13 +12,24 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// Código de verificación de correo (nv-91).
+// Código de verificación de correo (nv-91) y de restablecer la contraseña (nv-94).
 const (
 	CodeLength      = 6
 	CodeTTL         = 15 * time.Minute
 	MaxCodeAttempts = 5
 	MaxCodesPerDay  = 10
+	// MaxResetCodesPerDay es más bajo porque restablecer es pública y adivinar el código da la
+	// cuenta completa (nv-94): 5 códigos × 5 intentos = 25 intentos al día por cuenta.
+	MaxResetCodesPerDay = 5
 )
+
+// codesPerDay es el tope de códigos en 24 h de cada tipo.
+func codesPerDay(kind string) int64 {
+	if kind == "recuperar_password" {
+		return MaxResetCodesPerDay
+	}
+	return MaxCodesPerDay
+}
 
 // codeKeyLabel separa la llave del código de la firma de los JWT aunque las dos salgan de
 // JWT_SECRET: el HMAC con otra etiqueta da una llave distinta.

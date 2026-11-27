@@ -1049,7 +1049,7 @@
 - Decisión: `POST /auth/verificar-correo` `{codigo}` exige JWT (el registro ya devuelve tokens); el código solo identifica al usuario junto con su sesión. Ya verificado = 200 sin revisar el código.
 - Decisión: código con `crypto/rand`, 15 min, guardado en `tokens_un_uso` como HMAC-SHA256 de `id del documento + código` con una llave derivada de `JWT_SECRET` (etiqueta `wherever/codigo-correo/v1`). Porqué: un SHA-256 simple de 10⁶ valores se invierte al instante; el id evita choques en `ux_token_hash`. Sin variables ni índices nuevos.
 - Decisión: cada intento suma `intentos` con `FindOneAndUpdate` **antes** de comparar; del 6.º en adelante = 423 aunque el código sea correcto. Reenvío: llave propia `rate:auth_reenviar:{ip}` (10/min), 60 s y 10 códigos por 24 h por usuario (`TokenAtRank` sobre `ix_usuario_tipo`). Pedir otro invalida el anterior.
-- Decisión D-1: restablecer la contraseña sigue con enlace. Porqué: es pública y abre sesión; un código de 6 dígitos sin sesión daría la cuenta completa al adivinarlo.
+- Decisión D-1: restablecer la contraseña sigue con enlace. Porqué: es pública y abre sesión; un código de 6 dígitos sin sesión daría la cuenta completa al adivinarlo. **Revisada en nv-94**: pasa a código con tope más bajo.
 - A evitar: un código de 6 dígitos puede aparecer por azar en un log (ids, duraciones): no lo uses como cadena en `NotContains` sobre logs.
 - Pendiente: la app móvil cambia «Revisa tu correo» por el campo de 6 dígitos y «Reenviar código». Los enlaces de verificación ya enviados dejan de servir al desplegar.
 
@@ -1066,3 +1066,11 @@
 - Decisión: los filtros de fecha van sobre la fecha del cobro (`creado_en`), en días de la Ciudad de México y ambos incluidos; los totales suman solo `aprobado`, `reembolsado_parcial` y `reembolsado`, en todo el rango (una consulta con proyección de montos).
 - Decisión D-1: sin nombre ni id de quien pagó ni ids de Stripe; el panel cruza con la reserva por `reserva_id`.
 - A evitar: en `docs/endpoints.md` no escribas `` `desde`/`hasta` ``: `check_endpoints.sh` toma `` `/` `` como una ruta.
+
+## NV-94 — Restablecer la contraseña con código (2026-11-26)
+- Estado: rama `nv-94-codigo-restablecer`. `POST /auth/recuperar` manda un código de 6 dígitos (15 min) en lugar del enlace `/restablecer#token=`, que abierto en la computadora caía en el servidor. `POST /auth/restablecer` pide `{correo, codigo, password_nuevo}`. Spec en Borrador con evidencia.
+- Decisión: reusa el código de nv-91 (`checkCode`, `sendCode`, `codeWait` por tipo): HMAC con el id del documento, intentos atómicos antes de comparar, 6.º intento = 423, pedir otro invalida el anterior. Sin rutas, índices ni variables nuevas.
+- Decisión D-1 (revisa la de nv-91): tope de 5 códigos en 24 h para restablecer (10 en verificación) = 25 intentos diarios por cuenta sobre 10⁶. Porqué: la ruta es pública y abre sesión. Un correo sin cuenta o que no puede entrar da el mismo 400 que un código incorrecto.
+- Decisión: `UseToken` ahora falla si otra petición marcó el código primero (`ModifiedCount == 0` → 400): dos restablecer simultáneos con el código correcto no cambian la contraseña dos veces.
+- Pendiente: la app cambia la pantalla de «Nueva contraseña» desde el enlace por correo + código + contraseña nueva. Los enlaces de restablecer ya enviados dejan de servir al desplegar.
+

@@ -23,7 +23,7 @@ import (
 
 // Pruebas de seguridad del correo (spec nv-06 "Security/Mailer 4").
 
-var linkToken = regexp.MustCompile(`#token=([A-Za-z0-9_\-]+)`)
+var resetCode = regexp.MustCompile(`(?m)^[0-9]{6}\s*$`)
 
 func smtpMailer(host string, port int, user string, log *slog.Logger) *mailer.SMTP {
 	return mailer.NewSMTP(mailer.SMTPConfig{
@@ -67,10 +67,11 @@ func TestMailerSecurity_NoTokenLinkOrBodyInLogs(t *testing.T) {
 			assert.NotContains(t, logs, "/restablecer")
 			assert.NotContains(t, logs, "Pediste cambiar tu contraseña", "nunca el cuerpo")
 			assert.NotContains(t, logs, victim, "el destinatario va enmascarado")
+			// nv-94: el correo trae un código de 6 dígitos y ningún enlace. El código no se busca
+			// en los logs: 6 dígitos pueden salir por azar en ids o duraciones (Memoria, NV-91).
 			if msgs, err := mailpit.Messages(context.Background(), victim); err == nil && len(msgs) > 0 {
-				m := linkToken.FindStringSubmatch(msgs[0].Text)
-				require.Len(t, m, 2)
-				assert.NotContains(t, logs, m[1])
+				assert.NotContains(t, msgs[0].Text, "#token=")
+				assert.Regexp(t, resetCode, msgs[0].Text)
 			}
 		})
 	}

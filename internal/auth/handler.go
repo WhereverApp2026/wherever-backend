@@ -146,7 +146,7 @@ func (h *Handler) resetPassword(c *fiber.Ctx) error {
 	if err := h.bind(c, &req); err != nil {
 		return err
 	}
-	in := ResetInput{Token: req.Token, NewPassword: req.NewPassword, IP: middleware.ClientIP(c)}
+	in := ResetInput{Email: req.Email, Code: req.Code, NewPassword: req.NewPassword, IP: middleware.ClientIP(c)}
 	if req.Device != nil {
 		in.Device = req.Device.toDevice()
 	}

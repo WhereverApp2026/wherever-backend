@@ -23,3 +23,23 @@ func TestVerifyEmailRequest_Codigo(t *testing.T) {
 		assert.Equal(t, apperr.KindValidation, appErr.Kind, bad)
 	}
 }
+
+// nv-94: restablecer pide correo, código de 6 dígitos y contraseña nueva; sin alguno es 422.
+func TestResetRequest_CorreoYCodigo(t *testing.T) {
+	v, err := validation.New()
+	require.NoError(t, err)
+	ok := ResetRequest{Email: "ana@correo.com", Code: "042917", NewPassword: "NuevaClave9"}
+	require.NoError(t, v.Struct(ok))
+	for name, bad := range map[string]ResetRequest{
+		"sin correo":       {Code: "042917", NewPassword: "NuevaClave9"},
+		"correo inválido":  {Email: "ana", Code: "042917", NewPassword: "NuevaClave9"},
+		"sin código":       {Email: "ana@correo.com", NewPassword: "NuevaClave9"},
+		"código corto":     {Email: "ana@correo.com", Code: "04291", NewPassword: "NuevaClave9"},
+		"código con letra": {Email: "ana@correo.com", Code: "04291a", NewPassword: "NuevaClave9"},
+		"contraseña débil": {Email: "ana@correo.com", Code: "042917", NewPassword: "corta"},
+	} {
+		var appErr *apperr.Error
+		require.ErrorAs(t, v.Struct(bad), &appErr, name)
+		assert.Equal(t, apperr.KindValidation, appErr.Kind, name)
+	}
+}

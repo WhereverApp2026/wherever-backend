@@ -245,7 +245,7 @@ func otherCode(code string) string {
 	return "000000"
 }
 
-func TestAuthService_ExpiredLinkIs400(t *testing.T) {
+func TestAuthService_ExpiredResetCodeIs400(t *testing.T) {
 	env := authEnv(t)
 	user := env.CreateUser(t, ana)
 	require.NoError(t, env.Service.RequestPasswordReset(context.Background(), ana))
@@ -253,9 +253,25 @@ func TestAuthService_ExpiredLinkIs400(t *testing.T) {
 	require.True(t, ok)
 	env.ExpireLinks(t, user.ID)
 
-	_, err := env.Service.ResetPassword(context.Background(), auth.ResetInput{Token: msg.Token, NewPassword: "NuevaClave9"})
+	_, err := env.Service.ResetPassword(context.Background(), auth.ResetInput{Email: ana, Code: msg.Token, NewPassword: "NuevaClave9"})
 
 	assert.Equal(t, apperr.KindBadRequest, kindOf(t, err))
+}
+
+// nv-94: restablecer manda como máximo 5 códigos en 24 h; el sexto pedido responde igual
+// (sin error) pero no manda correo.
+func TestAuthService_ResetCodesPerDay(t *testing.T) {
+	env := authEnv(t)
+	user := env.CreateUser(t, ana)
+	for range auth.MaxResetCodesPerDay {
+		require.NoError(t, env.Service.RequestPasswordReset(context.Background(), ana))
+		env.AgeLinks(t, user.ID)
+	}
+	require.Len(t, env.Mail.Sent(), auth.MaxResetCodesPerDay)
+
+	require.NoError(t, env.Service.RequestPasswordReset(context.Background(), ana))
+
+	assert.Len(t, env.Mail.Sent(), auth.MaxResetCodesPerDay, "el sexto del día no sale")
 }
 
 func TestAuthService_ResendBefore60sIs429(t *testing.T) {
